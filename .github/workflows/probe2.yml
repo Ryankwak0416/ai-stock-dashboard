@@ -1,0 +1,42 @@
+name: probe-sources2
+on: { workflow_dispatch: }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install requests
+      - name: Probe endpoints
+        run: |
+          python3 - <<'PY'
+          import requests, re, json
+          H={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36','Accept':'*/*'}
+          def show(name,u,extract=None,extra=None):
+              try:
+                  r=requests.get(u,headers={**H,**(extra or {})},timeout=12)
+                  r.encoding=r.apparent_encoding if 'naver.com/sise' in u or 'finance.naver' in u else r.encoding
+                  t=r.text
+                  out=extract(t) if extract else t[:500]
+                  print(f"=== {name} [{r.status_code}] len={len(t)}")
+                  print(str(out)[:1200].replace('\n',' '))
+              except Exception as e:
+                  print(f"=== {name} ERROR {type(e).__name__}: {e}")
+              print()
+          
+          def tds(t):
+              rows=re.findall(r'<tr[^>]*>(.*?)</tr>',t,re.S)
+              res=[]
+              for row in rows:
+                  cells=[re.sub(r'<[^>]+>','',c).strip() for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>',row,re.S)]
+                  cells=[c for c in cells if c]
+                  if cells: res.append(cells)
+              return res[:14]
+          
+          show('index_day','https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI&page=1',tds)
+          show('inv_day_kospi','https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260602&sosok=01&page=1',tds)
+          show('inv_day_kosdaq','https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260602&sosok=02&page=1',tds)
+          show('industry_all','https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=200',lambda t:(len(json.loads(t).get('groups',[])),json.loads(t).get('totalCount'),json.loads(t)['groups'][:2]))
+          show('industry_detail','https://m.stock.naver.com/api/stocks/industry/330?page=1&pageSize=3')
+          show('trend_foreign','https://m.stock.naver.com/api/stocks/trend/foreign?page=1&pageSize=3')
+          show('trend_inst','https://m.stock.naver.com/api/stocks/trend/institution?page=1&pageSize=3')
+          show('deal_rank','https://finance.naver.com/sise/sise_deal_rank.naver',lambda t:t[:300])
+          PY
