@@ -1,0 +1,27 @@
+name: probe3
+on: { workflow_dispatch: }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install requests
+      - name: Probe deal_rank structure
+        run: |
+          python3 - <<'PY'
+          import requests, re
+          H={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126'}
+          t=requests.get('https://finance.naver.com/sise/sise_deal_rank.naver',headers=H,timeout=15)
+          t.encoding=t.apparent_encoding
+          html=t.text
+          tables=re.findall(r'<table[^>]*>(.*?)</table>',html,re.S)
+          print('tables:',len(tables))
+          for ti,tb in enumerate(tables):
+              if '종목명' not in tb and '금액' not in tb: continue
+              print(f'--- table {ti} len={len(tb)}')
+              trs=re.findall(r'<tr[^>]*>(.*?)</tr>',tb,re.S)
+              for ri,tr in enumerate(trs[:8]):
+                  cells=[re.sub(r'<[^>]+>','',c).replace('&nbsp;',' ').strip() for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>',tr,re.S)]
+                  print(ri,cells)
+          caps=re.findall(r'<caption[^>]*>(.*?)</caption>',html,re.S)
+          print('captions:',[re.sub(r'<[^>]+>','',c).strip() for c in caps])
+          PY
