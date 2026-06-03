@@ -53,7 +53,6 @@ def table_rows(html):
     return rows
 
 def fetch_index_history(code, max_pages=12):
-    """{date: (close, value_jo)}  거래대금 백만원→조원"""
     out = {}
     for p in range(1, max_pages + 1):
         html = get(f"https://finance.naver.com/sise/sise_index_day.naver?code={code}&page={p}").text
@@ -68,7 +67,6 @@ def fetch_index_history(code, max_pages=12):
     return out
 
 def fetch_investor_history(sosok, bizdate, max_pages=8):
-    """{date: (개인, 외국인, 기관계)} 단위 억원"""
     out = {}
     for p in range(1, max_pages + 1):
         u = (f"https://finance.naver.com/sise/investorDealTrendDay.naver"
@@ -108,18 +106,38 @@ def fetch_industry_stocks(no):
     return stocks
 
 def fetch_foreign_rank():
+    """외국인 순매수/순매도 상위. 테이블별 헤더에서 '금액' 컬럼을 찾아 파싱."""
     html = get("https://finance.naver.com/sise/sise_deal_rank.naver").text
-    res = []
-    for r in table_rows(html):
-        if len(r) >= 2 and num(r[-1]) is not None and not re.match(r"^[\d,.\-+%\s]+$", r[0]):
-            if r[0] in ("종목명", "구분"): continue
-            res.append({"name": r[0], "amt": num(r[-1])})
-    return res[:40]
+    res, side_idx = [], 0
+    for tb in re.findall(r"<table[^>]*>(.*?)</table>", html, re.S):
+        rows = []
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
+            cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
+                     for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
+            rows.append(cells)
+        hdr = next((r for r in rows if any("종목명" in c for c in r)), None)
+        if not hdr: continue
+        name_i = next(i for i, c in enumerate(hdr) if "종목명" in c)
+        amt_i = next((i for i, c in enumerate(hdr) if "금액" in c), None)
+        side = "buy" if side_idx == 0 else "sell"
+        side_idx += 1
+        for r in rows:
+            if r == hdr or len(r) <= max(name_i, amt_i or 0): continue
+            nm = r[name_i]
+            if not nm or re.match(r"^[\d,.\-+%\s]*$", nm): continue
+            amt = num(r[amt_i]) if amt_i is not None else None
+            res.append({"name": nm, "amt": amt, "side": side})
+        if side_idx >= 2: break
+    seen, dedup = set(), []
+    for r in res:
+        k = (r["name"], r["side"])
+        if k not in seen:
+            seen.add(k); dedup.append(r)
+    return dedup[:40]
 
 def main():
     out = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "errors": ERRORS, "version": 2}
 
-    # 1) 지수
     try:
         kospi = fetch_index_history("KOSPI")
     except Exception as e:
@@ -139,7 +157,6 @@ def main():
     }
     log(f"지수 {len(dates)}일 (마지막 {dates[-1]})")
 
-    # 2) 투자자
     biz = dates[-1].replace("-", "")
     inv_out = {}
     for key, sosok in [("kospi", "01"), ("kosdaq", "02")]:
@@ -155,7 +172,6 @@ def main():
             ERRORS.append(f"investor {key}: {e}")
     out["investor"] = inv_out
 
-    # 3) 업종 스냅샷 + 누적
     prev_hist = {}
     try:
         if os.path.exists(OUT):
@@ -175,7 +191,7 @@ def main():
                 ERRORS.append(f"industry {g.get('name')}: {e}"); continue
             tot = ksp = kdq = 0.0
             for s in ss:
-                v = num(s.get("accumulatedTradingValue")) or 0.0   # 백만원
+                v = num(s.get("accumulatedTradingValue")) or 0.0
                 tot += v
                 if str(s.get("sosok")) == "0": ksp += v
                 else: kdq += v
@@ -197,7 +213,6 @@ def main():
     out["histDays"] = nh
     log(f"업종 이력 {nh}일 누적")
 
-    # 파생지표
     tot_by_day = {d: sum((x[1] or 0) for x in prev_hist[d].values()) for d in hist_dates}
     kmap = dict(zip(dates, out["market"]["kospi"]["close"]))
     sectors = []
@@ -233,7 +248,6 @@ def main():
         sectors.append(s)
     out["sectors"] = sectors
 
-    # 4) 외국인 매매 상위
     try:
         rank = fetch_foreign_rank()
         for r in rank: r["sector"] = code2sec.get(r["name"], "")

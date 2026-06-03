@@ -68,7 +68,7 @@ td:first-child,th:first-child{text-align:left}
     <div style="width:170px;height:170px"><canvas id="donut"></canvas></div>
     <div style="flex:1;min-width:240px;height:170px"><canvas id="shareTrend"></canvas></div>
   </div>
-  <div class="note">도넛=오늘 거래대금 비중, 추이=최근 60거래일 코스닥 비중(%). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+  <div class="note">도넛=최근 거래일 거래대금 비중, 추이=최근 60거래일 코스닥 비중(%). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
 </div>
 
 <div class="card">
@@ -92,7 +92,7 @@ td:first-child,th:first-child{text-align:left}
     </span>
   </h2>
   <div id="treemap"></div>
-  <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 시장 내 거래대금 비중</span></div>
+  <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 전체 업종 내 거래대금 비중</span></div>
 </div>
 
 <div class="card">
@@ -110,7 +110,7 @@ td:first-child,th:first-child{text-align:left}
     </span>
   </h2>
   <div style="height:330px"><canvas id="rrg"></canvas></div>
-  <div class="note">가로=시장 대비 20일 상대강도, 세로=5일 상대모멘텀. 우상(주도)→우하(약화)→좌하(소외)→좌상(개선) 순으로 시계방향 회전하는 경향. 좌상에서 우상으로 진입하는 업종이 다음 주도주 후보.</div>
+  <div class="note">가로=시장 대비 20일 상대강도, 세로=5일 상대모멘텀. 우상(주도)→우하(약화)→좌하(소외)→좌상(개선) 순으로 회전하는 경향. 좌상에서 우상으로 진입하는 업종이 다음 주도주 후보.</div>
 </div>
 
 <div class="card full">
@@ -119,7 +119,7 @@ td:first-child,th:first-child{text-align:left}
 </div>
 
 </div>
-<div class="note" style="margin:14px 0">데이터: KRX 종가 기준(분단위 실시간 아님), 평일 18:40 KST 자동 갱신 · 본 페이지는 투자 참고용이며 투자 판단의 책임은 본인에게 있습니다.</div>
+<div class="note" style="margin:14px 0">데이터: 네이버 증권 종가 기준(분단위 실시간 아님), 평일 18:40 KST 자동 갱신 · 업종 이력은 매일 자동 누적(로테이션 맵은 약 25거래일 후 완성) · 본 페이지는 투자 참고용이며 투자 판단의 책임은 본인에게 있습니다.</div>
 
 <script>
 const DATA_URL='data.json';
@@ -141,7 +141,7 @@ fetch(DATA_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw new Error('HTTP '+r.sta
    document.getElementById('updated').textContent='';});
 
 function render(){
-  document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1];
+  document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1]+' · 업종이력 '+(D.histDays||1)+'일 누적';
   if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
   kpis(); marketShare(); invTab('kospi',document.querySelector('[data-m=kospi]'));
   treemap('ALL'); flowShift(); rrg('ALL'); foreignRank();
@@ -151,18 +151,18 @@ function kpis(){
   const n=D.dates.length, m=D.market;
   const items=[];
   for(const [k,label] of [['kospi','코스피'],['kosdaq','코스닥']]){
-    const c=m[k].close; if(!c.length)continue;
+    const c=m[k].close; if(!c||!c.length)continue;
     const chg=100*(c[n-1]/c[n-2]-1);
     items.push(`<div class="kpi"><div class="l">${label}</div><div class="v">${fmt(c[n-1],2)}</div><div class="d ${cls(chg)}">${sgn(chg)}${chg.toFixed(2)}%</div></div>`);
   }
-  const tv=m.kospi.value[n-1]+m.kosdaq.value[n-1];
+  const tv=(m.kospi.value[n-1]||0)+(m.kosdaq.value[n-1]||0);
   items.push(`<div class="kpi"><div class="l">합산 거래대금</div><div class="v">${fmt(tv,1)}조</div><div class="d flat">코스피 ${fmt(m.kospi.value[n-1],1)} · 코스닥 ${fmt(m.kosdaq.value[n-1],1)}</div></div>`);
   const inv=D.investor.kospi, invq=D.investor.kosdaq;
   if(inv&&inv.foreign.length){
-    const f=inv.foreign[n-1]+(invq?invq.foreign[n-1]:0);
-    const i=inv.institution[n-1]+(invq?invq.institution[n-1]:0);
-    const p=inv.individual[n-1]+(invq?invq.individual[n-1]:0);
-    items.push(`<div class="kpi"><div class="l">금일 순매수 (양시장 합)</div><div class="d ${cls(f)}">외국인 ${sgn(f)}${fmt(f,0)}억</div><div class="d ${cls(i)}">기관 ${sgn(i)}${fmt(i,0)}억</div><div class="d ${cls(p)}">개인 ${sgn(p)}${fmt(p,0)}억</div></div>`);
+    const f=(inv.foreign[n-1]||0)+((invq&&invq.foreign[n-1])||0);
+    const i=(inv.institution[n-1]||0)+((invq&&invq.institution[n-1])||0);
+    const p=(inv.individual[n-1]||0)+((invq&&invq.individual[n-1])||0);
+    items.push(`<div class="kpi"><div class="l">최근일 순매수 (양시장 합)</div><div class="d ${cls(f)}">외국인 ${sgn(f)}${fmt(f,0)}억</div><div class="d ${cls(i)}">기관 ${sgn(i)}${fmt(i,0)}억</div><div class="d ${cls(p)}">개인 ${sgn(p)}${fmt(p,0)}억</div></div>`);
   }
   document.getElementById('kpis').innerHTML=items.join('');
 }
@@ -174,9 +174,9 @@ function marketShare(){
   mk('donut',{type:'doughnut',data:{labels:['코스피','코스닥'],datasets:[{data:[ks[n-1],kq[n-1]],backgroundColor:['#f5b942','#5a8dee'],borderWidth:0}]},
     options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+' '+fmt(c.parsed,1)+'조 ('+(100*c.parsed/(ks[n-1]+kq[n-1])).toFixed(1)+'%)'}}},cutout:'55%'}});
   const L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
-  for(let i=n-L;i<n;i++)sh.push(+(100*kq[i]/(ks[i]+kq[i])).toFixed(1));
+  for(let i=n-L;i<n;i++){const t=(ks[i]||0)+(kq[i]||0);sh.push(t>0?+(100*kq[i]/t).toFixed(1):null);}
   mk('shareTrend',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금 비중(%)',data:sh,borderColor:'#5a8dee',backgroundColor:'#5a8dee33',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:false}}}}});
+    options:{maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:6}}}}});
 }
 
 function invTab(m,btn){
@@ -201,8 +201,9 @@ function heat(chg){
 
 function treemap(mkt){
   const el=document.getElementById('treemap');
-  let ss=D.sectors.filter(s=>mkt==='ALL'||s.market===mkt).filter(s=>s.val5d>0);
+  let ss=D.sectors.filter(s=>mkt==='ALL'||s.market===mkt).filter(s=>s.val5d>0.005);
   ss.sort((a,b)=>b.val5d-a.val5d);
+  ss=ss.slice(0,45);
   const tot=ss.reduce((a,s)=>a+s.val5d,0)||1;
   el.innerHTML=ss.map(s=>{
     const w=Math.max(6,100*s.val5d/tot);
@@ -244,9 +245,11 @@ function rrg(mkt){
   const ss=D.sectors.filter(s=>s.rrg&&s.rrg.length>1&&(mkt==='ALL'||s.market===mkt));
   if(!ss.length){
     if(charts['rrg']){charts['rrg'].destroy();delete charts['rrg'];}
-    const cv=document.getElementById('rrg');const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
-    cv.parentElement.insertAdjacentHTML('afterend',cv.dataset.msg?'':`<div class="note" id="rrgmsg">📥 로테이션 맵은 약 <b>25거래일</b> 데이터 축적 후 표시됩니다 (현재 ${D.histDays||1}거래일). 매일 자동으로 쌓이고 있습니다.</div>`);
-    cv.dataset.msg='1';return;}
+    if(!document.getElementById('rrgmsg')){
+      document.getElementById('rrg').parentElement.insertAdjacentHTML('afterend',`<div class="note" id="rrgmsg">📥 로테이션 맵은 약 <b>25거래일</b> 데이터 축적 후 표시됩니다 (현재 ${D.histDays||1}거래일). 매일 자동으로 쌓이고 있습니다.</div>`);
+    }
+    return;
+  }
   const pal=['#f04452','#f5b942','#5a8dee','#4dd0a1','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#94a3b8'];
   const data={datasets:ss.map((s,i)=>{
     const col=pal[i%pal.length];
@@ -265,11 +268,11 @@ function foreignRank(){
   const el=document.getElementById('foreignRank');
   const arr=D.foreignRank||[];
   if(!arr.length){el.innerHTML='<div class="note">외국인 매매 상위 데이터를 가져오지 못했습니다.</div>';return;}
-  const half=Math.ceil(Math.min(arr.length,20)/2);
-  const row=r=>`<tr><td>${r.name}</td><td style="color:${CTX2};font-size:11px">${r.sector||'-'}</td><td>${fmt(r.amt,0)}</td></tr>`;
+  const row=r=>`<tr><td>${r.name}</td><td style="color:${CTX2};font-size:11px">${r.sector||'-'}</td><td>${r.amt!=null?fmt(r.amt,0):'-'}</td></tr>`;
+  const buys=arr.filter(r=>r.side!=='sell').slice(0,10),sells=arr.filter(r=>r.side==='sell').slice(0,10);
   el.innerHTML=`<div class="cols3" style="grid-template-columns:1fr 1fr">
-    <div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${arr.slice(0,half).map(row).join('')}</table></div>
-    <div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${arr.slice(half,20).map(row).join('')}</table></div></div>`;
+    <div><div class="invh up">▲ 순매수 상위</div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${buys.map(row).join('')}</table></div>
+    <div><div class="invh dn">▼ 순매도 상위</div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${sells.map(row).join('')}</table></div></div>`;
 }
 </script>
 </body>
