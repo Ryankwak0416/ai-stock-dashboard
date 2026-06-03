@@ -213,7 +213,7 @@ TEMPLATE = r"""<!doctype html>
 <body>
 <div class="wrap">
   <h1>AI 관련주 대시보드</h1>
-  <div class="sub">갱신 <b>__DATE__</b> · <span class="pill">__MODE__</span> · 평일 18:10 자동 갱신(KST) · 시세 KRX 종가 · 뉴스 Google News</div>
+  <div class="sub">갱신 <b>__DATE__</b> · <span class="pill">__MODE__</span> · 평일 장중 매시 + 18:10 자동 갱신(KST) · 시세 KRX 종가 · 뉴스 Google News</div>
 
   <div class="kpis" id="kpis"></div>
 
