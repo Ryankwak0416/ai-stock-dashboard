@@ -1,0 +1,34 @@
+name: probe-sources
+on: { workflow_dispatch: }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install requests
+      - name: Probe endpoints
+        run: |
+          python3 - <<'PY'
+          import requests
+          H={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36','Accept':'application/json, text/html'}
+          urls=[
+           ('naver-index','https://m.stock.naver.com/api/index/KOSPI/price?pageSize=3&page=1',{}),
+           ('naver-kosdaq','https://m.stock.naver.com/api/index/KOSDAQ/price?pageSize=3&page=1',{}),
+           ('naver-invKOSPI','https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260602&sosok=01&page=1',{}),
+           ('naver-invKOSDAQ','https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260602&sosok=02&page=1',{}),
+           ('naver-upjong','https://finance.naver.com/sise/sise_group.naver?type=upjong',{}),
+           ('naver-upjong-detail','https://finance.naver.com/sise/sise_group_detail.naver?type=upjong&no=151',{}),
+           ('naver-industry-api','https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=5',{}),
+           ('naver-stock-integration','https://m.stock.naver.com/api/stock/005930/integration',{}),
+           ('daum-investor','https://finance.daum.net/api/investor/days?market=KOSPI&page=1&perPage=5',{'Referer':'https://finance.daum.net/domestic/investor'}),
+           ('krx-retry','http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd',{}),
+          ]
+          for name,u,extra in urls:
+              try:
+                  r=requests.get(u,headers={**H,**extra},timeout=12)
+                  body=r.text[:400].replace('\n',' ')
+                  print(f"=== {name} [{r.status_code}] enc={r.encoding} len={len(r.text)}")
+                  print(body)
+              except Exception as e:
+                  print(f"=== {name} ERROR {type(e).__name__}: {e}")
+              print()
+          PY
