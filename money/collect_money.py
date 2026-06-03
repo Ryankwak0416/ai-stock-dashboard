@@ -106,10 +106,23 @@ def fetch_industry_stocks(no):
     return stocks
 
 def fetch_foreign_rank():
-    """외국인 순매수/순매도 상위. 테이블별 헤더에서 '금액' 컬럼을 찾아 파싱."""
+    """외국인 순매수/순매도 상위. 본문+iframe 안의 테이블에서 '종목명/금액' 헤더를 찾아 파싱."""
     html = get("https://finance.naver.com/sise/sise_deal_rank.naver").text
+    htmls = [html]
+    for src in re.findall(r'<iframe[^>]*src=["\']([^"\']+)["\']', html)[:5]:
+        if src.startswith("/"):
+            src = "https://finance.naver.com" + src
+        if "naver.com" not in src:
+            continue
+        try:
+            htmls.append(get(src).text)
+        except Exception as e:
+            ERRORS.append(f"rank iframe: {e}")
     res, side_idx = [], 0
-    for tb in re.findall(r"<table[^>]*>(.*?)</table>", html, re.S):
+    all_tables = []
+    for h in htmls:
+        all_tables += re.findall(r"<table[^>]*>(.*?)</table>", h, re.S)
+    for tb in all_tables:
         rows = []
         for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
             cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
