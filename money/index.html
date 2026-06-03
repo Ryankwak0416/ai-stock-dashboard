@@ -84,7 +84,7 @@ td:first-child,th:first-child{text-align:left}
 </div>
 
 <div class="card full">
-  <h2>③ 업종 관심도 지도 <span class="sub">크기=최근 5일 평균 거래대금 · 색=금일 등락</span>
+  <h2>③ 업종 관심도 지도 <span class="sub">크기=당일 거래대금 · 색=금일 등락 · 시장표시=주 거래 시장</span>
     <span class="tabs">
       <button class="tab on" onclick="tmTab('ALL',this)">전체</button>
       <button class="tab" onclick="tmTab('KOSPI',this)">코스피</button>
@@ -114,13 +114,8 @@ td:first-child,th:first-child{text-align:left}
 </div>
 
 <div class="card full">
-  <h2>⑥ 투자자별 업종 순매수 <span class="sub">최근 5거래일 합계 (억원)</span></h2>
-  <div class="cols3" id="invSector"></div>
-</div>
-
-<div class="card full">
-  <h2>⑦ 투자자별 순매수 상위/하위 종목 <span class="sub">최근 5거래일 (억원)</span></h2>
-  <div class="cols3" id="topStocks"></div>
+  <h2>⑥ 외국인 매매 상위 종목 <span class="sub">당일 · 네이버 집계 · 업종 매핑</span></h2>
+  <div id="foreignRank"></div>
 </div>
 
 </div>
@@ -149,7 +144,7 @@ function render(){
   document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1];
   if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
   kpis(); marketShare(); invTab('kospi',document.querySelector('[data-m=kospi]'));
-  treemap('ALL'); flowShift(); rrg('ALL'); invSector(); topStocks();
+  treemap('ALL'); flowShift(); rrg('ALL'); foreignRank();
 }
 
 function kpis(){
@@ -193,7 +188,7 @@ function invTab(m,btn){
     options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
   const L2=Math.min(60,n),lab2=D.dates.slice(-L2).map(d=>d.slice(5));
   mk('invCum',{type:'line',data:{labels:lab2,datasets:sets.map(([l,k,c])=>{
-      let s=0;const arr=inv[k].slice(-L2).map(v=>+(s+=v).toFixed(0));
+      let s=0;const arr=inv[k].slice(-L2).map(v=>+(s+=(v||0)).toFixed(0));
       return {label:l+' 누적',data:arr,borderColor:c,pointRadius:0,tension:.2,borderWidth:2};})},
     options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
 }
@@ -211,7 +206,7 @@ function treemap(mkt){
   const tot=ss.reduce((a,s)=>a+s.val5d,0)||1;
   el.innerHTML=ss.map(s=>{
     const w=Math.max(6,100*s.val5d/tot);
-    return `<div class="tile" style="background:${heat(s.chg1)};flex:${s.val5d} 1 ${w*7}px" title="${s.name} (${s.market})\n금일 ${sgn(s.chg1)}${s.chg1??'-'}% · 5일 ${sgn(s.chg5)}${s.chg5??'-'}%\n5일평균 거래대금 ${fmt(s.val5d,2)}조 · 비중 ${s.valShare??'-'}%">
+    return `<div class="tile" style="background:${heat(s.chg1)};flex:${s.val5d} 1 ${w*7}px" title="${s.name} (${s.market})\n금일 ${sgn(s.chg1)}${s.chg1??'-'}% · 5일 ${sgn(s.chg5)}${s.chg5??'-'}%\n당일 거래대금 ${fmt(s.val5d,2)}조 · 비중 ${s.valShare??'-'}%">
       <div class="n">${s.name}</div><div class="c">${sgn(s.chg1)}${s.chg1??'-'}%</div><div class="s">${s.valShare??'-'}%${mkt==='ALL'?' · '+(s.market==='KOSPI'?'피':'닥'):''}</div></div>`;
   }).join('');
 }
@@ -219,6 +214,8 @@ function tmTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.cl
 
 function flowShift(){
   const el=document.getElementById('flowShift');
+  const ready=D.sectors.some(s=>s.valSharePrev!=null);
+  if(!ready){el.innerHTML=`<div class="note">📥 데이터 축적 중입니다 (현재 ${D.histDays||1}거래일). 업종별 과거 데이터는 제공되지 않아 매일 자동 누적되며, <b>10거래일</b>부터 수급 이동 비교가 표시됩니다.</div>`;return;}
   const rows=D.sectors.filter(s=>s.valShare!=null&&s.valSharePrev!=null)
     .map(s=>({n:s.name+(s.market==='KOSDAQ'?' (닥)':''),d:+(s.valShare-s.valSharePrev).toFixed(2),chg:s.chg5}))
     .sort((a,b)=>b.d-a.d);
@@ -245,6 +242,11 @@ const quadPlugin={id:'quad',beforeDraw(c){
 
 function rrg(mkt){
   const ss=D.sectors.filter(s=>s.rrg&&s.rrg.length>1&&(mkt==='ALL'||s.market===mkt));
+  if(!ss.length){
+    if(charts['rrg']){charts['rrg'].destroy();delete charts['rrg'];}
+    const cv=document.getElementById('rrg');const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+    cv.parentElement.insertAdjacentHTML('afterend',cv.dataset.msg?'':`<div class="note" id="rrgmsg">📥 로테이션 맵은 약 <b>25거래일</b> 데이터 축적 후 표시됩니다 (현재 ${D.histDays||1}거래일). 매일 자동으로 쌓이고 있습니다.</div>`);
+    cv.dataset.msg='1';return;}
   const pal=['#f04452','#f5b942','#5a8dee','#4dd0a1','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#94a3b8'];
   const data={datasets:ss.map((s,i)=>{
     const col=pal[i%pal.length];
@@ -259,30 +261,15 @@ function rrg(mkt){
 }
 function rrgTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));rrg(m);}
 
-function invSector(){
-  const el=document.getElementById('invSector');
-  const names={'외국인':'🌏 외국인','기관합계':'🏦 기관','개인':'👤 개인'};
-  el.innerHTML=Object.keys(D.investorSector||{}).map(inv=>{
-    const arr=D.investorSector[inv]; if(!arr||!arr.length)return '';
-    const top=arr.slice(0,6),bot=arr.slice(-6).reverse();
-    const max=Math.max(...arr.map(r=>Math.abs(r.net)),1);
-    const bar=r=>`<div class="flowbar"><span class="nm">${r.sector}</span>
-      <span class="bar" style="width:${Math.max(3,100*Math.abs(r.net)/max)*0.5}%;background:${r.net>=0?CUP:CDN}"></span>
-      <span class="val">${sgn(r.net)}${fmt(r.net,0)}</span></div>`;
-    return `<div><div class="invh">${names[inv]||inv}</div>${top.map(bar).join('')}<div style="height:6px"></div>${bot.filter(r=>r.net<0).map(bar).join('')}</div>`;
-  }).join('');
-}
-
-function topStocks(){
-  const el=document.getElementById('topStocks');
-  const names={'외국인':'🌏 외국인','기관합계':'🏦 기관','개인':'👤 개인'};
-  el.innerHTML=Object.keys(D.topStocks||{}).map(inv=>{
-    const arr=D.topStocks[inv]||[];
-    const buys=arr.filter(r=>r.net>0).slice(0,5),sells=arr.filter(r=>r.net<0).sort((a,b)=>a.net-b.net).slice(0,5);
-    const row=r=>`<tr><td>${r.name}</td><td style="color:${CTX2};font-size:11px">${r.sector||'-'}</td><td class="${cls(r.net)}">${sgn(r.net)}${fmt(r.net,0)}</td></tr>`;
-    return `<div><div class="invh">${names[inv]||inv}</div><table><tr><th>종목</th><th>업종</th><th>순매수(억)</th></tr>
-      ${buys.map(row).join('')}${sells.map(row).join('')}</table></div>`;
-  }).join('');
+function foreignRank(){
+  const el=document.getElementById('foreignRank');
+  const arr=D.foreignRank||[];
+  if(!arr.length){el.innerHTML='<div class="note">외국인 매매 상위 데이터를 가져오지 못했습니다.</div>';return;}
+  const half=Math.ceil(Math.min(arr.length,20)/2);
+  const row=r=>`<tr><td>${r.name}</td><td style="color:${CTX2};font-size:11px">${r.sector||'-'}</td><td>${fmt(r.amt,0)}</td></tr>`;
+  el.innerHTML=`<div class="cols3" style="grid-template-columns:1fr 1fr">
+    <div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${arr.slice(0,half).map(row).join('')}</table></div>
+    <div><table><tr><th>종목</th><th>업종</th><th>금액(백만)</th></tr>${arr.slice(half,20).map(row).join('')}</table></div></div>`;
 }
 </script>
 </body>
