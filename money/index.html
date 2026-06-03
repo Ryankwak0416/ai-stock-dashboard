@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수급흐름 대시보드 — 어디로 돈이 흐르는가</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0e1117; --card:#171c26; --card2:#1d2433; --line:#2a3245;
+  --tx:#e8ecf4; --tx2:#9aa5b8; --up:#f04452; --dn:#3485fa; --flat:#8b95a8;
+  --acc:#f5b942;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI','Malgun Gothic',sans-serif;padding:14px;max-width:1280px;margin:0 auto}
+h1{font-size:21px;margin-bottom:2px}
+h2{font-size:15px;margin:0 0 10px;color:var(--acc);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h2 .sub{font-size:11px;color:var(--tx2);font-weight:400}
+.updated{color:var(--tx2);font-size:12px;margin-bottom:14px}
+.grid{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.full{grid-column:1/-1}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.kpi{background:var(--card2);border-radius:10px;padding:10px 14px;flex:1;min-width:130px}
+.kpi .l{font-size:11px;color:var(--tx2)}
+.kpi .v{font-size:18px;font-weight:700;margin-top:2px}
+.kpi .d{font-size:12px;margin-top:1px}
+.up{color:var(--up)}.dn{color:var(--dn)}.flat{color:var(--flat)}
+canvas{max-width:100%}
+.tabs{display:flex;gap:6px}
+.tab{padding:4px 12px;border-radius:14px;border:1px solid var(--line);background:none;color:var(--tx2);cursor:pointer;font-size:12px}
+.tab.on{background:var(--acc);color:#10131a;border-color:var(--acc);font-weight:700}
+#treemap{display:flex;flex-wrap:wrap;gap:3px;min-height:280px;align-content:flex-start}
+.tile{border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;justify-content:center;min-width:74px;min-height:52px;overflow:hidden;cursor:default}
+.tile .n{font-size:12px;font-weight:700;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.tile .c{font-size:11px;opacity:.95}
+.tile .s{font-size:10px;opacity:.75}
+.flowbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}
+.flowbar .nm{width:110px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.flowbar .bar{height:14px;border-radius:3px}
+.flowbar .val{color:var(--tx2);font-size:11px;white-space:nowrap}
+.cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:900px){.cols3{grid-template-columns:1fr}}
+.invh{font-size:13px;font-weight:700;margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--line)}
+th{color:var(--tx2);font-weight:400}
+td:first-child,th:first-child{text-align:left}
+.note{font-size:11px;color:var(--tx2);margin-top:8px;line-height:1.5}
+.err{background:#3a1d22;border:1px solid #6b2a35;border-radius:8px;padding:10px;font-size:12px;margin-bottom:12px;display:none}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--tx2);flex-wrap:wrap;margin-top:6px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<h1>📊 수급흐름 대시보드</h1>
+<div class="updated" id="updated">불러오는 중…</div>
+<div class="err" id="err"></div>
+
+<div class="row" id="kpis" style="margin-bottom:14px"></div>
+
+<div class="grid">
+
+<div class="card">
+  <h2>① 시장 수급 집중도 <span class="sub">코스피 vs 코스닥 거래대금 비중</span></h2>
+  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+    <div style="width:170px;height:170px"><canvas id="donut"></canvas></div>
+    <div style="flex:1;min-width:240px;height:170px"><canvas id="shareTrend"></canvas></div>
+  </div>
+  <div class="note">도넛=오늘 거래대금 비중, 추이=최근 60거래일 코스닥 비중(%). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+</div>
+
+<div class="card">
+  <h2>② 투자자별 자금 흐름
+    <span class="tabs">
+      <button class="tab on" data-m="kospi" onclick="invTab('kospi',this)">코스피</button>
+      <button class="tab" data-m="kosdaq" onclick="invTab('kosdaq',this)">코스닥</button>
+    </span>
+  </h2>
+  <div style="height:150px"><canvas id="invDaily"></canvas></div>
+  <div style="height:150px;margin-top:8px"><canvas id="invCum"></canvas></div>
+  <div class="note">위=일별 순매수(최근 20거래일, 억원), 아래=60거래일 누적 순매수. 외국인·기관 동반 순매수 구간이 시장 추세 강화 구간.</div>
+</div>
+
+<div class="card full">
+  <h2>③ 업종 관심도 지도 <span class="sub">크기=최근 5일 평균 거래대금 · 색=금일 등락</span>
+    <span class="tabs">
+      <button class="tab on" onclick="tmTab('ALL',this)">전체</button>
+      <button class="tab" onclick="tmTab('KOSPI',this)">코스피</button>
+      <button class="tab" onclick="tmTab('KOSDAQ',this)">코스닥</button>
+    </span>
+  </h2>
+  <div id="treemap"></div>
+  <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 시장 내 거래대금 비중</span></div>
+</div>
+
+<div class="card">
+  <h2>④ 수급 이동 감지 <span class="sub">거래대금 비중 변화: 직전5일 → 최근5일 (%p)</span></h2>
+  <div id="flowShift"></div>
+  <div class="note">비중이 커진 업종 = 돈이 새로 몰리는 곳, 줄어든 업종 = 돈이 빠져나가는 곳. 등락률보다 먼저 움직이는 경우가 많아 로테이션 조기 감지에 유용.</div>
+</div>
+
+<div class="card">
+  <h2>⑤ 업종 로테이션 맵 <span class="sub">RRG 방식 · 꼬리=최근 5일 궤적</span>
+    <span class="tabs">
+      <button class="tab on" onclick="rrgTab('ALL',this)">전체</button>
+      <button class="tab" onclick="rrgTab('KOSPI',this)">코스피</button>
+      <button class="tab" onclick="rrgTab('KOSDAQ',this)">코스닥</button>
+    </span>
+  </h2>
+  <div style="height:330px"><canvas id="rrg"></canvas></div>
+  <div class="note">가로=시장 대비 20일 상대강도, 세로=5일 상대모멘텀. 우상(주도)→우하(약화)→좌하(소외)→좌상(개선) 순으로 시계방향 회전하는 경향. 좌상에서 우상으로 진입하는 업종이 다음 주도주 후보.</div>
+</div>
+
+<div class="card full">
+  <h2>⑥ 투자자별 업종 순매수 <span class="sub">최근 5거래일 합계 (억원)</span></h2>
+  <div class="cols3" id="invSector"></div>
+</div>
+
+<div class="card full">
+  <h2>⑦ 투자자별 순매수 상위/하위 종목 <span class="sub">최근 5거래일 (억원)</span></h2>
+  <div class="cols3" id="topStocks"></div>
+</div>
+
+</div>
+<div class="note" style="margin:14px 0">데이터: KRX 종가 기준(분단위 실시간 아님), 평일 18:40 KST 자동 갱신 · 본 페이지는 투자 참고용이며 투자 판단의 책임은 본인에게 있습니다.</div>
+
+<script>
+const DATA_URL='data.json';
+const CUP=getComputedStyle(document.documentElement).getPropertyValue('--up').trim();
+const CDN=getComputedStyle(document.documentElement).getPropertyValue('--dn').trim();
+const CTX2=getComputedStyle(document.documentElement).getPropertyValue('--tx2').trim();
+Chart.defaults.color=CTX2; Chart.defaults.borderColor='#2a3245';
+Chart.defaults.font.family="'Segoe UI','Malgun Gothic',sans-serif";
+let D=null, charts={};
+
+const fmt=(v,d=1)=>v==null?'-':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d,minimumFractionDigits:0});
+const cls=v=>v>0?'up':(v<0?'dn':'flat');
+const sgn=v=>v>0?'+':'';
+
+fetch(DATA_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+ .then(d=>{D=d;render();})
+ .catch(e=>{document.getElementById('err').style.display='block';
+   document.getElementById('err').textContent='데이터 로딩 실패: '+e.message+' — 워크플로우가 아직 실행되지 않았거나 data.json이 없습니다.';
+   document.getElementById('updated').textContent='';});
+
+function render(){
+  document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1];
+  if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
+  kpis(); marketShare(); invTab('kospi',document.querySelector('[data-m=kospi]'));
+  treemap('ALL'); flowShift(); rrg('ALL'); invSector(); topStocks();
+}
+
+function kpis(){
+  const n=D.dates.length, m=D.market;
+  const items=[];
+  for(const [k,label] of [['kospi','코스피'],['kosdaq','코스닥']]){
+    const c=m[k].close; if(!c.length)continue;
+    const chg=100*(c[n-1]/c[n-2]-1);
+    items.push(`<div class="kpi"><div class="l">${label}</div><div class="v">${fmt(c[n-1],2)}</div><div class="d ${cls(chg)}">${sgn(chg)}${chg.toFixed(2)}%</div></div>`);
+  }
+  const tv=m.kospi.value[n-1]+m.kosdaq.value[n-1];
+  items.push(`<div class="kpi"><div class="l">합산 거래대금</div><div class="v">${fmt(tv,1)}조</div><div class="d flat">코스피 ${fmt(m.kospi.value[n-1],1)} · 코스닥 ${fmt(m.kosdaq.value[n-1],1)}</div></div>`);
+  const inv=D.investor.kospi, invq=D.investor.kosdaq;
+  if(inv&&inv.foreign.length){
+    const f=inv.foreign[n-1]+(invq?invq.foreign[n-1]:0);
+    const i=inv.institution[n-1]+(invq?invq.institution[n-1]:0);
+    const p=inv.individual[n-1]+(invq?invq.individual[n-1]:0);
+    items.push(`<div class="kpi"><div class="l">금일 순매수 (양시장 합)</div><div class="d ${cls(f)}">외국인 ${sgn(f)}${fmt(f,0)}억</div><div class="d ${cls(i)}">기관 ${sgn(i)}${fmt(i,0)}억</div><div class="d ${cls(p)}">개인 ${sgn(p)}${fmt(p,0)}억</div></div>`);
+  }
+  document.getElementById('kpis').innerHTML=items.join('');
+}
+
+function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
+
+function marketShare(){
+  const n=D.dates.length,ks=D.market.kospi.value,kq=D.market.kosdaq.value;
+  mk('donut',{type:'doughnut',data:{labels:['코스피','코스닥'],datasets:[{data:[ks[n-1],kq[n-1]],backgroundColor:['#f5b942','#5a8dee'],borderWidth:0}]},
+    options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+' '+fmt(c.parsed,1)+'조 ('+(100*c.parsed/(ks[n-1]+kq[n-1])).toFixed(1)+'%)'}}},cutout:'55%'}});
+  const L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
+  for(let i=n-L;i<n;i++)sh.push(+(100*kq[i]/(ks[i]+kq[i])).toFixed(1));
+  mk('shareTrend',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금 비중(%)',data:sh,borderColor:'#5a8dee',backgroundColor:'#5a8dee33',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:false}}}}});
+}
+
+function invTab(m,btn){
+  document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b===btn));
+  const inv=D.investor[m]; if(!inv)return;
+  const n=D.dates.length,L=Math.min(20,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const sets=[['외국인','foreign',CUP],['기관','institution','#f5b942'],['개인','individual',CDN]];
+  mk('invDaily',{type:'bar',data:{labels:lab,datasets:sets.map(([l,k,c])=>({label:l,data:inv[k].slice(-L),backgroundColor:c}))},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
+  const L2=Math.min(60,n),lab2=D.dates.slice(-L2).map(d=>d.slice(5));
+  mk('invCum',{type:'line',data:{labels:lab2,datasets:sets.map(([l,k,c])=>{
+      let s=0;const arr=inv[k].slice(-L2).map(v=>+(s+=v).toFixed(0));
+      return {label:l+' 누적',data:arr,borderColor:c,pointRadius:0,tension:.2,borderWidth:2};})},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
+}
+
+function heat(chg){
+  if(chg==null)return '#3a4254';
+  const t=Math.min(Math.abs(chg)/3,1);
+  return chg>=0?`rgba(240,68,82,${.25+.6*t})`:`rgba(52,133,250,${.25+.6*t})`;
+}
+
+function treemap(mkt){
+  const el=document.getElementById('treemap');
+  let ss=D.sectors.filter(s=>mkt==='ALL'||s.market===mkt).filter(s=>s.val5d>0);
+  ss.sort((a,b)=>b.val5d-a.val5d);
+  const tot=ss.reduce((a,s)=>a+s.val5d,0)||1;
+  el.innerHTML=ss.map(s=>{
+    const w=Math.max(6,100*s.val5d/tot);
+    return `<div class="tile" style="background:${heat(s.chg1)};flex:${s.val5d} 1 ${w*7}px" title="${s.name} (${s.market})\n금일 ${sgn(s.chg1)}${s.chg1??'-'}% · 5일 ${sgn(s.chg5)}${s.chg5??'-'}%\n5일평균 거래대금 ${fmt(s.val5d,2)}조 · 비중 ${s.valShare??'-'}%">
+      <div class="n">${s.name}</div><div class="c">${sgn(s.chg1)}${s.chg1??'-'}%</div><div class="s">${s.valShare??'-'}%${mkt==='ALL'?' · '+(s.market==='KOSPI'?'피':'닥'):''}</div></div>`;
+  }).join('');
+}
+function tmTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));treemap(m);}
+
+function flowShift(){
+  const el=document.getElementById('flowShift');
+  const rows=D.sectors.filter(s=>s.valShare!=null&&s.valSharePrev!=null)
+    .map(s=>({n:s.name+(s.market==='KOSDAQ'?' (닥)':''),d:+(s.valShare-s.valSharePrev).toFixed(2),chg:s.chg5}))
+    .sort((a,b)=>b.d-a.d);
+  const top=rows.slice(0,7),bot=rows.slice(-7).reverse();
+  const max=Math.max(...rows.map(r=>Math.abs(r.d)),0.1);
+  const bar=r=>`<div class="flowbar"><span class="nm">${r.n}</span>
+    <span class="bar" style="width:${Math.max(3,100*Math.abs(r.d)/max)*0.55}%;background:${r.d>=0?CUP:CDN}"></span>
+    <span class="val">${sgn(r.d)}${r.d}%p · 5일 ${sgn(r.chg)}${r.chg??'-'}%</span></div>`;
+  el.innerHTML='<div class="invh up">▲ 돈이 들어오는 업종</div>'+top.map(bar).join('')
+    +'<div class="invh dn" style="margin-top:10px">▼ 돈이 빠지는 업종</div>'+bot.map(bar).join('');
+}
+
+const quadPlugin={id:'quad',beforeDraw(c){
+  const {ctx,chartArea:a,scales:{x,y}}=c; if(!a)return;
+  const x0=x.getPixelForValue(0),y0=y.getPixelForValue(0);
+  ctx.save();
+  ctx.fillStyle='rgba(240,68,82,.05)';ctx.fillRect(x0,a.top,a.right-x0,y0-a.top);
+  ctx.fillStyle='rgba(52,133,250,.05)';ctx.fillRect(a.left,y0,x0-a.left,a.bottom-y0);
+  ctx.strokeStyle='#3a4254';ctx.beginPath();ctx.moveTo(x0,a.top);ctx.lineTo(x0,a.bottom);ctx.moveTo(a.left,y0);ctx.lineTo(a.right,y0);ctx.stroke();
+  ctx.fillStyle='#9aa5b8';ctx.font='11px sans-serif';
+  ctx.fillText('주도',a.right-30,a.top+14);ctx.fillText('개선',a.left+6,a.top+14);
+  ctx.fillText('소외',a.left+6,a.bottom-6);ctx.fillText('약화',a.right-30,a.bottom-6);
+  ctx.restore();}};
+
+function rrg(mkt){
+  const ss=D.sectors.filter(s=>s.rrg&&s.rrg.length>1&&(mkt==='ALL'||s.market===mkt));
+  const pal=['#f04452','#f5b942','#5a8dee','#4dd0a1','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#94a3b8'];
+  const data={datasets:ss.map((s,i)=>{
+    const col=pal[i%pal.length];
+    return {label:s.name+(s.market==='KOSDAQ'?'(닥)':''),
+      data:s.rrg.map(p=>({x:p[0],y:p[1]})),showLine:true,borderColor:col+'88',backgroundColor:col,
+      borderWidth:1.5,pointRadius:s.rrg.map((_,j)=>j===s.rrg.length-1?5:2),tension:.3};})};
+  mk('rrg',{type:'scatter',data,plugins:[quadPlugin],
+    options:{maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{boxWidth:8,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+' 상대강도 '+c.parsed.x+'% / 모멘텀 '+c.parsed.y+'%'}}},
+      scales:{x:{title:{display:true,text:'시장 대비 20일 상대강도(%)'}},y:{title:{display:true,text:'5일 상대모멘텀(%)'}}}}});
+}
+function rrgTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));rrg(m);}
+
+function invSector(){
+  const el=document.getElementById('invSector');
+  const names={'외국인':'🌏 외국인','기관합계':'🏦 기관','개인':'👤 개인'};
+  el.innerHTML=Object.keys(D.investorSector||{}).map(inv=>{
+    const arr=D.investorSector[inv]; if(!arr||!arr.length)return '';
+    const top=arr.slice(0,6),bot=arr.slice(-6).reverse();
+    const max=Math.max(...arr.map(r=>Math.abs(r.net)),1);
+    const bar=r=>`<div class="flowbar"><span class="nm">${r.sector}</span>
+      <span class="bar" style="width:${Math.max(3,100*Math.abs(r.net)/max)*0.5}%;background:${r.net>=0?CUP:CDN}"></span>
+      <span class="val">${sgn(r.net)}${fmt(r.net,0)}</span></div>`;
+    return `<div><div class="invh">${names[inv]||inv}</div>${top.map(bar).join('')}<div style="height:6px"></div>${bot.filter(r=>r.net<0).map(bar).join('')}</div>`;
+  }).join('');
+}
+
+function topStocks(){
+  const el=document.getElementById('topStocks');
+  const names={'외국인':'🌏 외국인','기관합계':'🏦 기관','개인':'👤 개인'};
+  el.innerHTML=Object.keys(D.topStocks||{}).map(inv=>{
+    const arr=D.topStocks[inv]||[];
+    const buys=arr.filter(r=>r.net>0).slice(0,5),sells=arr.filter(r=>r.net<0).sort((a,b)=>a.net-b.net).slice(0,5);
+    const row=r=>`<tr><td>${r.name}</td><td style="color:${CTX2};font-size:11px">${r.sector||'-'}</td><td class="${cls(r.net)}">${sgn(r.net)}${fmt(r.net,0)}</td></tr>`;
+    return `<div><div class="invh">${names[inv]||inv}</div><table><tr><th>종목</th><th>업종</th><th>순매수(억)</th></tr>
+      ${buys.map(row).join('')}${sells.map(row).join('')}</table></div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
