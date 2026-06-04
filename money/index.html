@@ -95,6 +95,12 @@ td:first-child,th:first-child{text-align:left}
   <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 전체 업종 내 거래대금 비중</span></div>
 </div>
 
+<div class="card full">
+  <h2>③-1 업종 관심도 흐름 <span class="sub">거래대금 비중 상위 10개 업종 · 일별 추이</span></h2>
+  <div style="height:300px"><canvas id="shareFlow"></canvas></div>
+  <div class="note">각 선 = 해당 업종이 전체 업종 거래대금에서 차지한 비중(%). 가파르게 올라오는 선 = 시장 관심이 빠르게 몰리는 업종, 꺾여 내려가는 선 = 관심이 식는 업종.</div>
+</div>
+
 <div class="card">
   <h2>④ 수급 이동 감지 <span class="sub">거래대금 비중 변화: 직전5일 → 최근5일 (%p)</span></h2>
   <div id="flowShift"></div>
@@ -144,7 +150,7 @@ function render(){
   document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1]+' · 업종이력 '+(D.histDays||1)+'일 누적';
   if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
   kpis(); marketShare(); invTab('kospi',document.querySelector('[data-m=kospi]'));
-  treemap('ALL'); flowShift(); rrg('ALL'); foreignRank();
+  treemap('ALL'); shareFlow(); flowShift(); rrg('ALL'); foreignRank();
 }
 
 function kpis(){
@@ -212,6 +218,25 @@ function treemap(mkt){
   }).join('');
 }
 function tmTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));treemap(m);}
+
+function shareFlow(){
+  const h=D.sectorHist||{}; const ds=Object.keys(h).sort();
+  const cv=document.getElementById('shareFlow'); if(!cv)return;
+  if(ds.length<2){cv.parentElement.innerHTML='<div class="note">📥 이력 축적/백필 후 표시됩니다.</div>';return;}
+  const tot={}; ds.forEach(d=>{tot[d]=0;for(const k in h[d])tot[d]+=(h[d][k][1]||0);});
+  const names=[...new Set([].concat(...ds.map(d=>Object.keys(h[d]))))].filter(n=>n!=='기타');
+  const avg={};
+  names.forEach(n=>{let s=0,c=0;ds.slice(-5).forEach(d=>{if(h[d][n]&&tot[d]>0){s+=h[d][n][1]/tot[d];c++;}});avg[n]=c?s/c:0;});
+  const top=names.sort((a,b)=>avg[b]-avg[a]).slice(0,10);
+  const pal=['#d93a4e','#e3a008','#2b6fe3','#0e9f6e','#9061f9','#ff5a1f','#0694a2','#e74694','#84cc16','#64748b'];
+  mk('shareFlow',{type:'line',data:{labels:ds.map(d=>d.slice(5)),
+    datasets:top.map((n,i)=>({label:n,data:ds.map(d=>(h[d][n]&&tot[d]>0)?+(100*h[d][n][1]/tot[d]).toFixed(2):null),
+      borderColor:pal[i%10],backgroundColor:pal[i%10],pointRadius:0,tension:.3,borderWidth:i<3?2.5:1.5,spanGaps:true}))},
+    options:{maintainAspectRatio:false,interaction:{mode:'nearest',intersect:false},
+      plugins:{legend:{position:'right',labels:{boxWidth:8,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+' '+c.parsed.y+'%'}}},
+      scales:{x:{ticks:{maxTicksLimit:8}},y:{title:{display:true,text:'거래대금 비중(%)'}}}}});
+}
 
 function flowShift(){
   const el=document.getElementById('flowShift');

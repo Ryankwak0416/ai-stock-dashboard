@@ -105,6 +105,45 @@ def fetch_industry_stocks(no):
         if len(ss) < 60: break
     return stocks
 
+def backfill_sector_history(sector_top, snap, prev_hist, dates):
+    """업종 이력 백필: 업종별 거래대금 상위 8종목의 일별 시세(종가x거래량 근사)를 합산하고,
+    오늘의 정확한 업종 합계로 스케일 보정해 과거 ~30거래일 이력을 역산한다."""
+    need = [d for d in dates[-31:] if d not in prev_hist]
+    if len(need) < 3:
+        return 0
+    log(f"백필 시작: {len(need)}일 x {len(sector_top)}업종 (상위8종목 근사)")
+    today = dates[-1]
+    filled = set()
+    for name, tops in sector_top.items():
+        exact = (snap.get(name) or {}).get("val") or 0.0
+        day_val, day_cnum, approx_today = {}, {}, 0.0
+        for code, _v in tops:
+            if not code: continue
+            try:
+                rows = get(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=40&page=1",
+                           retries=1).json()
+            except Exception:
+                continue
+            if not isinstance(rows, list): continue
+            for r in rows:
+                d = str(r.get("localTradedAt", ""))[:10]
+                close, vol = num(r.get("closePrice")), num(r.get("accumulatedTradingVolume"))
+                chg = num(r.get("fluctuationsRatio"))
+                if not d or close is None or vol is None: continue
+                val = close * vol / 1e12  # 조원 근사
+                day_val[d] = day_val.get(d, 0.0) + val
+                day_cnum[d] = day_cnum.get(d, 0.0) + (chg or 0.0) * val
+                if d == today: approx_today += val
+        scale = (exact / approx_today) if approx_today > 0 and exact > 0 else 1.0
+        for d in need:
+            v = day_val.get(d)
+            if v and v > 0:
+                chg = day_cnum[d] / v
+                prev_hist.setdefault(d, {})[name] = [round(chg, 2), round(v * scale, 4)]
+                filled.add(d)
+    log(f"백필 완료: {len(filled)}일 추가")
+    return len(filled)
+
 def fetch_foreign_rank():
     """외국인 순매수/순매도 상위. 본문+iframe 안의 테이블에서 '종목명/금액' 헤더를 찾아 파싱."""
     html = get("https://finance.naver.com/sise/sise_deal_rank.naver").text
@@ -193,7 +232,7 @@ def main():
     except Exception as e:
         ERRORS.append(f"prev hist: {e}")
 
-    snap, code2sec = {}, {}
+    snap, code2sec, sector_top = {}, {}, {}
     try:
         groups = fetch_industries()
         log(f"업종 {len(groups)}개")
@@ -203,6 +242,7 @@ def main():
             except Exception as e:
                 ERRORS.append(f"industry {g.get('name')}: {e}"); continue
             tot = ksp = kdq = 0.0
+            stocks_v = []
             for s in ss:
                 v = num(s.get("accumulatedTradingValue")) or 0.0
                 tot += v
@@ -210,6 +250,9 @@ def main():
                 else: kdq += v
                 code2sec[s.get("itemCode")] = g["name"]
                 code2sec[s.get("stockName")] = g["name"]
+                stocks_v.append((s.get("itemCode"), v))
+            stocks_v.sort(key=lambda x: -x[1])
+            sector_top[g["name"]] = stocks_v[:8]
             snap[g["name"]] = {"chg": num(g.get("changeRate")), "val": round(tot / 1e6, 4),
                                "ksp": round(ksp / 1e6, 4), "kdq": round(kdq / 1e6, 4),
                                "rise": g.get("riseCount"), "fall": g.get("fallCount")}
@@ -219,6 +262,11 @@ def main():
     today = dates[-1]
     if snap:
         prev_hist[today] = {k: [v["chg"], v["val"]] for k, v in snap.items()}
+    if snap:
+        try:
+            backfill_sector_history(sector_top, snap, prev_hist, dates)
+        except Exception as e:
+            ERRORS.append(f"backfill: {e}"); traceback.print_exc()
     hist_dates = sorted(prev_hist.keys())[-DAYS:]
     prev_hist = {d: prev_hist[d] for d in hist_dates}
     out["sectorHist"] = prev_hist
