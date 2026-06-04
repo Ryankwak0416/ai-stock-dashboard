@@ -69,7 +69,13 @@ td:first-child,th:first-child{text-align:left}
     <div style="width:170px;height:170px"><canvas id="donut"></canvas></div>
     <div style="flex:1;min-width:240px;height:170px"><canvas id="shareTrend"></canvas></div>
   </div>
-  <div class="note">도넛=최근 거래일 거래대금 비중, 추이=최근 60거래일 코스닥 비중(%). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+  <div class="note">도넛=최근 거래일 거래대금 비중, 추이=코스피·코스닥 각각의 거래대금(조원)과 코스닥 비중(점선, %). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+</div>
+
+<div class="card">
+  <h2>①-1 환율 vs 외국인 수급 <span class="sub">원/달러 환율과 외국인 누적 순매수(양시장 합)</span></h2>
+  <div style="height:220px"><canvas id="fxChart"></canvas></div>
+  <div class="note">노란선=원/달러 환율(좌축), 빨간선=외국인 누적 순매수(우축, 억원). 통상 환율 상승(원화 약세) 구간에서 외국인 매도가 동반되고, 환율이 꺾이며 외국인이 순매수로 전환되는 시점이 수급 개선 신호로 해석됩니다.</div>
 </div>
 
 <div class="card">
@@ -150,7 +156,7 @@ fetch(DATA_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw new Error('HTTP '+r.sta
 function render(){
   document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1]+' · 업종이력 '+(D.histDays||1)+'일 누적';
   if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
-  kpis(); marketShare(); invTab('kospi',document.querySelector('[data-m=kospi]'));
+  kpis(); marketShare(); fxChart(); invTab('kospi',document.querySelector('[data-m=kospi]'));
   treemap('ALL'); shareFlow(); flowShift(); rrg('ALL'); foreignRank();
 }
 
@@ -178,12 +184,37 @@ function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(docu
 
 function marketShare(){
   const n=D.dates.length,ks=D.market.kospi.value,kq=D.market.kosdaq.value;
-  mk('donut',{type:'doughnut',data:{labels:['코스피','코스닥'],datasets:[{data:[ks[n-1],kq[n-1]],backgroundColor:['#f5b942','#5a8dee'],borderWidth:0}]},
+  mk('donut',{type:'doughnut',data:{labels:['코스피','코스닥'],datasets:[{data:[ks[n-1],kq[n-1]],backgroundColor:['#e3a008','#5a8dee'],borderWidth:0}]},
     options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+' '+fmt(c.parsed,1)+'조 ('+(100*c.parsed/(ks[n-1]+kq[n-1])).toFixed(1)+'%)'}}},cutout:'55%'}});
   const L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
   for(let i=n-L;i<n;i++){const t=(ks[i]||0)+(kq[i]||0);sh.push(t>0?+(100*kq[i]/t).toFixed(1):null);}
-  mk('shareTrend',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금 비중(%)',data:sh,borderColor:'#5a8dee',backgroundColor:'#5a8dee33',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:6}}}}});
+  mk('shareTrend',{type:'line',data:{labels:lab,datasets:[
+    {label:'코스피 거래대금(조)',data:ks.slice(-L),borderColor:'#e3a008',backgroundColor:'#e3a00822',fill:true,pointRadius:0,tension:.3,borderWidth:2,yAxisID:'y'},
+    {label:'코스닥 거래대금(조)',data:kq.slice(-L),borderColor:'#5a8dee',backgroundColor:'#5a8dee22',fill:true,pointRadius:0,tension:.3,borderWidth:2,yAxisID:'y'},
+    {label:'코스닥 비중(%)',data:sh,borderColor:'#9aa5b8',borderDash:[4,3],pointRadius:0,tension:.3,borderWidth:1.5,yAxisID:'y2'}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},
+      scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:'조원'}},
+        y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+}
+
+function fxChart(){
+  const cv=document.getElementById('fxChart'); if(!cv)return;
+  const fx=D.fx||[];
+  if(!fx.some(v=>v!=null)){cv.parentElement.parentElement.querySelector('.note').textContent='환율 데이터가 아직 없습니다. 다음 데이터 갱신 후 자동 표시됩니다.';return;}
+  const n=D.dates.length,L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const inv=D.investor||{};
+  let s=0; const cum=[];
+  for(let i=n-L;i<n;i++){
+    s+=(((inv.kospi||{}).foreign||[])[i]||0)+(((inv.kosdaq||{}).foreign||[])[i]||0);
+    cum.push(+s.toFixed(0));
+  }
+  mk('fxChart',{type:'line',data:{labels:lab,datasets:[
+    {label:'원/달러',data:fx.slice(-L),borderColor:'#e3a008',pointRadius:0,tension:.3,borderWidth:2,spanGaps:true,yAxisID:'y'},
+    {label:'외국인 누적 순매수(억)',data:cum,borderColor:CUP,pointRadius:0,tension:.2,borderWidth:2,yAxisID:'y2'}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:8}}},
+      scales:{x:{ticks:{maxTicksLimit:8}},y:{title:{display:true,text:'원/달러'}},
+        y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v,0)}}}}});
 }
 
 function invTab(m,btn){

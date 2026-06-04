@@ -82,6 +82,23 @@ def fetch_investor_history(sosok, bizdate, max_pages=8):
         if got == 0: break
     return out
 
+def fetch_fx_history(max_pages=10):
+    """원/달러 일별 환율 (네이버 시장지표, 매매기준율)"""
+    out = {}
+    for p in range(1, max_pages + 1):
+        html = get("https://finance.naver.com/marketindex/exchangeDailyQuote.naver"
+                   f"?marketindexCd=FX_USDKRW&page={p}").text
+        got = 0
+        for r in table_rows(html):
+            if len(r) >= 2 and re.match(r"\d{4}\.\d{2}\.\d{2}", r[0]):
+                v = num(r[1])
+                if v and 800 < v < 2500:
+                    d = r[0].replace(".", "-")
+                    if d not in out:
+                        out[d] = v; got += 1
+        if got == 0: break
+    return out
+
 def fetch_industries():
     groups, seen = [], set()
     for p in range(1, 12):
@@ -223,6 +240,13 @@ def main():
         except Exception as e:
             ERRORS.append(f"investor {key}: {e}")
     out["investor"] = inv_out
+
+    try:
+        fx = fetch_fx_history()
+        out["fx"] = [fx.get(d) for d in dates]
+        log(f"환율 {sum(1 for d in dates if d in fx)}일")
+    except Exception as e:
+        ERRORS.append(f"fx: {e}")
 
     prev_hist = {}
     try:
