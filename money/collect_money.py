@@ -16,7 +16,8 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 NOW = datetime.datetime.now(KST)
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "data.json")
-DAYS = 60
+DAYS = 240          # 시계열 보관 거래일수 (지수/투자자/환율)
+HIST_DAYS = 120      # 업종 이력 보관일수
 SLEEP = 0.25
 ERRORS = []
 H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
@@ -52,7 +53,7 @@ def table_rows(html):
         if cells: rows.append(cells)
     return rows
 
-def fetch_index_history(code, max_pages=12):
+def fetch_index_history(code, max_pages=45):
     out = {}
     for p in range(1, max_pages + 1):
         html = get(f"https://finance.naver.com/sise/sise_index_day.naver?code={code}&page={p}").text
@@ -66,7 +67,7 @@ def fetch_index_history(code, max_pages=12):
         if got == 0: break
     return out
 
-def fetch_investor_history(sosok, bizdate, max_pages=8):
+def fetch_investor_history(sosok, bizdate, max_pages=26):
     out = {}
     for p in range(1, max_pages + 1):
         u = (f"https://finance.naver.com/sise/investorDealTrendDay.naver"
@@ -82,7 +83,7 @@ def fetch_investor_history(sosok, bizdate, max_pages=8):
         if got == 0: break
     return out
 
-def fetch_fx_history(max_pages=10):
+def fetch_fx_history(max_pages=26):
     """원/달러 일별 환율 (네이버 시장지표, 매매기준율)"""
     out = {}
     for p in range(1, max_pages + 1):
@@ -296,7 +297,7 @@ def main():
             backfill_sector_history(sector_top, snap, prev_hist, dates)
         except Exception as e:
             ERRORS.append(f"backfill: {e}"); traceback.print_exc()
-    hist_dates = sorted(prev_hist.keys())[-DAYS:]
+    hist_dates = sorted(prev_hist.keys())[-HIST_DAYS:]
     prev_hist = {d: prev_hist[d] for d in hist_dates}
     out["sectorHist"] = prev_hist
     nh = len(hist_dates)

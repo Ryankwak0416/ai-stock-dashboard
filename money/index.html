@@ -63,8 +63,21 @@ td:first-child,th:first-child{text-align:left}
 
 <div class="grid">
 
+<div class="card full" style="display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap">
+  <span style="font-size:12px;color:var(--tx2);font-weight:700">📅 차트 기간</span>
+  <span class="tabs" id="periodTabs">
+    <button class="tab" onclick="setPeriod(5,this)">5일</button>
+    <button class="tab" onclick="setPeriod(10,this)">10일</button>
+    <button class="tab" onclick="setPeriod(20,this)">20일</button>
+    <button class="tab on" onclick="setPeriod(60,this)">60일</button>
+    <button class="tab" onclick="setPeriod(120,this)">120일</button>
+    <button class="tab" onclick="setPeriod(240,this)">240일</button>
+  </span>
+  <span class="note" style="margin:0">거래대금·비율·환율·투자자 수급·업종 관심도 흐름 차트에 일괄 적용 (보유 데이터 범위 내)</span>
+</div>
+
 <div class="card">
-  <h2>① 시장 거래대금 <span class="sub">최근 60거래일 · 시장별 별도 축</span></h2>
+  <h2>① 시장 거래대금 <span class="sub">시장별 별도 축 · 기간 선택 적용</span></h2>
   <div style="height:140px"><canvas id="valKospi"></canvas></div>
   <div style="height:140px;margin-top:8px"><canvas id="valKosdaq"></canvas></div>
   <div class="note">코스피·코스닥을 각각의 축으로 분리해 코스닥의 거래대금 변화도 또렷하게 보입니다.</div>
@@ -74,7 +87,7 @@ td:first-child,th:first-child{text-align:left}
   <h2>①-1 코스피 vs 코스닥 비율 <span class="sub">거래대금 기준</span></h2>
   <div id="ratioBar" style="margin-bottom:10px"></div>
   <div style="height:180px"><canvas id="shareTrend"></canvas></div>
-  <div class="note">막대=최근 거래일 비율, 차트=코스닥 비중(%) 60거래일 추이. 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+  <div class="note">막대=최근 거래일 비율, 차트=코스닥 비중(%) 추이(기간 선택 적용). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
 </div>
 
 <div class="card">
@@ -84,14 +97,14 @@ td:first-child,th:first-child{text-align:left}
 </div>
 
 <div class="card">
-  <h2>② 투자자별 수급 — 코스피 <span class="sub">일별 순매수 선차트 · 최근 20거래일 · 억원</span></h2>
+  <h2>② 투자자별 수급 — 코스피 <span class="sub">일별 순매수 선차트 · 억원 · 기간 선택 적용</span></h2>
   <div class="note" id="kpiKospi" style="margin:0 0 8px;font-size:12px"></div>
   <div style="height:220px"><canvas id="invKospi"></canvas></div>
   <div class="note">0선 위=순매수, 아래=순매도. 외국인·기관이 함께 0선 위로 올라오는 구간이 수급 개선 구간.</div>
 </div>
 
 <div class="card">
-  <h2>②-1 투자자별 수급 — 코스닥 <span class="sub">일별 순매수 선차트 · 최근 20거래일 · 억원</span></h2>
+  <h2>②-1 투자자별 수급 — 코스닥 <span class="sub">일별 순매수 선차트 · 억원 · 기간 선택 적용</span></h2>
   <div class="note" id="kpiKosdaq" style="margin:0 0 8px;font-size:12px"></div>
   <div style="height:220px"><canvas id="invKosdaq"></canvas></div>
   <div class="note">0선 위=순매수, 아래=순매도. 코스닥은 개인 비중이 커서 외국인 선의 방향 전환이 더 민감한 신호.</div>
@@ -149,6 +162,13 @@ const CTX2=getComputedStyle(document.documentElement).getPropertyValue('--tx2').
 Chart.defaults.color=CTX2; Chart.defaults.borderColor='#2a3245';
 Chart.defaults.font.family="'Segoe UI','Malgun Gothic',sans-serif";
 let D=null, charts={};
+let PERIOD=60;
+function setPeriod(p,btn){
+  PERIOD=p;
+  document.querySelectorAll('#periodTabs .tab').forEach(b=>b.classList.toggle('on',b===btn));
+  if(D){valueCharts();ratioCard();fxChart();invMarket();shareFlow();}
+}
+
 
 const fmt=(v,d=1)=>v==null?'-':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d,minimumFractionDigits:0});
 const cls=v=>v>0?'up':(v<0?'dn':'flat');
@@ -190,7 +210,7 @@ function kpis(){
 function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
 
 function valueCharts(){
-  const n=D.dates.length,L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const n=D.dates.length,L=Math.min(PERIOD,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
   const opt=t=>({maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:t}}}});
   mk('valKospi',{type:'line',data:{labels:lab,datasets:[{label:'코스피 거래대금(조)',data:D.market.kospi.value.slice(-L),borderColor:'#e3a008',backgroundColor:'#e3a00833',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},options:opt('조원')});
   mk('valKosdaq',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금(조)',data:D.market.kosdaq.value.slice(-L),borderColor:'#5a8dee',backgroundColor:'#5a8dee33',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},options:opt('조원')});
@@ -204,14 +224,14 @@ function ratioCard(){
    `<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700">
       <div style="width:${pk}%;background:#e3a008;display:flex;align-items:center;justify-content:center;color:#10131a;white-space:nowrap">코스피 ${pk.toFixed(1)}% (${fmt(ks[n-1],1)}조)</div>
       <div style="width:${pq}%;background:#5a8dee;display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap">코스닥 ${pq.toFixed(1)}%</div></div>`;
-  const L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
+  const L=Math.min(PERIOD,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
   for(let i=n-L;i<n;i++){const tt=(ks[i]||0)+(kq[i]||0);sh.push(tt>0?+(100*kq[i]/tt).toFixed(1):null);}
   mk('shareTrend',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금 비중(%)',data:sh,borderColor:'#5a8dee',backgroundColor:'#5a8dee22',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},
     options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{ticks:{callback:v=>v+'%'}}}}});
 }
 
 function invMarket(){
-  const n=D.dates.length,L=Math.min(20,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const n=D.dates.length,L=Math.min(PERIOD,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
   const zero={id:'zero',beforeDraw(c){const{ctx,chartArea:a,scales:{y}}=c;if(!a||!y)return;const y0=y.getPixelForValue(0);if(y0<a.top||y0>a.bottom)return;ctx.save();ctx.strokeStyle='#7d8696';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(a.left,y0);ctx.lineTo(a.right,y0);ctx.stroke();ctx.restore();}};
   for(const [key,cid,kid] of [['kospi','invKospi','kpiKospi'],['kosdaq','invKosdaq','kpiKosdaq']]){
     const inv=(D.investor||{})[key]; const kel=document.getElementById(kid);
@@ -233,7 +253,7 @@ function fxChart(){
   const cv=document.getElementById('fxChart'); if(!cv)return;
   const fx=D.fx||[];
   if(!fx.some(v=>v!=null)){cv.parentElement.parentElement.querySelector('.note').textContent='환율 데이터가 아직 없습니다. 다음 데이터 갱신 후 자동 표시됩니다.';return;}
-  const n=D.dates.length,L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const n=D.dates.length,L=Math.min(PERIOD,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
   const inv=D.investor||{};
   let s=0; const cum=[];
   for(let i=n-L;i<n;i++){
@@ -292,7 +312,7 @@ function drill(name){
 function tmTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));treemap(m);}
 
 function shareFlow(){
-  const h=D.sectorHist||{}; const ds=Object.keys(h).sort();
+  const h=D.sectorHist||{}; let ds=Object.keys(h).sort(); ds=ds.slice(-PERIOD);
   const cv=document.getElementById('shareFlow'); if(!cv)return;
   if(ds.length<2){cv.parentElement.innerHTML='<div class="note">📥 이력 축적/백필 후 표시됩니다.</div>';return;}
   const tot={}; ds.forEach(d=>{tot[d]=0;for(const k in h[d])tot[d]+=(h[d][k][1]||0);});
