@@ -232,7 +232,7 @@ def main():
     except Exception as e:
         ERRORS.append(f"prev hist: {e}")
 
-    snap, code2sec, sector_top = {}, {}, {}
+    snap, code2sec, sector_top, sector_stocks = {}, {}, {}, {}
     try:
         groups = fetch_industries()
         log(f"업종 {len(groups)}개")
@@ -242,7 +242,7 @@ def main():
             except Exception as e:
                 ERRORS.append(f"industry {g.get('name')}: {e}"); continue
             tot = ksp = kdq = 0.0
-            stocks_v = []
+            stocks_v, stocks_info = [], []
             for s in ss:
                 v = num(s.get("accumulatedTradingValue")) or 0.0
                 tot += v
@@ -251,8 +251,13 @@ def main():
                 code2sec[s.get("itemCode")] = g["name"]
                 code2sec[s.get("stockName")] = g["name"]
                 stocks_v.append((s.get("itemCode"), v))
+                mv = num(s.get("marketValue")) or 0.0   # 억원
+                stocks_info.append([s.get("stockName"), round(mv / 1e4, 3),
+                                    num(s.get("fluctuationsRatio")), round(v / 1e6, 4)])
             stocks_v.sort(key=lambda x: -x[1])
             sector_top[g["name"]] = stocks_v[:8]
+            stocks_info.sort(key=lambda x: -(x[1] or 0))
+            sector_stocks[g["name"]] = stocks_info[:20]
             snap[g["name"]] = {"chg": num(g.get("changeRate")), "val": round(tot / 1e6, 4),
                                "ksp": round(ksp / 1e6, 4), "kdq": round(kdq / 1e6, 4),
                                "rise": g.get("riseCount"), "fall": g.get("fallCount")}
@@ -308,6 +313,7 @@ def main():
                     if trail: s["rrg"] = trail
         sectors.append(s)
     out["sectors"] = sectors
+    out["sectorStocks"] = sector_stocks
 
     try:
         rank = fetch_foreign_rank()

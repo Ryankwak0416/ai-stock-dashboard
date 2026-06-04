@@ -32,7 +32,7 @@ canvas{max-width:100%}
 .tab{padding:4px 12px;border-radius:14px;border:1px solid var(--line);background:none;color:var(--tx2);cursor:pointer;font-size:12px}
 .tab.on{background:var(--acc);color:#10131a;border-color:var(--acc);font-weight:700}
 #treemap{display:flex;flex-wrap:wrap;gap:3px;min-height:280px;align-content:flex-start}
-.tile{border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;justify-content:center;min-width:74px;min-height:52px;overflow:hidden;cursor:default}
+.tile{cursor:pointer;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;justify-content:center;min-width:74px;min-height:52px;overflow:hidden}
 .tile .n{font-size:12px;font-weight:700;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
 .tile .c{font-size:11px;opacity:.95}
 .tile .s{font-size:10px;opacity:.75}
@@ -51,6 +51,7 @@ td:first-child,th:first-child{text-align:left}
 .err{background:#3a1d22;border:1px solid #6b2a35;border-radius:8px;padding:10px;font-size:12px;margin-bottom:12px;display:none}
 .legend{display:flex;gap:12px;font-size:11px;color:var(--tx2);flex-wrap:wrap;margin-top:6px}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+@keyframes zoomIn{from{transform:scale(.55);opacity:.25}to{transform:scale(1);opacity:1}}
 </style>
 </head>
 <body>
@@ -92,7 +93,7 @@ td:first-child,th:first-child{text-align:left}
     </span>
   </h2>
   <div id="treemap"></div>
-  <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 전체 업종 내 거래대금 비중</span></div>
+  <div class="legend"><span><span class="dot" style="background:var(--up)"></span>상승</span><span><span class="dot" style="background:var(--dn)"></span>하락</span><span>타일 하단 % = 전체 업종 내 거래대금 비중 · <b>타일 클릭 = 확대(구성종목 시총 비율)</b></span></div>
 </div>
 
 <div class="card full">
@@ -205,7 +206,9 @@ function heat(chg){
   return chg>=0?`rgba(240,68,82,${.25+.6*t})`:`rgba(52,133,250,${.25+.6*t})`;
 }
 
+let tmMkt='ALL';
 function treemap(mkt){
+  tmMkt=mkt;
   const el=document.getElementById('treemap');
   let ss=D.sectors.filter(s=>mkt==='ALL'||s.market===mkt).filter(s=>s.val5d>0.005);
   ss.sort((a,b)=>b.val5d-a.val5d);
@@ -213,8 +216,27 @@ function treemap(mkt){
   const tot=ss.reduce((a,s)=>a+s.val5d,0)||1;
   el.innerHTML=ss.map(s=>{
     const w=Math.max(6,100*s.val5d/tot);
-    return `<div class="tile" style="background:${heat(s.chg1)};flex:${s.val5d} 1 ${w*7}px" title="${s.name} (${s.market})\n금일 ${sgn(s.chg1)}${s.chg1??'-'}% · 5일 ${sgn(s.chg5)}${s.chg5??'-'}%\n당일 거래대금 ${fmt(s.val5d,2)}조 · 비중 ${s.valShare??'-'}%">
+    return `<div class="tile" data-sec="${s.name}" style="background:${heat(s.chg1)};flex:${s.val5d} 1 ${w*7}px" title="${s.name} (${s.market})\n금일 ${sgn(s.chg1)}${s.chg1??'-'}% · 5일 ${sgn(s.chg5)}${s.chg5??'-'}%\n당일 거래대금 ${fmt(s.val5d,2)}조 · 비중 ${s.valShare??'-'}%\n▶ 클릭하면 구성종목이 펼쳐집니다">
       <div class="n">${s.name}</div><div class="c">${sgn(s.chg1)}${s.chg1??'-'}%</div><div class="s">${s.valShare??'-'}%${mkt==='ALL'?' · '+(s.market==='KOSPI'?'피':'닥'):''}</div></div>`;
+  }).join('');
+  el.querySelectorAll('.tile').forEach(t=>t.onclick=()=>drill(t.dataset.sec));
+}
+function drill(name){
+  const el=document.getElementById('treemap');
+  let arr=((D.sectorStocks||{})[name]||[]).filter(x=>x[1]>0);
+  const head=`<div style="width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px">
+    <button class="tab on" onclick="treemap(tmMkt)">← 전체 업종</button>
+    <span class="invh" style="margin:0">${name} — 구성종목 시가총액 비율${arr.length?` (상위 ${arr.length}개)`:''}</span></div>`;
+  el.style.animation='none'; void el.offsetWidth; el.style.animation='zoomIn .35s ease';
+  if(!arr.length){
+    el.innerHTML=head+`<div class="note">이 업종의 구성종목 데이터가 아직 없습니다. 다음 데이터 갱신(매시 자동) 후 표시됩니다.</div>`;
+    return;
+  }
+  const tot=arr.reduce((a,x)=>a+x[1],0)||1;
+  el.innerHTML=head+arr.map(x=>{
+    const sh=100*x[1]/tot, w=Math.max(6,sh);
+    return `<div class="tile" style="background:${heat(x[2])};flex:${x[1]} 1 ${w*7}px" title="${x[0]}\n시총 ${fmt(x[1],2)}조 (업종 내 ${sh.toFixed(1)}%)\n금일 ${sgn(x[2])}${x[2]??'-'}% · 거래대금 ${fmt(x[3],3)}조">
+      <div class="n">${x[0]}</div><div class="c">${sgn(x[2])}${x[2]??'-'}%</div><div class="s">${sh.toFixed(1)}%</div></div>`;
   }).join('');
 }
 function tmTab(m,btn){btn.parentElement.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b===btn));treemap(m);}
