@@ -143,13 +143,56 @@ def fetch_news(query, n=2):
         if len(items) >= n: break
     return items
 
+def fetch_fundamentals(code):
+    """네이버 금융 모바일 API에서 PER/PBR/EPS/BPS 공시값 수집(방어적 파싱)."""
+    import json as _json
+    def _num(v):
+        if v is None: return None
+        t = str(v).replace(",", "").replace("배", "").replace("원", "").strip()
+        if t in ("", "-", "–", "N/A", "n/a"): return None
+        try: return float(t)
+        except Exception: return None
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+    out = {"per": None, "pbr": None, "eps": None, "bps": None}
+    for path in ("integration", "basic"):
+        try:
+            req = urllib.request.Request(f"https://m.stock.naver.com/api/stock/{code}/{path}", headers=headers)
+            with urllib.request.urlopen(req, timeout=8) as r:
+                d = _json.loads(r.read().decode("utf-8"))
+        except Exception:
+            continue
+        for it in (d.get("totalInfos") or []):
+            c = str(it.get("code") or it.get("key") or "").lower()
+            if c in out and out[c] is None:
+                out[c] = _num(it.get("value"))
+        for dk, dv in (d.items() if isinstance(d, dict) else []):
+            k = str(dk).lower()
+            if k in out and out[k] is None and not isinstance(dv, (dict, list)):
+                out[k] = _num(dv)
+        if out["per"] is not None and out["pbr"] is not None:
+            break
+    return out
+
 def main():
     if OFFLINE:
         prices, mode, news = SEED, "초기 데이터(스냅샷)", {}
         print("[모드] OFFLINE")
     else:
         prices, ok = fetch_prices()
-        mode = f"라이브 {ok}/{len(META)}종목"
+        fok = 0
+        for m in META:
+            try:
+                f = fetch_fundamentals(m["code"])
+                rec = prices[m["code"]]
+                if f.get("per") is not None: rec["per"] = f["per"]
+                if f.get("pbr") is not None: rec["pbr"] = f["pbr"]
+                if f.get("bps") is not None: rec["bps"] = f["bps"]
+                if f.get("eps"): rec["eps"] = int(f["eps"])
+                if f.get("per") is not None or f.get("pbr") is not None: fok += 1
+            except Exception as e:
+                print("[warn] fund", m["code"], e)
+        print(f"[펀더멘털 PER/PBR] {fok}/{len(META)}")
+        mode = f"라이브 {ok}/{len(META)} · PER/PBR {fok}종목"
         news = {}
         for m in META:
             try:
@@ -250,11 +293,11 @@ TEMPLATE = r"""<!doctype html>
       <table id="tbl"><thead><tr>
         <th data-k="category">카테고리</th><th data-k="name">종목</th><th data-k="market">시장</th><th data-k="grade">등급</th>
         <th class="num" data-k="price">현재가</th><th class="num" data-k="changePct">등락%</th>
-        <th class="num" data-k="capNum">시총</th><th class="num" data-k="per">PER</th>
+        <th class="num" data-k="capNum">시총</th><th class="num" data-k="per">PER</th><th class="num" data-k="pbr">PBR</th>
         <th data-k="w52pos">52주 위치</th><th data-k="comment">1Q 실적·코멘트</th><th>뉴스</th>
       </tr></thead><tbody id="tbody"></tbody></table>
     </div>
-    <div class="note" style="margin-top:6px;">※ 등락 색: <span class="up">빨강=상승</span>/<span class="down">파랑=하락</span>. 적자 종목은 PER 대신 '적자'. PER=현재가÷직전 EPS 추정. 뉴스는 매일 자동 갱신 시점 기준.</div>
+    <div class="note" style="margin-top:6px;">※ 등락 색: <span class="up">빨강=상승</span>/<span class="down">파랑=하락</span>. 적자 종목은 PER 대신 '적자'. PER·PBR은 네이버 금융 공시값(미제공 시 추정 또는 –). 뉴스는 매일 자동 갱신 시점 기준.</div>
   </div>
   <div class="src">베이스: AI관련주_재무정리 · 시세 FinanceDataReader/KRX · 뉴스 Google News · GitHub Actions 자동 빌드</div>
 </div>
@@ -268,9 +311,10 @@ const LEADERS=["삼성전자","SK하이닉스","이수페타시스","NAVER","뷰
 function capNum(s){ if(!s)return -1; const m=String(s).match(/([\d.]+)\s*([TBM]?)/); if(!m)return -1; let v=parseFloat(m[1]); const u=m[2]; if(u==="T")v*=1e12; else if(u==="B")v*=1e9; else if(u==="M")v*=1e6; return v; }
 const STOCKS = META.map(function(m){ const s=Object.assign({},m); const p=PRICES[m.code];
   if(p){ s.price=p.price;s.changePct=p.changePct;s.cap=p.cap;s.capNum=capNum(p.cap);s.h52=p.h52;s.l52=p.l52;s.eps=p.eps;s.t=p.t;
-    s.per=(p.eps&&p.eps>0)?+(p.price/p.eps).toFixed(1):null;
+    s.per=(p.per!=null)?p.per:((p.eps&&p.eps>0)?+(p.price/p.eps).toFixed(1):null);
+    s.pbr=(p.pbr!=null)?p.pbr:((p.bps&&p.bps>0)?+(p.price/p.bps).toFixed(2):null);
     s.w52pos=(p.h52>p.l52)?Math.round((p.price-p.l52)/(p.h52-p.l52)*100):null;
-  } else { s.price=null;s.changePct=null;s.capNum=-1;s.per=null;s.w52pos=null; } return s; });
+  } else { s.price=null;s.changePct=null;s.capNum=-1;s.per=null;s.pbr=null;s.w52pos=null; } return s; });
 const fmt=n=>n==null?"–":n.toLocaleString("ko-KR");
 const gcls=g=>g==="B"?"g-B":g==="C"?"g-C":g==="D"?"g-D":"g-x";
 const chCls=v=>v==null?"":v>0?"up":v<0?"down":"";
@@ -298,7 +342,7 @@ let sortK="changePct",sortDir=-1,fCat,fMkt,fGrade,fSearch;
 function filtered(){
   const cat=fCat.value,mkt=fMkt.value,gr=fGrade.value,q=fSearch.value.trim().toLowerCase();
   let rows=STOCKS.filter(s=>(!cat||s.category===cat)&&(!mkt||s.market===mkt)&&(!gr||s.grade===gr)&&(!q||(s.name+s.code+s.comment+s.note+s.category).toLowerCase().includes(q)));
-  rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];const numK=["price","changePct","capNum","per","score","w52pos"].includes(sortK);if(numK){x=x==null?-Infinity:x;y=y==null?-Infinity:y;return (x-y)*sortDir;}return (x||"").toString().localeCompare((y||"").toString(),"ko")*sortDir;});
+  rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];const numK=["price","changePct","capNum","per","pbr","score","w52pos"].includes(sortK);if(numK){x=x==null?-Infinity:x;y=y==null?-Infinity:y;return (x-y)*sortDir;}return (x||"").toString().localeCompare((y||"").toString(),"ko")*sortDir;});
   return rows;
 }
 function renderTable(){
@@ -307,10 +351,11 @@ function renderTable(){
   document.getElementById("tbody").innerHTML=rows.map(s=>{
     const mk=`<span class="mk ${s.market==="코스닥"?"kosdaq":""}">${s.market}</span>`;
     const per=s.per==null?(s.eps!=null&&s.eps<=0?'<span class="note">적자</span>':'–'):s.per;
+    const pbr=s.pbr==null?'–':s.pbr;
     const w52=s.w52pos==null?'':`<div class="w52"><div class="note">${s.w52pos}%</div><div class="bar"><div class="dot" style="left:${s.w52pos}%"></div></div></div>`;
     const hasNews=(NEWSDATA[s.name]||[]).length>0;
     const nbtn=hasNews?`<button class="nbtn" data-q="${s.name}">뉴스 ▾</button><div class="nw"></div>`:'<span class="note">-</span>';
-    return `<tr><td class="note">${s.category}</td><td class="name">${s.name}<br><span class="code">${s.code}</span></td><td>${mk}</td><td><span class="chip ${gcls(s.grade)}">${s.grade==="-"?"미수록":s.grade}${s.score!=null?" "+s.score:""}</span></td><td class="num">${fmt(s.price)}</td><td class="num ${chCls(s.changePct)}" title="${s.t||""} 기준">${chTxt(s.changePct)}</td><td class="num">${s.cap||"–"}</td><td class="num">${per}</td><td>${w52}</td><td class="comment">${s.comment}<div class="note">${s.note}</div></td><td>${nbtn}</td></tr>`;
+    return `<tr><td class="note">${s.category}</td><td class="name">${s.name}<br><span class="code">${s.code}</span></td><td>${mk}</td><td><span class="chip ${gcls(s.grade)}">${s.grade==="-"?"미수록":s.grade}${s.score!=null?" "+s.score:""}</span></td><td class="num">${fmt(s.price)}</td><td class="num ${chCls(s.changePct)}" title="${s.t||""} 기준">${chTxt(s.changePct)}</td><td class="num">${s.cap||"–"}</td><td class="num">${per}</td><td class="num">${pbr}</td><td>${w52}</td><td class="comment">${s.comment}<div class="note">${s.note}</div></td><td>${nbtn}</td></tr>`;
   }).join("");
 }
 function setupSort(){ document.querySelectorAll("#tbl th[data-k]").forEach(th=>{ th.onclick=()=>{const k=th.dataset.k; if(sortK===k)sortDir*=-1; else{sortK=k;sortDir=(["category","name","market","grade"].includes(k))?1:-1;} renderTable();}; }); }
