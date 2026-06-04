@@ -219,38 +219,39 @@ TEMPLATE = r"""<!doctype html>
 <title>AI 관련주 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
 <style>
-  :root{color-scheme:light;} *{box-sizing:border-box;}
-  body{margin:0;background:#f6f7f9;color:#1a1d21;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;}
+  :root{color-scheme:dark;} *{box-sizing:border-box;}
+  body{margin:0;background:#0b0e13;color:#e7e9ee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;}
   .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 60px;}
-  h1{font-size:20px;margin:0 0 2px;} .sub{color:#6b7280;font-size:12.5px;}
-  .card{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:14px 16px;margin-top:14px;}
+  h1{font-size:20px;margin:0 0 2px;color:#fff;} .sub{color:#8b93a1;font-size:12.5px;}
+  .card{background:#12161d;border:1px solid #232a35;border-radius:12px;padding:14px 16px;margin-top:14px;}
   .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:14px;}
-  .kpi{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:12px;}
-  .kpi .n{font-size:20px;font-weight:700;} .kpi .l{font-size:11.5px;color:#6b7280;margin-top:2px;}
-  .up{color:#dc2626;} .down{color:#2563eb;}
-  .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;} .warn b{color:#7c2d12;}
-  .pill{font-size:11px;padding:2px 8px;border-radius:999px;background:#16a34a;color:#fff;}
-  .rankrow{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #eee;} .rankrow:last-child{border-bottom:0;}
-  .rk{flex:0 0 26px;height:26px;border-radius:50%;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;}
+  .kpi{background:#12161d;border:1px solid #232a35;border-radius:12px;padding:12px;}
+  .kpi .n{font-size:20px;font-weight:700;color:#f3f5f8;} .kpi .l{font-size:11.5px;color:#8b93a1;margin-top:2px;}
+  .up{color:#ff5c5c;} .down{color:#4da3ff;}
+  .warn{background:#241a0e;border:1px solid #5b3a1a;color:#f0b35c;} .warn b{color:#ffd28a;}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;background:#15803d;color:#d7ffe5;}
+  .rankrow{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #232a35;} .rankrow:last-child{border-bottom:0;}
+  .rk{flex:0 0 26px;height:26px;border-radius:50%;background:#334155;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;}
   .charts{display:grid;grid-template-columns:1.1fr 0.8fr 1.1fr;gap:14px;}
-  .chartbox{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:12px;} .chartbox h3{font-size:13px;margin:0 0 8px;color:#374151;}
+  .chartbox{background:#12161d;border:1px solid #232a35;border-radius:12px;padding:12px;} .chartbox h3{font-size:13px;margin:0 0 8px;color:#aab2c0;}
   canvas{max-height:250px;}
   .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;}
-  select,input[type=text]{font-size:13px;padding:7px 9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#111;} input[type=text]{min-width:160px;}
+  select,input[type=text]{font-size:13px;padding:7px 9px;border:1px solid #2b3442;border-radius:8px;background:#0f1319;color:#e7e9ee;} input[type=text]{min-width:160px;}
   table{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px;}
-  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #eef0f2;vertical-align:top;}
-  th{position:sticky;top:0;background:#fafbfc;cursor:pointer;user-select:none;white-space:nowrap;font-size:11.5px;color:#374151;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #1d242e;vertical-align:top;}
+  th{position:sticky;top:0;background:#161b23;cursor:pointer;user-select:none;white-space:nowrap;font-size:11.5px;color:#aab2c0;}
   th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-  td.name{font-weight:600;white-space:nowrap;} td.name .code{color:#9ca3af;font-weight:400;font-size:11px;}
+  td.name{font-weight:600;white-space:nowrap;color:#f3f5f8;} td.name .code{color:#6b7280;font-weight:400;font-size:11px;}
+  tr:hover td{background:#151b24;}
   .chip{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;}
-  .g-B{background:#dcfce7;color:#166534;} .g-C{background:#fef9c3;color:#854d0e;} .g-D{background:#fee2e2;color:#991b1b;} .g-x{background:#eef1f4;color:#6b7280;}
-  .mk{display:inline-block;padding:1px 6px;border-radius:6px;font-size:10.5px;background:#eef2ff;color:#3730a3;} .mk.kosdaq{background:#ecfeff;color:#155e75;}
-  .comment{color:#374151;max-width:280px;font-size:12px;} .note{color:#9ca3af;font-size:11px;}
-  .w52{width:84px;} .w52 .bar{position:relative;height:6px;background:#eef0f2;border-radius:4px;margin-top:3px;} .w52 .dot{position:absolute;top:-2px;width:10px;height:10px;border-radius:50%;background:#111827;transform:translateX(-50%);}
-  .nbtn{font-size:11px;padding:3px 8px;border:1px solid #d1d5db;border-radius:7px;background:#fff;cursor:pointer;white-space:nowrap;} .nbtn:hover{background:#f3f4f6;}
-  .newscell{font-size:12px;color:#374151;background:#f9fafb;border-radius:8px;padding:8px 10px;margin-top:6px;} .newscell a{color:#1d4ed8;text-decoration:none;} .newscell .dt{color:#9ca3af;font-size:10.5px;}
-  .headline{background:#fff;border:1px solid #e6e8eb;border-radius:10px;padding:9px 12px;margin-top:8px;} .headline .t{font-weight:600;font-size:13px;}
-  .src{font-size:11px;color:#94a3b8;margin-top:4px;}
+  .g-B{background:#0f3d24;color:#4ade80;} .g-C{background:#443a0a;color:#facc15;} .g-D{background:#43181a;color:#f87171;} .g-x{background:#232a35;color:#8b93a1;}
+  .mk{display:inline-block;padding:1px 6px;border-radius:6px;font-size:10.5px;background:#1e2530;color:#9bb0ff;} .mk.kosdaq{background:#0f2b33;color:#67e8f9;}
+  .comment{color:#c3c9d4;max-width:280px;font-size:12px;} .note{color:#717a89;font-size:11px;}
+  .w52{width:84px;} .w52 .bar{position:relative;height:6px;background:#232a35;border-radius:4px;margin-top:3px;} .w52 .dot{position:absolute;top:-2px;width:10px;height:10px;border-radius:50%;background:#e7e9ee;transform:translateX(-50%);}
+  .nbtn{font-size:11px;padding:3px 8px;border:1px solid #2b3442;border-radius:7px;background:#1a212b;color:#dbe1ea;cursor:pointer;white-space:nowrap;} .nbtn:hover{background:#232c39;}
+  .newscell{font-size:12px;color:#c3c9d4;background:#161b23;border-radius:8px;padding:8px 10px;margin-top:6px;} .newscell a{color:#6ea8ff;text-decoration:none;} .newscell .dt{color:#717a89;font-size:10.5px;}
+  .headline{background:#12161d;border:1px solid #232a35;border-radius:10px;padding:9px 12px;margin-top:8px;} .headline .t{font-weight:600;font-size:13px;color:#e7e9ee;}
+  .src{font-size:11px;color:#5b6472;margin-top:4px;}
   @media(max-width:900px){.kpis{grid-template-columns:repeat(3,1fr);}.charts{grid-template-columns:1fr;}.comment{max-width:none;}}
 </style>
 <body>
@@ -330,13 +331,14 @@ function renderKpis(){
 }
 function renderRanks(){ document.getElementById("ranks").innerHTML=RANKS.map(([r,c,d])=>`<div class="rankrow"><div class="rk">${r}</div><div><b>${c}</b><div class="note">${d}</div></div></div>`).join(""); }
 function renderCharts(){
+  Chart.defaults.color="#9aa3b2"; Chart.defaults.borderColor="rgba(255,255,255,0.08)";
   const ps=STOCKS.filter(s=>s.changePct!=null).slice().sort((a,b)=>b.changePct-a.changePct);
   const movers=[...ps.slice(0,6),...ps.slice(-4)];
-  new Chart(document.getElementById("moveChart"),{type:"bar",data:{labels:movers.map(s=>s.name),datasets:[{data:movers.map(s=>s.changePct),backgroundColor:movers.map(s=>s.changePct>0?"#ef4444":"#3b82f6")}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>chTxt(c.raw)}}},maintainAspectRatio:false}});
+  new Chart(document.getElementById("moveChart"),{type:"bar",data:{labels:movers.map(s=>s.name),datasets:[{data:movers.map(s=>s.changePct),backgroundColor:movers.map(s=>s.changePct>0?"#ff5c5c":"#4da3ff")}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>chTxt(c.raw)}}},maintainAspectRatio:false}});
   const gc={B:0,C:0,D:0,"미수록":0}; STOCKS.forEach(s=>{gc[s.grade==="-"?"미수록":s.grade]++;});
-  new Chart(document.getElementById("gradeChart"),{type:"doughnut",data:{labels:Object.keys(gc),datasets:[{data:Object.values(gc),backgroundColor:["#22c55e","#eab308","#ef4444","#cbd5e1"]}]},options:{plugins:{legend:{position:"bottom"}},maintainAspectRatio:false}});
+  new Chart(document.getElementById("gradeChart"),{type:"doughnut",data:{labels:Object.keys(gc),datasets:[{data:Object.values(gc),backgroundColor:["#22c55e","#eab308","#ef4444","#475569"]}]},options:{plugins:{legend:{position:"bottom"}},maintainAspectRatio:false}});
   const cap=STOCKS.filter(s=>s.capNum>0).sort((a,b)=>b.capNum-a.capNum).slice(0,10);
-  new Chart(document.getElementById("capChart"),{type:"bar",data:{labels:cap.map(s=>s.name),datasets:[{data:cap.map(s=>s.capNum/1e12),backgroundColor:"#6366f1"}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw>=1?c.raw.toFixed(1)+"조":(c.raw*1000).toFixed(0)+"십억"}}},scales:{x:{title:{display:true,text:"조 원"}}},maintainAspectRatio:false}});
+  new Chart(document.getElementById("capChart"),{type:"bar",data:{labels:cap.map(s=>s.name),datasets:[{data:cap.map(s=>s.capNum/1e12),backgroundColor:"#818cf8"}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw>=1?c.raw.toFixed(1)+"조":(c.raw*1000).toFixed(0)+"십억"}}},scales:{x:{title:{display:true,text:"조 원"}}},maintainAspectRatio:false}});
 }
 let sortK="changePct",sortDir=-1,fCat,fMkt,fGrade,fSearch;
 function filtered(){
@@ -370,7 +372,7 @@ function bindNews(){
 }
 function renderHeadlines(){
   const box=document.getElementById("headlines"); let html="";
-  LEADERS.forEach(n=>{ const it=(NEWSDATA[n]||[])[0]; if(it) html+=`<div class="headline"><div class="t">${n} · <a href="${it.link}" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:none;">${stripTags(it.title)}</a></div><div class="note">${it.source||""} · ${it.pubDate||""}</div></div>`; });
+  LEADERS.forEach(n=>{ const it=(NEWSDATA[n]||[])[0]; if(it) html+=`<div class="headline"><div class="t">${n} · <a href="${it.link}" target="_blank" rel="noopener" style="color:#6ea8ff;text-decoration:none;">${stripTags(it.title)}</a></div><div class="note">${it.source||""} · ${it.pubDate||""}</div></div>`; });
   if(html) box.innerHTML=html;
 }
 function init(){
