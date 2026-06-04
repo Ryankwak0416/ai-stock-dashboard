@@ -64,30 +64,37 @@ td:first-child,th:first-child{text-align:left}
 <div class="grid">
 
 <div class="card">
-  <h2>① 시장 수급 집중도 <span class="sub">코스피 vs 코스닥 거래대금 비중</span></h2>
-  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-    <div style="width:170px;height:170px"><canvas id="donut"></canvas></div>
-    <div style="flex:1;min-width:240px;height:170px"><canvas id="shareTrend"></canvas></div>
-  </div>
-  <div class="note">도넛=최근 거래일 거래대금 비중, 추이=코스피·코스닥 각각의 거래대금(조원)과 코스닥 비중(점선, %). 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+  <h2>① 시장 거래대금 <span class="sub">최근 60거래일 · 시장별 별도 축</span></h2>
+  <div style="height:140px"><canvas id="valKospi"></canvas></div>
+  <div style="height:140px;margin-top:8px"><canvas id="valKosdaq"></canvas></div>
+  <div class="note">코스피·코스닥을 각각의 축으로 분리해 코스닥의 거래대금 변화도 또렷하게 보입니다.</div>
 </div>
 
 <div class="card">
-  <h2>①-1 환율 vs 외국인 수급 <span class="sub">원/달러 환율과 외국인 누적 순매수(양시장 합)</span></h2>
+  <h2>①-1 코스피 vs 코스닥 비율 <span class="sub">거래대금 기준</span></h2>
+  <div id="ratioBar" style="margin-bottom:10px"></div>
+  <div style="height:180px"><canvas id="shareTrend"></canvas></div>
+  <div class="note">막대=최근 거래일 비율, 차트=코스닥 비중(%) 60거래일 추이. 코스닥 비중 상승 = 개인 중심 위험선호 확대 신호로 자주 해석.</div>
+</div>
+
+<div class="card">
+  <h2>①-2 환율 vs 외국인 수급 <span class="sub">원/달러 환율과 외국인 누적 순매수(양시장 합)</span></h2>
   <div style="height:220px"><canvas id="fxChart"></canvas></div>
   <div class="note">노란선=원/달러 환율(좌축), 빨간선=외국인 누적 순매수(우축, 억원). 통상 환율 상승(원화 약세) 구간에서 외국인 매도가 동반되고, 환율이 꺾이며 외국인이 순매수로 전환되는 시점이 수급 개선 신호로 해석됩니다.</div>
 </div>
 
 <div class="card">
-  <h2>② 투자자별 자금 흐름
-    <span class="tabs">
-      <button class="tab on" data-m="kospi" onclick="invTab('kospi',this)">코스피</button>
-      <button class="tab" data-m="kosdaq" onclick="invTab('kosdaq',this)">코스닥</button>
-    </span>
-  </h2>
-  <div style="height:150px"><canvas id="invDaily"></canvas></div>
-  <div style="height:150px;margin-top:8px"><canvas id="invCum"></canvas></div>
-  <div class="note">위=일별 순매수(최근 20거래일, 억원), 아래=60거래일 누적 순매수. 외국인·기관 동반 순매수 구간이 시장 추세 강화 구간.</div>
+  <h2>② 투자자별 수급 — 코스피 <span class="sub">일별 순매수 선차트 · 최근 20거래일 · 억원</span></h2>
+  <div class="note" id="kpiKospi" style="margin:0 0 8px;font-size:12px"></div>
+  <div style="height:220px"><canvas id="invKospi"></canvas></div>
+  <div class="note">0선 위=순매수, 아래=순매도. 외국인·기관이 함께 0선 위로 올라오는 구간이 수급 개선 구간.</div>
+</div>
+
+<div class="card">
+  <h2>②-1 투자자별 수급 — 코스닥 <span class="sub">일별 순매수 선차트 · 최근 20거래일 · 억원</span></h2>
+  <div class="note" id="kpiKosdaq" style="margin:0 0 8px;font-size:12px"></div>
+  <div style="height:220px"><canvas id="invKosdaq"></canvas></div>
+  <div class="note">0선 위=순매수, 아래=순매도. 코스닥은 개인 비중이 커서 외국인 선의 방향 전환이 더 민감한 신호.</div>
 </div>
 
 <div class="card full">
@@ -156,7 +163,7 @@ fetch(DATA_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw new Error('HTTP '+r.sta
 function render(){
   document.getElementById('updated').textContent='업데이트: '+D.updated+' · 기준일: '+D.dates[D.dates.length-1]+' · 업종이력 '+(D.histDays||1)+'일 누적';
   if(D.errors&&D.errors.length){const e=document.getElementById('err');e.style.display='block';e.textContent='일부 수집 오류 '+D.errors.length+'건(해당 섹션 비표시 가능): '+D.errors.slice(0,3).join(' | ');}
-  kpis(); marketShare(); fxChart(); invTab('kospi',document.querySelector('[data-m=kospi]'));
+  kpis(); valueCharts(); ratioCard(); fxChart(); invMarket();
   treemap('ALL'); shareFlow(); flowShift(); rrg('ALL'); foreignRank();
 }
 
@@ -182,19 +189,44 @@ function kpis(){
 
 function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
 
-function marketShare(){
+function valueCharts(){
+  const n=D.dates.length,L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const opt=t=>({maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:t}}}});
+  mk('valKospi',{type:'line',data:{labels:lab,datasets:[{label:'코스피 거래대금(조)',data:D.market.kospi.value.slice(-L),borderColor:'#e3a008',backgroundColor:'#e3a00833',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},options:opt('조원')});
+  mk('valKosdaq',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금(조)',data:D.market.kosdaq.value.slice(-L),borderColor:'#5a8dee',backgroundColor:'#5a8dee33',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},options:opt('조원')});
+}
+
+function ratioCard(){
   const n=D.dates.length,ks=D.market.kospi.value,kq=D.market.kosdaq.value;
-  mk('donut',{type:'doughnut',data:{labels:['코스피','코스닥'],datasets:[{data:[ks[n-1],kq[n-1]],backgroundColor:['#e3a008','#5a8dee'],borderWidth:0}]},
-    options:{plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+' '+fmt(c.parsed,1)+'조 ('+(100*c.parsed/(ks[n-1]+kq[n-1])).toFixed(1)+'%)'}}},cutout:'55%'}});
+  const t=(ks[n-1]||0)+(kq[n-1]||0);
+  const pk=t>0?100*ks[n-1]/t:50,pq=100-pk;
+  document.getElementById('ratioBar').innerHTML=
+   `<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700">
+      <div style="width:${pk}%;background:#e3a008;display:flex;align-items:center;justify-content:center;color:#10131a;white-space:nowrap">코스피 ${pk.toFixed(1)}% (${fmt(ks[n-1],1)}조)</div>
+      <div style="width:${pq}%;background:#5a8dee;display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap">코스닥 ${pq.toFixed(1)}%</div></div>`;
   const L=Math.min(60,n),lab=D.dates.slice(-L).map(d=>d.slice(5)),sh=[];
-  for(let i=n-L;i<n;i++){const t=(ks[i]||0)+(kq[i]||0);sh.push(t>0?+(100*kq[i]/t).toFixed(1):null);}
-  mk('shareTrend',{type:'line',data:{labels:lab,datasets:[
-    {label:'코스피 거래대금(조)',data:ks.slice(-L),borderColor:'#e3a008',backgroundColor:'#e3a00822',fill:true,pointRadius:0,tension:.3,borderWidth:2,yAxisID:'y'},
-    {label:'코스닥 거래대금(조)',data:kq.slice(-L),borderColor:'#5a8dee',backgroundColor:'#5a8dee22',fill:true,pointRadius:0,tension:.3,borderWidth:2,yAxisID:'y'},
-    {label:'코스닥 비중(%)',data:sh,borderColor:'#9aa5b8',borderDash:[4,3],pointRadius:0,tension:.3,borderWidth:1.5,yAxisID:'y2'}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},
-      scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:'조원'}},
-        y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+  for(let i=n-L;i<n;i++){const tt=(ks[i]||0)+(kq[i]||0);sh.push(tt>0?+(100*kq[i]/tt).toFixed(1):null);}
+  mk('shareTrend',{type:'line',data:{labels:lab,datasets:[{label:'코스닥 거래대금 비중(%)',data:sh,borderColor:'#5a8dee',backgroundColor:'#5a8dee22',fill:true,pointRadius:0,tension:.3,borderWidth:2}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},scales:{x:{ticks:{maxTicksLimit:6}},y:{ticks:{callback:v=>v+'%'}}}}});
+}
+
+function invMarket(){
+  const n=D.dates.length,L=Math.min(20,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
+  const zero={id:'zero',beforeDraw(c){const{ctx,chartArea:a,scales:{y}}=c;if(!a||!y)return;const y0=y.getPixelForValue(0);if(y0<a.top||y0>a.bottom)return;ctx.save();ctx.strokeStyle='#7d8696';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(a.left,y0);ctx.lineTo(a.right,y0);ctx.stroke();ctx.restore();}};
+  for(const [key,cid,kid] of [['kospi','invKospi','kpiKospi'],['kosdaq','invKosdaq','kpiKosdaq']]){
+    const inv=(D.investor||{})[key]; const kel=document.getElementById(kid);
+    if(!inv){if(kel)kel.textContent='데이터 없음';continue;}
+    const f=inv.foreign[n-1],i2=inv.institution[n-1],p=inv.individual[n-1];
+    kel.innerHTML=`<b>${D.dates[n-1]} 순매수</b> &nbsp; <span class="${cls(f)}">외국인 ${sgn(f)}${fmt(f,0)}억</span> · <span style="color:#e3a008">기관 ${sgn(i2)}${fmt(i2,0)}억</span> · <span class="${cls(p)}">개인 ${sgn(p)}${fmt(p,0)}억</span>`;
+    mk(cid,{type:'line',data:{labels:lab,datasets:[
+      {label:'외국인',data:inv.foreign.slice(-L),borderColor:CUP,backgroundColor:CUP,pointRadius:2,tension:.25,borderWidth:2},
+      {label:'기관',data:inv.institution.slice(-L),borderColor:'#e3a008',backgroundColor:'#e3a008',pointRadius:2,tension:.25,borderWidth:2},
+      {label:'개인',data:inv.individual.slice(-L),borderColor:CDN,backgroundColor:CDN,pointRadius:2,tension:.25,borderWidth:2}]},
+     plugins:[zero],
+     options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+       plugins:{legend:{labels:{boxWidth:8}}},
+       scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
+  }
 }
 
 function fxChart(){
@@ -217,19 +249,6 @@ function fxChart(){
         y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v,0)}}}}});
 }
 
-function invTab(m,btn){
-  document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b===btn));
-  const inv=D.investor[m]; if(!inv)return;
-  const n=D.dates.length,L=Math.min(20,n),lab=D.dates.slice(-L).map(d=>d.slice(5));
-  const sets=[['외국인','foreign',CUP],['기관','institution','#f5b942'],['개인','individual',CDN]];
-  mk('invDaily',{type:'bar',data:{labels:lab,datasets:sets.map(([l,k,c])=>({label:l,data:inv[k].slice(-L),backgroundColor:c}))},
-    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
-  const L2=Math.min(60,n),lab2=D.dates.slice(-L2).map(d=>d.slice(5));
-  mk('invCum',{type:'line',data:{labels:lab2,datasets:sets.map(([l,k,c])=>{
-      let s=0;const arr=inv[k].slice(-L2).map(v=>+(s+=(v||0)).toFixed(0));
-      return {label:l+' 누적',data:arr,borderColor:c,pointRadius:0,tension:.2,borderWidth:2};})},
-    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:8}}},scales:{x:{ticks:{maxTicksLimit:8}},y:{ticks:{callback:v=>fmt(v,0)}}}}});
-}
 
 function heat(chg){
   if(chg==null)return '#3a4254';
