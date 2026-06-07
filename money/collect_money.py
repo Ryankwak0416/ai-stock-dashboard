@@ -16,8 +16,7 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 NOW = datetime.datetime.now(KST)
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "data.json")
-DAYS = 240          # 시계열 보관 거래일수 (지수/투자자/환율)
-HIST_DAYS = 120      # 업종 이력 보관일수
+DAYS = 60
 SLEEP = 0.25
 ERRORS = []
 H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
@@ -53,7 +52,7 @@ def table_rows(html):
         if cells: rows.append(cells)
     return rows
 
-def fetch_index_history(code, max_pages=45):
+def fetch_index_history(code, max_pages=12):
     out = {}
     for p in range(1, max_pages + 1):
         html = get(f"https://finance.naver.com/sise/sise_index_day.naver?code={code}&page={p}").text
@@ -67,7 +66,7 @@ def fetch_index_history(code, max_pages=45):
         if got == 0: break
     return out
 
-def fetch_investor_history(sosok, bizdate, max_pages=26):
+def fetch_investor_history(sosok, bizdate, max_pages=8):
     out = {}
     for p in range(1, max_pages + 1):
         u = (f"https://finance.naver.com/sise/investorDealTrendDay.naver"
@@ -80,23 +79,6 @@ def fetch_investor_history(sosok, bizdate, max_pages=26):
                 ind, frn, ins = num(r[1]), num(r[2]), num(r[3])
                 if ind is not None:
                     out[d] = (ind, frn, ins); got += 1
-        if got == 0: break
-    return out
-
-def fetch_fx_history(max_pages=26):
-    """원/달러 일별 환율 (네이버 시장지표, 매매기준율)"""
-    out = {}
-    for p in range(1, max_pages + 1):
-        html = get("https://finance.naver.com/marketindex/exchangeDailyQuote.naver"
-                   f"?marketindexCd=FX_USDKRW&page={p}").text
-        got = 0
-        for r in table_rows(html):
-            if len(r) >= 2 and re.match(r"\d{4}\.\d{2}\.\d{2}", r[0]):
-                v = num(r[1])
-                if v and 800 < v < 2500:
-                    d = r[0].replace(".", "-")
-                    if d not in out:
-                        out[d] = v; got += 1
         if got == 0: break
     return out
 
@@ -123,86 +105,101 @@ def fetch_industry_stocks(no):
         if len(ss) < 60: break
     return stocks
 
-def backfill_sector_history(sector_top, snap, prev_hist, dates):
-    """업종 이력 백필: 업종별 거래대금 상위 8종목의 일별 시세(종가x거래량 근사)를 합산하고,
-    오늘의 정확한 업종 합계로 스케일 보정해 과거 ~30거래일 이력을 역산한다."""
-    need = [d for d in dates[-31:] if d not in prev_hist]
-    if len(need) < 3:
-        return 0
-    log(f"백필 시작: {len(need)}일 x {len(sector_top)}업종 (상위8종목 근사)")
-    today = dates[-1]
-    filled = set()
-    for name, tops in sector_top.items():
-        exact = (snap.get(name) or {}).get("val") or 0.0
-        day_val, day_cnum, approx_today = {}, {}, 0.0
-        for code, _v in tops:
-            if not code: continue
-            try:
-                rows = get(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=40&page=1",
-                           retries=1).json()
-            except Exception:
-                continue
-            if not isinstance(rows, list): continue
-            for r in rows:
-                d = str(r.get("localTradedAt", ""))[:10]
-                close, vol = num(r.get("closePrice")), num(r.get("accumulatedTradingVolume"))
-                chg = num(r.get("fluctuationsRatio"))
-                if not d or close is None or vol is None: continue
-                val = close * vol / 1e12  # 조원 근사
-                day_val[d] = day_val.get(d, 0.0) + val
-                day_cnum[d] = day_cnum.get(d, 0.0) + (chg or 0.0) * val
-                if d == today: approx_today += val
-        scale = (exact / approx_today) if approx_today > 0 and exact > 0 else 1.0
-        for d in need:
-            v = day_val.get(d)
-            if v and v > 0:
-                chg = day_cnum[d] / v
-                prev_hist.setdefault(d, {})[name] = [round(chg, 2), round(v * scale, 4)]
-                filled.add(d)
-    log(f"백필 완료: {len(filled)}일 추가")
-    return len(filled)
+def _iter_labeled_tables(html):
+    """본문에서 (라벨, table내부HTML) 쌍을 순서대로 산출.
+    <caption>이 있으면 그것만 라벨로 쓴다(주변 텍스트 혼입 방지).
+    caption이 전혀 없을 때만 표 바로 앞 텍스트를 라벨 후보로 사용."""
+    for m in re.finditer(r"<table[^>]*>(.*?)</table>", html, re.S):
+        tb = m.group(1)
+        cap_m = re.search(r"<caption[^>]*>(.*?)</caption>", tb, re.S)
+        if cap_m:
+            label = re.sub(r"<[^>]+>", " ", cap_m.group(1))
+        else:
+            pre = html[max(0, m.start() - 120):m.start()]
+            cut = pre.rfind("</table>")
+            if cut != -1:
+                pre = pre[cut + 8:]
+            label = re.sub(r"<[^>]+>", " ", pre)
+        yield re.sub(r"\s+", " ", label).strip(), tb
 
 def fetch_foreign_rank():
-    """외국인 순매수/순매도 상위. 본문+iframe 안의 테이블에서 '종목명/금액' 헤더를 찾아 파싱."""
-    html = get("https://finance.naver.com/sise/sise_deal_rank.naver").text
-    htmls = [html]
-    for src in re.findall(r'<iframe[^>]*src=["\']([^"\']+)["\']', html)[:5]:
-        if src.startswith("/"):
-            src = "https://finance.naver.com" + src
-        if "naver.com" not in src:
-            continue
+    """외국인 순매수/순매도 상위.
+    deal_rank 페이지는 표의 caption(예: '외국인 순매수 상위')으로 종류를 구분한다.
+    URL 파라미터가 환경에 따라 다를 수 있으므로 여러 후보 URL을 받아
+    본문+iframe의 모든 표를 모으고, 라벨에 '외국인'+'순매수/순매도'가 있는 표만 채택한다.
+    (그래서 기관/인기검색어 표를 외국인으로 오인하지 않는다.)
+    외국인 표를 못 찾으면 잘못된 데이터를 넣지 않고 빈 리스트를 반환한다."""
+    base = "https://finance.naver.com/sise/sise_deal_rank.naver"
+    candidates = [
+        base,
+        base + "?investor_gubun=9000&type=buy",
+        base + "?investor_gubun=9000&type=sell",
+        base + "?investor=9000",
+        base + "?type=foreigner",
+    ]
+    pages, seen_url = [], set()
+    for u in candidates:
+        if u in seen_url: continue
+        seen_url.add(u)
         try:
-            htmls.append(get(src).text)
+            pages.append(get(u).text)
         except Exception as e:
-            ERRORS.append(f"rank iframe: {e}")
-    res, side_idx = [], 0
-    all_tables = []
-    for h in htmls:
-        all_tables += re.findall(r"<table[^>]*>(.*?)</table>", h, re.S)
-    for tb in all_tables:
-        rows = []
-        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
-            cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
-                     for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
-            rows.append(cells)
-        hdr = next((r for r in rows if any("종목명" in c for c in r)), None)
-        if not hdr: continue
-        name_i = next(i for i, c in enumerate(hdr) if "종목명" in c)
-        amt_i = next((i for i, c in enumerate(hdr) if "금액" in c), None)
-        side = "buy" if side_idx == 0 else "sell"
-        side_idx += 1
-        for r in rows:
-            if r == hdr or len(r) <= max(name_i, amt_i or 0): continue
-            nm = r[name_i]
-            if not nm or re.match(r"^[\d,.\-+%\s]*$", nm): continue
-            amt = num(r[amt_i]) if amt_i is not None else None
-            res.append({"name": nm, "amt": amt, "side": side})
-        if side_idx >= 2: break
+            ERRORS.append(f"rank url {u}: {e}")
+    # iframe 추적
+    extra = []
+    for h in list(pages):
+        for src in re.findall(r'<iframe[^>]*src=["\']([^"\']+)["\']', h)[:6]:
+            if src.startswith("/"):
+                src = "https://finance.naver.com" + src
+            if "naver.com" not in src:
+                continue
+            try:
+                extra.append(get(src).text)
+            except Exception as e:
+                ERRORS.append(f"rank iframe: {e}")
+    pages += extra
+
+    res = []
+    labels_seen = []
+    for h in pages:
+        for label, tb in _iter_labeled_tables(h):
+            if "외국인" not in label:
+                continue
+            if "순매수" in label:
+                side = "buy"
+            elif "순매도" in label:
+                side = "sell"
+            else:
+                continue
+            labels_seen.append(label[:30])
+            rows = []
+            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
+                cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
+                         for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
+                rows.append(cells)
+            hdr = next((r for r in rows if any("종목" in c for c in r)), None)
+            if not hdr:
+                continue
+            name_i = next(i for i, c in enumerate(hdr) if "종목" in c)
+            amt_i = next((i for i, c in enumerate(hdr) if ("금액" in c or "대금" in c)), None)
+            for r in rows:
+                if r == hdr or len(r) <= name_i:
+                    continue
+                nm = r[name_i].strip()
+                if not nm or re.match(r"^[\d,.\-+%\s]*$", nm):
+                    continue
+                amt = num(r[amt_i]) if (amt_i is not None and len(r) > amt_i) else None
+                res.append({"name": nm, "amt": amt, "side": side})
+
     seen, dedup = set(), []
     for r in res:
         k = (r["name"], r["side"])
         if k not in seen:
             seen.add(k); dedup.append(r)
+    if not dedup:
+        ERRORS.append("foreign rank: 외국인 표를 찾지 못함(파라미터/렌더링 변경 가능)")
+    else:
+        log(f"외국인 표 라벨: {labels_seen[:4]}")
     return dedup[:40]
 
 def main():
@@ -242,13 +239,6 @@ def main():
             ERRORS.append(f"investor {key}: {e}")
     out["investor"] = inv_out
 
-    try:
-        fx = fetch_fx_history()
-        out["fx"] = [fx.get(d) for d in dates]
-        log(f"환율 {sum(1 for d in dates if d in fx)}일")
-    except Exception as e:
-        ERRORS.append(f"fx: {e}")
-
     prev_hist = {}
     try:
         if os.path.exists(OUT):
@@ -257,7 +247,7 @@ def main():
     except Exception as e:
         ERRORS.append(f"prev hist: {e}")
 
-    snap, code2sec, sector_top, sector_stocks = {}, {}, {}, {}
+    snap, code2sec = {}, {}
     try:
         groups = fetch_industries()
         log(f"업종 {len(groups)}개")
@@ -267,7 +257,6 @@ def main():
             except Exception as e:
                 ERRORS.append(f"industry {g.get('name')}: {e}"); continue
             tot = ksp = kdq = 0.0
-            stocks_v, stocks_info = [], []
             for s in ss:
                 v = num(s.get("accumulatedTradingValue")) or 0.0
                 tot += v
@@ -275,14 +264,6 @@ def main():
                 else: kdq += v
                 code2sec[s.get("itemCode")] = g["name"]
                 code2sec[s.get("stockName")] = g["name"]
-                stocks_v.append((s.get("itemCode"), v))
-                mv = num(s.get("marketValue")) or 0.0   # 억원
-                stocks_info.append([s.get("stockName"), round(mv / 1e4, 3),
-                                    num(s.get("fluctuationsRatio")), round(v / 1e6, 4)])
-            stocks_v.sort(key=lambda x: -x[1])
-            sector_top[g["name"]] = stocks_v[:8]
-            stocks_info.sort(key=lambda x: -(x[1] or 0))
-            sector_stocks[g["name"]] = stocks_info[:20]
             snap[g["name"]] = {"chg": num(g.get("changeRate")), "val": round(tot / 1e6, 4),
                                "ksp": round(ksp / 1e6, 4), "kdq": round(kdq / 1e6, 4),
                                "rise": g.get("riseCount"), "fall": g.get("fallCount")}
@@ -292,12 +273,7 @@ def main():
     today = dates[-1]
     if snap:
         prev_hist[today] = {k: [v["chg"], v["val"]] for k, v in snap.items()}
-    if snap:
-        try:
-            backfill_sector_history(sector_top, snap, prev_hist, dates)
-        except Exception as e:
-            ERRORS.append(f"backfill: {e}"); traceback.print_exc()
-    hist_dates = sorted(prev_hist.keys())[-HIST_DAYS:]
+    hist_dates = sorted(prev_hist.keys())[-DAYS:]
     prev_hist = {d: prev_hist[d] for d in hist_dates}
     out["sectorHist"] = prev_hist
     nh = len(hist_dates)
@@ -338,7 +314,6 @@ def main():
                     if trail: s["rrg"] = trail
         sectors.append(s)
     out["sectors"] = sectors
-    out["sectorStocks"] = sector_stocks
 
     try:
         rank = fetch_foreign_rank()
