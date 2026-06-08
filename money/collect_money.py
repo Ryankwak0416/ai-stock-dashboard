@@ -105,6 +105,24 @@ def fetch_industry_stocks(no):
         if len(ss) < 60: break
     return stocks
 
+def fetch_fx(max_pages=8):
+    """원/달러 매매기준율 일별 이력 (네이버 마켓인덱스). {date: rate}."""
+    out = {}
+    for p in range(1, max_pages + 1):
+        try:
+            html = get(f"https://finance.naver.com/marketindex/exchangeDailyQuote.naver"
+                       f"?marketindexCd=FX_USDKRW&page={p}").text
+        except Exception as e:
+            ERRORS.append(f"fx p{p}: {e}"); break
+        got = 0
+        for r in table_rows(html):
+            if len(r) >= 2 and re.match(r"\d{4}\.\d{2}\.\d{2}", r[0]):
+                rate = num(r[1])
+                if rate:
+                    out[r[0].replace(".", "-")] = rate; got += 1
+        if got == 0: break
+    return out
+
 def _iter_labeled_tables(html):
     """본문에서 (라벨, table내부HTML) 쌍을 순서대로 산출.
     <caption>이 있으면 그것만 라벨로 쓴다(주변 텍스트 혼입 방지).
@@ -247,7 +265,7 @@ def main():
     except Exception as e:
         ERRORS.append(f"prev hist: {e}")
 
-    snap, code2sec = {}, {}
+    snap, code2sec, sec_stocks = {}, {}, {}
     try:
         groups = fetch_industries()
         log(f"업종 {len(groups)}개")
@@ -257,6 +275,7 @@ def main():
             except Exception as e:
                 ERRORS.append(f"industry {g.get('name')}: {e}"); continue
             tot = ksp = kdq = 0.0
+            stk = []
             for s in ss:
                 v = num(s.get("accumulatedTradingValue")) or 0.0
                 tot += v
@@ -264,6 +283,15 @@ def main():
                 else: kdq += v
                 code2sec[s.get("itemCode")] = g["name"]
                 code2sec[s.get("stockName")] = g["name"]
+                cap = num(s.get("marketValue"))
+                chg = num(s.get("fluctuationsRatio"))
+                if chg is None: chg = num(s.get("changeRate"))
+                stk.append([s.get("stockName"),
+                            round(cap / 1e4, 3) if cap else None,
+                            chg, round(v / 1e6, 4)])
+            stk = [x for x in stk if x[1]]
+            stk.sort(key=lambda x: x[1], reverse=True)
+            sec_stocks[g["name"]] = stk[:20]
             snap[g["name"]] = {"chg": num(g.get("changeRate")), "val": round(tot / 1e6, 4),
                                "ksp": round(ksp / 1e6, 4), "kdq": round(kdq / 1e6, 4),
                                "rise": g.get("riseCount"), "fall": g.get("fallCount")}
@@ -314,6 +342,14 @@ def main():
                     if trail: s["rrg"] = trail
         sectors.append(s)
     out["sectors"] = sectors
+    out["sectorStocks"] = sec_stocks
+
+    try:
+        fxh = fetch_fx()
+        out["fx"] = [fxh.get(d) for d in dates]
+        log(f"환율 {sum(1 for d in dates if fxh.get(d))}일")
+    except Exception as e:
+        ERRORS.append(f"fx: {e}")
 
     try:
         rank = fetch_foreign_rank()
