@@ -217,10 +217,7 @@ TEMPLATE = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI 관련주 대시보드</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/layout-base/layout-base.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cose-base/cose-base.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose/cytoscape-fcose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
 <style>
   :root{color-scheme:dark;} *{box-sizing:border-box;}
   body{margin:0;background:#0b0e13;color:#e7e9ee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;}
@@ -378,41 +375,10 @@ function renderDigest(){var ps=STOCKS.filter(function(s){return s.changePct!=nul
   LEADERS.forEach(n=>{ const it=(NEWSDATA[n]||[])[0]; if(it) html+=`<div class="headline"><div class="t">${n} · <a href="${it.link}" target="_blank" rel="noopener" style="color:#6ea8ff;text-decoration:none;">${stripTags(it.title)}</a></div><div class="note">${it.source||""} · ${it.pubDate||""}</div></div>`; });
   if(html) box.innerHTML=html;
 }
-function renderMindmap(){
-  if(typeof cytoscape==="undefined")return;
-  var KP="#6ea8ff",KD="#5eead4",EX="#cbd5e1";
-  var E=[["005930","000660","HBM 메모리 양대 축"],["042700","000660","TC본더 HBM 핵심장비 납품"],["042700","005930","HBM 장비 공급"],["039030","000660","반도체 레이저장비"],["095340","000660","테스트 소켓"],["403870","000660","고압어닐링 HBM 공정"],["007660","nvidia","엔비디아향 MLB 기판"],["042700","spacex","스페이스X 지분 취득"],["403870","042700","스페이스X 테마 동반"],["399720","054450","디자인 파트너"],["399720","005930","삼성 파운드리 디자인하우스"],["445090","tsmc","TSMC 디자인 파트너"],["277810","005930","삼성전자 지분투자"],["454910","277810","협동·휴머노이드 로봇"],["090360","277810","로봇 테마 동반"],["056080","277810","자율주행 로봇 테마"],["338220","328130","AI 의료영상"],["338220","322510","의료AI 동반 급등"],["108860","338220","의료AI 동반"],["328130","322510","AI 의료영상"],["035420","035720","대형 플랫폼 AI"],["299900","289220","VFX·버추얼휴먼"]];
-  var ids={};E.forEach(function(e){ids[e[0]]=1;ids[e[1]]=1;});
-  var nodes=STOCKS.filter(function(st){return ids[st.code];}).map(function(st){var col=(st.market==="코스피")?KP:KD;var sz=(st.capNum>0?Math.max(60,Math.min(128,Math.log10(st.capNum)*12-70)):60);return {data:{id:st.code,label:st.name,cat:st.category,color:col,size:sz}};});
-  [["nvidia","NVIDIA"],["tsmc","TSMC"],["spacex","스페이스X"]].forEach(function(e){nodes.push({data:{id:e[0],label:e[1],cat:"외부 핵심축",color:EX,size:74,ext:1}});});
-  var edges=E.map(function(e){return {data:{id:e[0]+"_"+e[1],source:e[0],target:e[1],label:e[2]}};});
-  var lg=function(c,sh){return "<span style='display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-size:11.5px;color:#aab2c0'><span style='width:11px;height:11px;"+(sh==="d"?"transform:rotate(45deg);":"border-radius:50%;")+"background:"+c+";display:inline-block'></span>";};
-  var legend=lg(KP)+"코스피</span>"+lg(KD)+"코스닥</span>"+lg(EX,"d")+"외부 핵심축</span>";
-  var card=document.createElement("div");card.className="card";
-  card.innerHTML="<h3 style='margin:0 0 6px;font-size:15px;color:#fff'>관계 마인드맵 · 업체 연결도</h3><div class='note' style='margin-bottom:8px'>노드 크기 = 시가총액 · 색 = 시장 · 선 = 공급·지분·파트너·테마 관계(코멘트·뉴스 기반). 관계가 있는 종목만 표시. <b style='color:#9bb0ff'>노드에 마우스를 올리면 직접 연결만 강조</b>됩니다.</div><div style='margin-bottom:10px'>"+legend+"</div><div id='mmcy' style='height:380px;border:1px solid #232a35;border-radius:14px;background:radial-gradient(circle at 50% 50%,#141a28,#0a0d12)'></div><div id='mminfo' class='note' style='margin-top:8px;min-height:18px'>노드나 선을 클릭하면 상세가 표시됩니다.</div>";
-  var ref=document.getElementById("headlines").closest(".card");ref.parentNode.insertBefore(card,ref);
-  var cy=cytoscape({container:document.getElementById("mmcy"),elements:{nodes:nodes,edges:edges},style:[
-    {selector:"node",style:{"background-color":"data(color)","background-opacity":0.96,"label":"data(label)","color":"#08203a","font-size":"12px","font-weight":"700","text-valign":"center","text-halign":"center","width":"data(size)","height":"data(size)","border-width":2,"border-color":"#0b0e13","border-opacity":0.28,"text-max-width":"74px","text-wrap":"wrap","min-zoomed-font-size":6,"transition-property":"opacity border-width border-color","transition-duration":"0.15s"}},
-    {selector:"node[ext]",style:{"shape":"round-diamond","color":"#1f2937","border-color":"#94a3b8"}},
-    {selector:"edge",style:{"width":1.8,"line-color":"#465062","curve-style":"bezier","opacity":0.6,"transition-property":"opacity line-color width","transition-duration":"0.15s"}},
-    {selector:".dim",style:{"opacity":0.06}},
-    {selector:"node.hl",style:{"border-color":"#ffffff","border-width":3,"border-opacity":1,"opacity":1}},
-    {selector:"edge.hl",style:{"line-color":"#7cc4ff","width":3,"opacity":0.98}}
-  ],minZoom:0.3,maxZoom:2.8,wheelSensitivity:0.18});
-  var lo;try{lo=cy.layout({name:"fcose",quality:"proof",randomize:true,animate:false,padding:24,nodeSeparation:42,idealEdgeLength:56,nodeRepulsion:2200,gravity:0.6,gravityRange:1.5,numIter:3000,tile:false,packComponents:true});}catch(e){lo=cy.layout({name:"cose",animate:false,padding:24,nodeRepulsion:9000,idealEdgeLength:56,nodeOverlap:16});}
-  function _ff(){try{cy.resize();cy.fit(cy.elements(),24);}catch(e){}}lo.one("layoutstop",_ff);lo.run();[150,500,1200,2200,3500].forEach(function(t){setTimeout(_ff,t);});try{var _ro=new ResizeObserver(_ff);_ro.observe(document.getElementById("mmcy"));setTimeout(function(){_ro.disconnect();},5000);}catch(e){}window.addEventListener("load",_ff);
-  function focusOn(n){cy.batch(function(){cy.elements().addClass("dim").removeClass("hl");n.closedNeighborhood().removeClass("dim").addClass("hl");});}
-  function clearFocus(){cy.batch(function(){cy.elements().removeClass("dim hl");});}
-  cy.on("mouseover","node",function(ev){if(!cy.scratch("_pin"))focusOn(ev.target);});
-  cy.on("mouseout","node",function(){if(!cy.scratch("_pin"))clearFocus();});
-  cy.on("tap","node",function(ev){var n=ev.target;cy.scratch("_pin",n.id());focusOn(n);document.getElementById("mminfo").innerHTML="<b style='color:#e7e9ee'>"+n.data("label")+"</b> · "+(n.data("cat")||"외부 핵심축")+" · 직접 연결 "+n.connectedEdges().length+"건";});
-  cy.on("tap","edge",function(ev){var d=ev.target.data();cy.scratch("_pin",d.id);cy.batch(function(){cy.elements().addClass("dim").removeClass("hl");ev.target.removeClass("dim").addClass("hl");ev.target.connectedNodes().removeClass("dim").addClass("hl");});document.getElementById("mminfo").innerHTML="<b style='color:#7cc4ff'>"+cy.getElementById(d.source).data("label")+" ↔ "+cy.getElementById(d.target).data("label")+"</b> — "+d.label;});
-  cy.on("tap",function(ev){if(ev.target===cy){cy.scratch("_pin",null);clearFocus();document.getElementById("mminfo").textContent="노드나 선을 클릭하면 상세가 표시됩니다.";}});
-}
 function init(){
   fCat=document.getElementById("fCat");fMkt=document.getElementById("fMkt");fGrade=document.getElementById("fGrade");fSearch=document.getElementById("fSearch");
   [...new Set(META.map(s=>s.category))].forEach(c=>{const o=document.createElement("option");o.textContent=c;fCat.appendChild(o);});
-  renderKpis();renderRanks();renderCharts();renderTable();setupSort();bindNews();renderHeadlines();renderDigest();renderMindmap();
+  renderKpis();renderRanks();renderCharts();renderTable();setupSort();bindNews();renderHeadlines();renderDigest();
   ["fCat","fMkt","fGrade","fSearch"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
 }
 init();
