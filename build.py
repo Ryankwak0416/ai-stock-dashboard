@@ -400,7 +400,7 @@ function renderMindmap(){
     {selector:"edge.hl",style:{"line-color":"#7cc4ff","width":3,"opacity":0.98}}
   ],minZoom:0.3,maxZoom:2.8,wheelSensitivity:0.18});
   var lo;try{lo=cy.layout({name:"fcose",quality:"proof",randomize:true,animate:false,padding:24,nodeSeparation:60,idealEdgeLength:95,nodeRepulsion:5000,gravity:0.3,gravityRange:3.2,numIter:3000,tile:false,packComponents:true});}catch(e){lo=cy.layout({name:"cose",animate:false,padding:24,nodeRepulsion:9000,idealEdgeLength:95,nodeOverlap:16});}
-  lo.one("layoutstop",function(){try{cy.resize();cy.fit(cy.elements(),26);}catch(e){}});lo.run();function _ff(){try{cy.resize();cy.fit(cy.elements(),26);}catch(e){}}setTimeout(_ff,400);setTimeout(_ff,1100);
+  function _ff(){try{cy.resize();cy.fit(cy.elements(),24);}catch(e){}}lo.one("layoutstop",_ff);lo.run();[150,500,1200,2200,3500].forEach(function(t){setTimeout(_ff,t);});try{var _ro=new ResizeObserver(_ff);_ro.observe(document.getElementById("mmcy"));setTimeout(function(){_ro.disconnect();},5000);}catch(e){}window.addEventListener("load",_ff);
   function focusOn(n){cy.batch(function(){cy.elements().addClass("dim").removeClass("hl");n.closedNeighborhood().removeClass("dim").addClass("hl");});}
   function clearFocus(){cy.batch(function(){cy.elements().removeClass("dim hl");});}
   cy.on("mouseover","node",function(ev){if(!cy.scratch("_pin"))focusOn(ev.target);});
