@@ -391,7 +391,7 @@ function renderMindmap(){
   var lg=function(c,sh){return "<span style='display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-size:11.5px;color:#aab2c0'><span style='width:11px;height:11px;"+(sh==="d"?"transform:rotate(45deg);":"border-radius:50%;")+"background:"+c+";display:inline-block'></span>";};
   var legend=lg(C_KP)+"코스피</span>"+lg(C_KD)+"코스닥</span>"+lg(C_EX,"d")+"외부 핵심축</span>";
   var card=document.createElement("div");card.className="card";
-  card.innerHTML="<h3 style='margin:0 0 6px;font-size:15px;color:#fff'>관계 마인드맵 · 업체 연결도</h3><div class='note' style='margin-bottom:8px'>중심에 가까울수록·노드가 클수록 시가총액이 큽니다. 선 = 공급·지분·파트너·테마 관계(코멘트·뉴스 기반). <b style='color:#9bb0ff'>노드에 마우스를 올리면 직접 연결만 강조</b>됩니다.</div><div style='margin-bottom:10px'>"+legend+"</div><div id='mmcy' style='height:580px;border:1px solid #232a35;border-radius:14px;background:radial-gradient(circle at 50% 50%,#141a28,#0a0d12)'></div><div id='mminfo' class='note' style='margin-top:8px;min-height:18px'>노드나 선을 클릭하면 상세가 표시됩니다.</div>";
+  card.innerHTML="<h3 style='margin:0 0 6px;font-size:15px;color:#fff'>관계 마인드맵 · 업체 연결도</h3><div class='note' style='margin-bottom:8px'>중심에 가까울수록·노드가 클수록 시가총액이 큽니다. 선 = 공급·지분·파트너·테마 관계(코멘트·뉴스 기반). <b style='color:#9bb0ff'>노드에 마우스를 올리면 직접 연결만 강조</b>됩니다.</div><div style='margin-bottom:10px'>"+legend+"</div><div id='mmcy' style='height:520px;border:1px solid #232a35;border-radius:14px;background:radial-gradient(circle at 50% 50%,#141a28,#0a0d12)'></div><div id='mminfo' class='note' style='margin-top:8px;min-height:18px'>노드나 선을 클릭하면 상세가 표시됩니다.</div>";
   var ref=document.getElementById("headlines").closest(".card");ref.parentNode.insertBefore(card,ref);
   var cy=cytoscape({container:document.getElementById("mmcy"),elements:{nodes:nodes,edges:edges},style:[
     {selector:"node",style:{"background-color":"data(color)","background-opacity":0.95,"label":"data(label)","color":"#08203a","font-size":"10.5px","font-weight":"700","text-valign":"center","text-halign":"center","width":"data(size)","height":"data(size)","border-width":2,"border-color":"#0b0e13","border-opacity":0.28,"text-max-width":"68px","text-wrap":"wrap","min-zoomed-font-size":7,"transition-property":"opacity border-width border-color","transition-duration":"0.15s"}},
@@ -401,8 +401,8 @@ function renderMindmap(){
     {selector:"node.hl",style:{"border-color":"#ffffff","border-width":3,"border-opacity":1,"opacity":1}},
     {selector:"edge.hl",style:{"line-color":"#7cc4ff","width":2.6,"opacity":0.96}}
   ],minZoom:0.3,maxZoom:2.6,wheelSensitivity:0.18});
-  var lo=cy.layout({name:"concentric",concentric:function(n){return n.data("w");},levelWidth:function(){return ring;},minNodeSpacing:30,spacing:1.05,animate:false,padding:22,equidistant:true,avoidOverlap:true});
-  lo.run();setTimeout(function(){try{cy.fit(cy.elements(),24);}catch(e){}},120);
+  var lo=cy.layout({name:"concentric",concentric:function(n){return n.data("w");},levelWidth:function(){return ring;},minNodeSpacing:52,spacing:1.3,animate:false,padding:22,equidistant:true,avoidOverlap:true});
+  lo.run();function _ff(){try{cy.resize();cy.fit(cy.elements(),28);}catch(e){}}setTimeout(_ff,250);setTimeout(_ff,750);
   function focusOn(n){cy.batch(function(){cy.elements().addClass("dim").removeClass("hl");n.closedNeighborhood().removeClass("dim").addClass("hl");});}
   function clearFocus(){cy.batch(function(){cy.elements().removeClass("dim hl");});}
   cy.on("mouseover","node",function(ev){if(!cy.scratch("_pin"))focusOn(ev.target);});
