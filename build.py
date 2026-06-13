@@ -388,7 +388,7 @@ function renderMindmap(){
   var edges=E.map(function(e){return {data:{id:e[0]+"_"+e[1],source:e[0],target:e[1],label:e[2]}};});
   var legend=cats.map(function(c){return "<span style='display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:11px;color:#aab2c0'><span style='width:11px;height:11px;border-radius:50%;background:"+palette[c]+"'></span>"+c+"</span>";}).join("")+"<span style='display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:11px;color:#aab2c0'><span style='width:10px;height:10px;transform:rotate(45deg);background:#e5e7eb'></span>외부 핵심축</span>";
   var card=document.createElement("div");card.className="card";
-  card.innerHTML="<h3 style='margin:0 0 6px;font-size:15px;color:#fff'>관계 마인드맵 · 업체 연결도</h3><div class='note' style='margin-bottom:8px'>노드 크기 = 시가총액 · 색 = 카테고리 · 선 = 공급·지분·파트너·테마 관계(코멘트·뉴스 기반 큐레이션). <b style='color:#9bb0ff'>노드에 마우스를 올리면 직접 연결만 강조</b>되고 나머지는 흐려집니다. 드래그·휠 줌 가능.</div><div style='margin-bottom:10px;line-height:2'>"+legend+"</div><div id='mmcy' style='height:660px;border:1px solid #232a35;border-radius:14px;background:radial-gradient(circle at 50% 38%,#121826,#0a0d12)'></div><div id='mminfo' class='note' style='margin-top:8px;min-height:18px'>노드나 선을 클릭하면 상세가 표시됩니다.</div>";
+  card.innerHTML="<h3 style='margin:0 0 6px;font-size:15px;color:#fff'>관계 마인드맵 · 업체 연결도</h3><div class='note' style='margin-bottom:8px'>노드 크기 = 시가총액 · 색 = 카테고리 · 선 = 공급·지분·파트너·테마 관계(코멘트·뉴스 기반 큐레이션). <b style='color:#9bb0ff'>노드에 마우스를 올리면 직접 연결만 강조</b>되고 나머지는 흐려집니다. 드래그·휠 줌 가능.</div><div style='margin-bottom:10px;line-height:2'>"+legend+"</div><div id='mmcy' style='height:480px;border:1px solid #232a35;border-radius:14px;background:radial-gradient(circle at 50% 38%,#121826,#0a0d12)'></div><div id='mminfo' class='note' style='margin-top:8px;min-height:18px'>노드나 선을 클릭하면 상세가 표시됩니다.</div>";
   var ref=document.getElementById("headlines").closest(".card");ref.parentNode.insertBefore(card,ref);
   var cy=cytoscape({container:document.getElementById("mmcy"),elements:{nodes:nodes,edges:edges},style:[
     {selector:"node",style:{"background-color":"data(color)","background-opacity":0.95,"label":"data(label)","color":"#0b0e13","font-size":"11px","font-weight":"700","text-valign":"center","text-halign":"center","width":"data(size)","height":"data(size)","border-width":2,"border-color":"#0b0e13","border-opacity":0.35,"text-max-width":"78px","text-wrap":"wrap","transition-property":"opacity border-color border-width","transition-duration":"0.15s"}},
@@ -398,8 +398,8 @@ function renderMindmap(){
     {selector:"node.hl",style:{"border-color":"#ffffff","border-width":3,"border-opacity":1,"opacity":1}},
     {selector:"edge.hl",style:{"line-color":"#6ea8ff","width":2.8,"opacity":0.98}}
   ],minZoom:0.25,maxZoom:2.6,wheelSensitivity:0.18});
-  var lo;try{lo=cy.layout({name:"fcose",quality:"proof",randomize:true,animate:true,animationDuration:600,padding:55,nodeSeparation:155,idealEdgeLength:140,nodeRepulsion:9500,gravity:0.18,gravityRange:3.8,tile:true,packComponents:true});}catch(e){lo=cy.layout({name:"cose",animate:false,padding:50,nodeRepulsion:11000,idealEdgeLength:140,nodeOverlap:18});}
-  lo.run();
+  var lo;try{lo=cy.layout({name:"fcose",quality:"proof",randomize:true,animate:false,padding:30,nodeSeparation:125,idealEdgeLength:105,nodeRepulsion:7000,gravity:0.45,gravityRange:2.4,tile:true,packComponents:true});}catch(e){lo=cy.layout({name:"cose",animate:false,padding:50,nodeRepulsion:11000,idealEdgeLength:140,nodeOverlap:18});}
+  lo.run();setTimeout(function(){try{cy.fit(cy.elements(),25);}catch(e){}},150);
   function focusOn(n){cy.batch(function(){cy.elements().addClass("dim").removeClass("hl");var nb=n.closedNeighborhood();nb.removeClass("dim").addClass("hl");});}
   function clearFocus(){cy.batch(function(){cy.elements().removeClass("dim hl");});}
   cy.on("mouseover","node",function(ev){if(!cy.scratch("_pin"))focusOn(ev.target);});
