@@ -1,12 +1,22 @@
 name: update-dashboard
 on:
   schedule:
-    - cron: "10 0-7,9 * * 1-5"
+    # KST 9~16시 30분 간격(5분·35분) + 18시대. 평일만.
+    # 30분 2회 시도 -> GitHub의 schedule 누락을 통계적으로 보완.
+    - cron: "5,35 0-7,9 * * 1-5"
   workflow_dispatch:
   push:
     branches: [ main ]
+
 permissions:
   contents: write
+
+# main에 push하는 다른 워크플로우(money-flow 등)에도 같은 group 이름을 넣으면
+# 서로 직렬화되어 push 충돌을 방지함.
+concurrency:
+  group: main-content
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,10 +27,13 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements.txt
       - run: python build.py
-      - name: commit and push
+      - name: commit and push (rebase-safe, retry)
         run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
           git add index.html
-          git commit -m "auto update" || echo "no changes"
-          git push
+          git commit -m "auto update" || { echo "no changes"; exit 0; }
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push && break
+            echo "push retry $i"; sleep 5
+          done
