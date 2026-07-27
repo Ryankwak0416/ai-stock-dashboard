@@ -43,7 +43,12 @@ jobs:
           git add stoch/data
           if git diff --staged --quiet; then
             echo "변경 없음"
-          else
-            git commit -m "stoch: data update $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
+            exit 0
           fi
+          git commit -m "stoch: data update $(date -u +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push 재시도 $i"
+            sleep 10
+          done
+          exit 1
