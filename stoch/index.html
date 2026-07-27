@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>멀티 타임프레임 스토캐스틱</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#30363d; --tx:#e6edf3; --dim:#8b949e;
+    --short:#4da3ff; --mid:#ffc247; --long:#ff6b9d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font-family:-apple-system,'Segoe UI','Malgun Gothic',sans-serif;font-size:14px}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;
+         flex-wrap:wrap;gap:10px;align-items:center}
+  h1{font-size:16px;margin:0 14px 0 0;font-weight:600;white-space:nowrap}
+  input,select,button{background:var(--panel);color:var(--tx);border:1px solid var(--line);
+       border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit}
+  input{width:210px}
+  button{cursor:pointer}
+  button:hover{border-color:#58a6ff}
+  button.on{background:#1f6feb;border-color:#1f6feb;color:#fff}
+  .sp{flex:1}
+  #wrap{padding:14px 18px}
+  #chartbox{position:relative;height:calc(100vh - 250px);min-height:380px;
+            background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+  #title{font-size:15px;font-weight:600;margin:0 0 8px 2px}
+  #title span{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+  #legend{margin-top:12px;background:var(--panel);border:1px solid var(--line);
+          border-radius:8px;padding:12px 14px;line-height:1.9}
+  #legend b{font-weight:600}
+  .sw{display:inline-block;width:34px;height:10px;vertical-align:middle;margin-right:7px}
+  .item{display:inline-block;margin-right:18px;cursor:pointer;user-select:none;white-space:nowrap;
+        vertical-align:middle}
+  .item.off{opacity:.35}
+  .grp{color:var(--dim);margin-right:8px;display:inline-block;width:92px;vertical-align:middle}
+  .note{color:var(--dim);font-size:12px;margin-top:10px;line-height:1.7}
+  #msg{color:var(--dim);padding:10px 2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>멀티 타임프레임 스토캐스틱</h1>
+  <input id="q" list="tk" placeholder="종목명 또는 코드 (예: 삼성전자 / 005930)" autocomplete="off">
+  <datalist id="tk"></datalist>
+  <button id="go">조회</button>
+  <button class="quick" data-code="KS11">코스피</button>
+  <button class="quick" data-code="KQ11">코스닥</button>
+  <span class="sp"></span>
+  <select id="span">
+    <option value="120">최근 120일</option>
+    <option value="250" selected>최근 250일</option>
+    <option value="500">최근 500일</option>
+  </select>
+  <button class="tf on" data-tf="day">일</button>
+  <button class="tf on" data-tf="week">주</button>
+  <button class="tf on" data-tf="month">월</button>
+</header>
+
+<div id="wrap">
+  <div id="title">종목을 선택하세요<span id="sub"></span></div>
+  <div id="chartbox"><canvas id="cv"></canvas></div>
+  <div id="msg"></div>
+
+  <div id="legend">
+    <div><span class="grp">색 =</span>
+      <b style="color:var(--short)">파랑 단기(5)</b> ·
+      <b style="color:var(--mid)">노랑 중기(10)</b> ·
+      <b style="color:var(--long)">분홍 장기(20)</b>
+      &nbsp;|&nbsp;<span class="grp" style="width:auto">선 =</span>
+      실선 일봉 · 긴파선 주봉 · 점선 월봉
+      &nbsp;|&nbsp; <b>굵은 흰선</b> = 주가·지수 (오른쪽 축)
+    </div>
+    <div id="lg"></div>
+  </div>
+
+  <div class="note">
+    스토캐스틱은 왼쪽 0~100 축, 가격은 오른쪽 축입니다. 20·80 기준선은 회색 점선.<br>
+    주봉·월봉 값은 일봉을 각각 5배·20배 환산한 것입니다 (주5주=일25, 월5월=일100).
+    주봉 20주와 월봉 5월은 100,60,60으로 같은 값이라 겹쳐 그려집니다.<br>
+    항목을 클릭하면 해당 선만 켜고 끌 수 있습니다.
+  </div>
+</div>
+
+<script>
+const SETTINGS = [
+  {label:'D5',  name:'일 단기 5,3,3',      tf:'day',   tier:'short'},
+  {label:'D10', name:'일 중기 10,6,6',     tf:'day',   tier:'mid'},
+  {label:'D20', name:'일 장기 20,12,12',   tf:'day',   tier:'long'},
+  {label:'W5',  name:'주 단기 25,15,15',   tf:'week',  tier:'short'},
+  {label:'W10', name:'주 중기 50,30,30',   tf:'week',  tier:'mid'},
+  {label:'W20', name:'주 장기 100,60,60',  tf:'week',  tier:'long'},
+  {label:'M5',  name:'월 단기 100,60,60',  tf:'month', tier:'short'},
+  {label:'M10', name:'월 중기 200,120,120',tf:'month', tier:'mid'},
+  {label:'M20', name:'월 장기 400,240,240',tf:'month', tier:'long'},
+];
+const COLOR = {short:'#4da3ff', mid:'#ffc247', long:'#ff6b9d'};
+const DASH  = {day:[], week:[10,5], month:[2,4]};
+const WIDTH = {day:1.5, week:1.9, month:2.3};
+
+let chart = null, cur = null, tickers = [];
+const tfOn = {day:true, week:true, month:true};
+const lineOn = {};
+SETTINGS.forEach(s => lineOn[s.label] = true);
+
+const $ = id => document.getElementById(id);
+
+const guides = {
+  id:'guides',
+  beforeDatasetsDraw(c){
+    const y = c.scales.y, x = c.chartArea; if(!y) return;
+    const g = c.ctx; g.save(); g.setLineDash([4,4]); g.lineWidth = 1;
+    [[20,'#3f4b58'],[50,'#2b333c'],[80,'#3f4b58']].forEach(([v,col])=>{
+      const py = y.getPixelForValue(v);
+      g.strokeStyle = col; g.beginPath();
+      g.moveTo(x.left,py); g.lineTo(x.right,py); g.stroke();
+    });
+    g.restore();
+  }
+};
+
+async function loadIndex(){
+  try{
+    const r = await fetch('data/index.json?t=' + Date.now());
+    const m = await r.json();
+    tickers = m.tickers || [];
+    $('tk').innerHTML = tickers.map(t =>
+      `<option value="${t.name}">${t.code} · ${t.market}</option>`).join('');
+    $('sub').textContent = '데이터 ' + (m.built||'') + ' · ' + (m.count||0) + '종목';
+  }catch(e){ $('msg').textContent = '종목목록을 불러오지 못했습니다. (data/index.json)'; }
+}
+
+function resolve(q){
+  q = (q||'').trim();
+  if(!q) return null;
+  if(/^[A-Za-z0-9]{4,6}$/.test(q)){
+    const byCode = tickers.find(t => t.code.toUpperCase() === q.toUpperCase());
+    if(byCode) return byCode.code;
+    return q.toUpperCase();
+  }
+  const exact = tickers.find(t => t.name === q);
+  if(exact) return exact.code;
+  const part = tickers.find(t => t.name.replace(/\s/g,'').includes(q.replace(/\s/g,'')));
+  return part ? part.code : q;
+}
+
+async function show(code){
+  $('msg').textContent = '불러오는 중...';
+  try{
+    const r = await fetch('data/' + code + '.json?t=' + Date.now());
+    if(!r.ok) throw new Error('없음');
+    cur = await r.json();
+    $('msg').textContent = '';
+    draw();
+  }catch(e){
+    $('msg').textContent = '『' + code + '』 데이터가 없습니다. 목록에 있는 종목인지 확인하세요.';
+  }
+}
+
+function draw(){
+  if(!cur) return;
+  const keep = +$('span').value;
+  const s = Math.max(0, cur.dates.length - keep);
+  const labels = cur.dates.slice(s);
+  const price  = cur.close.slice(s);
+
+  const ds = [{
+    label:'가격', data:price, yAxisID:'y1',
+    borderColor:'#ffffff', borderWidth:2.8, pointRadius:0,
+    tension:0, order:99
+  }];
+  SETTINGS.forEach(st=>{
+    if(!tfOn[st.tf] || !lineOn[st.label]) return;
+    ds.push({
+      label:st.name, data:(cur.stoch[st.label]||[]).slice(s), yAxisID:'y',
+      borderColor:COLOR[st.tier], borderDash:DASH[st.tf],
+      borderWidth:WIDTH[st.tf], pointRadius:0, tension:0, spanGaps:true
+    });
+  });
+
+  const last = price[price.length-1];
+  $('title').innerHTML = (cur.name||cur.code) + ' <span>' + cur.code + ' · ' +
+    (cur.market||'') + ' · 최근 ' + (last!=null ? last.toLocaleString() : '-') + '</span>';
+
+  if(chart) chart.destroy();
+  chart = new Chart($('cv'), {
+    type:'line',
+    data:{labels, datasets:ds},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0d1117', borderColor:'#30363d', borderWidth:1,
+          callbacks:{ label:c => c.dataset.label + ': ' +
+            (c.parsed.y==null?'-':c.parsed.y.toLocaleString()) }
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#8b949e',maxTicksLimit:10},grid:{color:'#21262d'}},
+        y:{position:'left',min:0,max:100,
+           ticks:{color:'#8b949e',stepSize:20},grid:{color:'#21262d'},
+           title:{display:true,text:'스토캐스틱 %K',color:'#8b949e'}},
+        y1:{position:'right',grid:{display:false},
+           ticks:{color:'#e6edf3',callback:v=>v.toLocaleString()},
+           title:{display:true,text:'가격',color:'#e6edf3'}}
+      }
+    },
+    plugins:[guides]
+  });
+  renderLegend();
+}
+
+function renderLegend(){
+  const groups = {day:'일봉(실선)', week:'주봉(파선)', month:'월봉(점선)'};
+  let html = '';
+  ['day','week','month'].forEach(tf=>{
+    html += '<div><span class="grp">' + groups[tf] + '</span>';
+    SETTINGS.filter(s=>s.tf===tf).forEach(s=>{
+      const d = DASH[tf].length ? DASH[tf].join(' ') : '';
+      html += `<span class="item ${lineOn[s.label]?'':'off'}" data-k="${s.label}">
+        <svg class="sw" height="10" width="34"><line x1="0" y1="5" x2="34" y2="5"
+          stroke="${COLOR[s.tier]}" stroke-width="${WIDTH[tf]+0.4}"
+          ${d?`stroke-dasharray="${d}"`:''}></line></svg>${s.name}</span>`;
+    });
+    html += '</div>';
+  });
+  $('lg').innerHTML = html;
+  $('lg').querySelectorAll('.item').forEach(el=>{
+    el.onclick = () => { lineOn[el.dataset.k] = !lineOn[el.dataset.k]; draw(); };
+  });
+}
+
+$('go').onclick = () => { const c = resolve($('q').value); if(c) show(c); };
+$('q').onkeydown = e => { if(e.key === 'Enter') $('go').click(); };
+$('span').onchange = draw;
+document.querySelectorAll('.quick').forEach(b=>{
+  b.onclick = () => { $('q').value = b.textContent; show(b.dataset.code); };
+});
+document.querySelectorAll('.tf').forEach(b=>{
+  b.onclick = () => { tfOn[b.dataset.tf] = !tfOn[b.dataset.tf];
+    b.classList.toggle('on', tfOn[b.dataset.tf]); draw(); };
+});
+
+(async ()=>{ await loadIndex(); $('q').value = '코스피'; show('KS11'); })();
+</script>
+</body>
+</html>
