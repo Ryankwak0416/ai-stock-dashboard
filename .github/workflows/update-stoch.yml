@@ -1,0 +1,49 @@
+name: update-stoch
+
+on:
+  schedule:
+    - cron: '35 9 * * 1-5'   # 평일 18:35 KST (종가 반영)
+  workflow_dispatch:
+    inputs:
+      top_n:
+        description: '수집할 시총 상위 종목 수'
+        required: false
+        default: '500'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-stoch
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install finance-datareader pandas lxml requests
+
+      - name: Collect stochastic data
+        env:
+          TOP_N: ${{ github.event.inputs.top_n || '500' }}
+        run: python stoch/collect_stoch.py
+
+      - name: Commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add stoch/data
+          if git diff --staged --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "stoch: data update $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
