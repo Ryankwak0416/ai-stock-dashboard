@@ -65,11 +65,11 @@
   <div id="msg"></div>
 
   <div id="legend">
-    <div><span class="grp" style="width:auto">색 =</span>
-      <b style="color:var(--short)">파랑 일 기준</b> ·
-      <b style="color:var(--mid)">노랑 주→일 환산(×5)</b> ·
-      <b style="color:var(--long)">분홍 월→일 환산(×20)</b>
-      &nbsp;|&nbsp;<span class="grp" style="width:auto">선 =</span>
+    <div><span class="grp" style="width:auto">색·굵기 =</span>
+      <b style="color:var(--short)">파랑 얇게(1.0) 일 기준</b> ·
+      <b style="color:var(--mid)">노랑 보통(2.0) 주→일 환산(×5)</b> ·
+      <b style="color:var(--long)">분홍 굵게(3.0) 월→일 환산(×20)</b>
+      &nbsp;|&nbsp;<span class="grp" style="width:auto">선 종류 =</span>
       실선 단기(5) · 긴파선 중기(10) · 점선 장기(20)
       &nbsp;|&nbsp; <b>굵은 흰선</b> = 주가·지수 (오른쪽 축)
     </div>
@@ -96,10 +96,10 @@ const SETTINGS = [
   {label:'M10', name:'10월 → 200,120,120', tf:'month', tier:'mid'},
   {label:'M20', name:'20월 → 400,240,240', tf:'month', tier:'long'},
 ];
-// 색 = 환산 기준(일/주/월), 선 종류·굵기 = 단기/중기/장기
+// 색·굵기 = 환산 기준(일/주/월), 선 종류 = 단기/중기/장기
 const COLOR = {day:'#4da3ff', week:'#ffc247', month:'#ff6b9d'};
 const DASH  = {short:[], mid:[10,5], long:[2,4]};
-const WIDTH = {short:1.5, mid:1.9, long:2.3};
+const WIDTH = {day:1.0, week:2.0, month:3.0};
 
 let chart = null, cur = null, tickers = [];
 const tfOn = {day:true, week:true, month:true};
@@ -177,7 +177,7 @@ function draw(){
     ds.push({
       label:st.name, data:(cur.stoch[st.label]||[]).slice(s), yAxisID:'y',
       borderColor:COLOR[st.tf], borderDash:DASH[st.tier],
-      borderWidth:WIDTH[st.tier], pointRadius:0, tension:0, spanGaps:true
+      borderWidth:WIDTH[st.tf], pointRadius:0, tension:0, spanGaps:true
     });
   });
 
@@ -224,7 +224,7 @@ function renderLegend(){
       const d = DASH[s.tier].length ? DASH[s.tier].join(' ') : '';
       html += `<span class="item ${lineOn[s.label]?'':'off'}" data-k="${s.label}">
         <svg class="sw" height="10" width="34"><line x1="0" y1="5" x2="34" y2="5"
-          stroke="${COLOR[tf]}" stroke-width="${WIDTH[s.tier]+0.4}"
+          stroke="${COLOR[tf]}" stroke-width="${WIDTH[tf]}"
           ${d?`stroke-dasharray="${d}"`:''}></line></svg>${s.name}</span>`;
     });
     html += '</div>';
