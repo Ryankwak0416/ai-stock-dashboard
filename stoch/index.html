@@ -77,7 +77,7 @@
   </div>
 
   <div class="note">
-    스토캐스틱은 왼쪽 0~100 축, 가격은 오른쪽 축입니다. 20·80 기준선은 회색 점선.<br>
+    스토캐스틱은 왼쪽 0~100 축, 가격은 오른쪽 축입니다. 20·80 기준선은 가는 회색 실선, 50은 흐린 점선.<br>
     9종 모두 <b>일봉 데이터 하나</b>로 계산합니다. 주·월은 별도 봉이 아니라 기간을
     일수로 환산한 값입니다 (5주=25일, 5월=100일). 20주와 5월은 둘 다 100,60,60이라 겹쳐 그려집니다.<br>
     항목을 클릭하면 해당 선만 켜고 끌 수 있습니다.
@@ -112,11 +112,16 @@ const guides = {
   id:'guides',
   beforeDatasetsDraw(c){
     const y = c.scales.y, x = c.chartArea; if(!y) return;
-    const g = c.ctx; g.save(); g.setLineDash([4,4]); g.lineWidth = 1;
-    [[20,'#3f4b58'],[50,'#2b333c'],[80,'#3f4b58']].forEach(([v,col])=>{
-      const py = y.getPixelForValue(v);
-      g.strokeStyle = col; g.beginPath();
-      g.moveTo(x.left,py); g.lineTo(x.right,py); g.stroke();
+    const g = c.ctx; g.save();
+    // 50: 아주 흐린 점선
+    g.setLineDash([4,4]); g.lineWidth = 1; g.strokeStyle = '#2b333c';
+    let py = y.getPixelForValue(50);
+    g.beginPath(); g.moveTo(x.left,py); g.lineTo(x.right,py); g.stroke();
+    // 20 / 80: 가는 실선, 더 잘 보이게
+    g.setLineDash([]); g.lineWidth = 0.8; g.strokeStyle = '#8fa3b8';
+    [20,80].forEach(v=>{
+      py = y.getPixelForValue(v);
+      g.beginPath(); g.moveTo(x.left,py); g.lineTo(x.right,py); g.stroke();
     });
     g.restore();
   }
