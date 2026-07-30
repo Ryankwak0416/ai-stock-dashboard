@@ -55,8 +55,8 @@
     <option value="500">최근 500일</option>
   </select>
   <button class="tf on" data-tf="day">일</button>
-  <button class="tf on" data-tf="week">주</button>
-  <button class="tf on" data-tf="month">월</button>
+  <button class="tf on" data-tf="week">주환산</button>
+  <button class="tf on" data-tf="month">월환산</button>
 </header>
 
 <div id="wrap">
@@ -65,12 +65,12 @@
   <div id="msg"></div>
 
   <div id="legend">
-    <div><span class="grp">색 =</span>
-      <b style="color:var(--short)">파랑 단기(5)</b> ·
-      <b style="color:var(--mid)">노랑 중기(10)</b> ·
-      <b style="color:var(--long)">분홍 장기(20)</b>
+    <div><span class="grp" style="width:auto">색 =</span>
+      <b style="color:var(--short)">파랑 일 기준</b> ·
+      <b style="color:var(--mid)">노랑 주→일 환산(×5)</b> ·
+      <b style="color:var(--long)">분홍 월→일 환산(×20)</b>
       &nbsp;|&nbsp;<span class="grp" style="width:auto">선 =</span>
-      실선 일봉 · 긴파선 주봉 · 점선 월봉
+      실선 단기(5) · 긴파선 중기(10) · 점선 장기(20)
       &nbsp;|&nbsp; <b>굵은 흰선</b> = 주가·지수 (오른쪽 축)
     </div>
     <div id="lg"></div>
@@ -78,27 +78,28 @@
 
   <div class="note">
     스토캐스틱은 왼쪽 0~100 축, 가격은 오른쪽 축입니다. 20·80 기준선은 회색 점선.<br>
-    주봉·월봉 값은 일봉을 각각 5배·20배 환산한 것입니다 (주5주=일25, 월5월=일100).
-    주봉 20주와 월봉 5월은 100,60,60으로 같은 값이라 겹쳐 그려집니다.<br>
+    9종 모두 <b>일봉 데이터 하나</b>로 계산합니다. 주·월은 별도 봉이 아니라 기간을
+    일수로 환산한 값입니다 (5주=25일, 5월=100일). 20주와 5월은 둘 다 100,60,60이라 겹쳐 그려집니다.<br>
     항목을 클릭하면 해당 선만 켜고 끌 수 있습니다.
   </div>
 </div>
 
 <script>
 const SETTINGS = [
-  {label:'D5',  name:'일 단기 5,3,3',      tf:'day',   tier:'short'},
-  {label:'D10', name:'일 중기 10,6,6',     tf:'day',   tier:'mid'},
-  {label:'D20', name:'일 장기 20,12,12',   tf:'day',   tier:'long'},
-  {label:'W5',  name:'주 단기 25,15,15',   tf:'week',  tier:'short'},
-  {label:'W10', name:'주 중기 50,30,30',   tf:'week',  tier:'mid'},
-  {label:'W20', name:'주 장기 100,60,60',  tf:'week',  tier:'long'},
-  {label:'M5',  name:'월 단기 100,60,60',  tf:'month', tier:'short'},
-  {label:'M10', name:'월 중기 200,120,120',tf:'month', tier:'mid'},
-  {label:'M20', name:'월 장기 400,240,240',tf:'month', tier:'long'},
+  {label:'D5',  name:'5일 → 5,3,3',        tf:'day',   tier:'short'},
+  {label:'D10', name:'10일 → 10,6,6',      tf:'day',   tier:'mid'},
+  {label:'D20', name:'20일 → 20,12,12',    tf:'day',   tier:'long'},
+  {label:'W5',  name:'5주 → 25,15,15',     tf:'week',  tier:'short'},
+  {label:'W10', name:'10주 → 50,30,30',    tf:'week',  tier:'mid'},
+  {label:'W20', name:'20주 → 100,60,60',   tf:'week',  tier:'long'},
+  {label:'M5',  name:'5월 → 100,60,60',    tf:'month', tier:'short'},
+  {label:'M10', name:'10월 → 200,120,120', tf:'month', tier:'mid'},
+  {label:'M20', name:'20월 → 400,240,240', tf:'month', tier:'long'},
 ];
-const COLOR = {short:'#4da3ff', mid:'#ffc247', long:'#ff6b9d'};
-const DASH  = {day:[], week:[10,5], month:[2,4]};
-const WIDTH = {day:1.5, week:1.9, month:2.3};
+// 색 = 환산 기준(일/주/월), 선 종류·굵기 = 단기/중기/장기
+const COLOR = {day:'#4da3ff', week:'#ffc247', month:'#ff6b9d'};
+const DASH  = {short:[], mid:[10,5], long:[2,4]};
+const WIDTH = {short:1.5, mid:1.9, long:2.3};
 
 let chart = null, cur = null, tickers = [];
 const tfOn = {day:true, week:true, month:true};
@@ -175,8 +176,8 @@ function draw(){
     if(!tfOn[st.tf] || !lineOn[st.label]) return;
     ds.push({
       label:st.name, data:(cur.stoch[st.label]||[]).slice(s), yAxisID:'y',
-      borderColor:COLOR[st.tier], borderDash:DASH[st.tf],
-      borderWidth:WIDTH[st.tf], pointRadius:0, tension:0, spanGaps:true
+      borderColor:COLOR[st.tf], borderDash:DASH[st.tier],
+      borderWidth:WIDTH[st.tier], pointRadius:0, tension:0, spanGaps:true
     });
   });
 
@@ -215,15 +216,15 @@ function draw(){
 }
 
 function renderLegend(){
-  const groups = {day:'일봉(실선)', week:'주봉(파선)', month:'월봉(점선)'};
+  const groups = {day:'일 기준(파랑)', week:'주→일 환산(노랑)', month:'월→일 환산(분홍)'};
   let html = '';
   ['day','week','month'].forEach(tf=>{
     html += '<div><span class="grp">' + groups[tf] + '</span>';
     SETTINGS.filter(s=>s.tf===tf).forEach(s=>{
-      const d = DASH[tf].length ? DASH[tf].join(' ') : '';
+      const d = DASH[s.tier].length ? DASH[s.tier].join(' ') : '';
       html += `<span class="item ${lineOn[s.label]?'':'off'}" data-k="${s.label}">
         <svg class="sw" height="10" width="34"><line x1="0" y1="5" x2="34" y2="5"
-          stroke="${COLOR[s.tier]}" stroke-width="${WIDTH[tf]+0.4}"
+          stroke="${COLOR[tf]}" stroke-width="${WIDTH[s.tier]+0.4}"
           ${d?`stroke-dasharray="${d}"`:''}></line></svg>${s.name}</span>`;
     });
     html += '</div>';
