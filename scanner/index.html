@@ -55,7 +55,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
         <button class="pre" data-b="0">전체</button>
       </div></div>
     <div class="f"><label>합의 임계(표)</label>
-      <select id="th"><option value="2">2표 이상</option><option value="3" selected>3표 이상</option><option value="4">4표(만장일치)</option></select></div>
+      <select id="th"><option value="2">2표 이상</option><option value="3" selected>3표 이상</option><option value="4">4표 이상</option><option value="5">5표(만장일치)</option></select></div>
   </div>
   <div class="lbl"><span>구간: <b id="d0">-</b> ~ <b id="d1">-</b></span><span id="info"></span></div>
   <div class="scrollrow"><button class="step" id="prev">◀</button><input type="range" id="sc" min="0" max="0" value="0"><button class="step" id="next">▶</button></div>
@@ -68,6 +68,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
   <div class="tab" data-t="boll">볼린저밴드</div>
   <div class="tab" data-t="macd">MACD</div>
   <div class="tab" data-t="rsi">RSI</div>
+  <div class="tab" data-t="ma">이동평균선</div>
   <div class="tab" data-t="bt">백테스트</div>
 </div>
 <div class="card" style="border-radius:0 12px 12px 12px">
@@ -77,7 +78,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 </div>
 <div class="note" id="tabnote"></div>
 <p class="small">스토캐스틱은 이 저장소가 계산한 값(D5=막내 5·3 / D10=둘째 10·6 / D20=큰형 20·12). 볼린저(20·2σ)·MACD(12·26·9)·RSI(14)는 종가로 이 페이지가 직접 계산합니다.
-<b>거래량 데이터가 없어 OBV는 제외</b>되며 종합 스코어는 4개 지표로 집계합니다.
+이동평균선은 5·20·60·120·240·480 정배열/역배열로 판정합니다. <b>거래량 데이터가 없어 OBV는 제외</b>되며 종합 스코어는 5개 지표로 집계합니다.
 <b>기계적 타점은 규칙이 발화한 지점일 뿐 수익을 보장하지 않습니다.</b></p>
 </div>
 <script>
@@ -100,8 +101,9 @@ function recompute(){
   const up=mid.map((m,i)=>m==null?null:m+2*sd[i]), lo=mid.map((m,i)=>m==null?null:m-2*sd[i]);
   const e12=ema(c,12),e26=ema(c,26),macd=e12.map((v,i)=>v-e26[i]),sig=ema(macd,9),hist=macd.map((v,i)=>v-sig[i]);
   const rsi=rsiW(c,14), rsig=ema(rsi.map(v=>v==null?50:v),6);
-  const ev={st:Array(N).fill(0),bo:Array(N).fill(0),ma:Array(N).fill(0),rs:Array(N).fill(0)};
-  const st={st:Array(N).fill(0),bo:Array(N).fill(0),ma:Array(N).fill(0),rs:Array(N).fill(0)};
+  const MAP=[5,20,60,120,240,480], MA=MAP.map(p=>sma(c,p));
+  const ev={st:Array(N).fill(0),bo:Array(N).fill(0),ma:Array(N).fill(0),rs:Array(N).fill(0),mv:Array(N).fill(0)};
+  const st={st:Array(N).fill(0),bo:Array(N).fill(0),ma:Array(N).fill(0),rs:Array(N).fill(0),mv:Array(N).fill(0)};
   for(let i=1;i<N;i++){
     const km=SER[i][F.KM],kp=SER[i-1][F.KM];
     if(km!=null&&kp!=null){ if(km<25&&km>kp) ev.st[i]=1; else if(km>75&&km<kp) ev.st[i]=-1; }
@@ -111,10 +113,23 @@ function recompute(){
     if(sig[i]!=null) st.ma[i]= macd[i]>sig[i]?1:-1;
     if(rsi[i]!=null&&rsi[i-1]!=null){ if(rsi[i]>30&&rsi[i-1]<=30)ev.rs[i]=1; else if(rsi[i]<70&&rsi[i-1]>=70)ev.rs[i]=-1; }
     if(rsi[i]!=null) st.rs[i]= rsi[i]<35?1:(rsi[i]>65?-1:0);
+    // 이평선: 정배열(단기>장기 순) = 매수, 역배열 = 매도. 계산 가능한 선만 비교.
+    const av=MA.map(m=>m[i]).filter(v=>v!=null);
+    if(av.length>=3){
+      let up=true,dn=true;
+      for(let k=0;k+1<av.length;k++){ if(!(av[k]>av[k+1]))up=false; if(!(av[k]<av[k+1]))dn=false; }
+      st.mv[i]= up?1:(dn?-1:0);
+      const prev=MA.map(m=>m[i-1]).filter(v=>v!=null);
+      if(prev.length===av.length){
+        let pu=true,pd=true;
+        for(let k=0;k+1<prev.length;k++){ if(!(prev[k]>prev[k+1]))pu=false; if(!(prev[k]<prev[k+1]))pd=false; }
+        if(up&&!pu) ev.mv[i]=1; else if(dn&&!pd) ev.mv[i]=-1;
+      }
+    }
   }
-  const K=['st','bo','ma','rs'], bv=Array(N).fill(0), sv=Array(N).fill(0), sc=Array(N).fill(0);
+  const K=['st','bo','ma','rs','mv'], bv=Array(N).fill(0), sv=Array(N).fill(0), sc=Array(N).fill(0);
   for(let i=0;i<N;i++){let b=0,s=0;K.forEach(k=>{if(st[k][i]>0)b++;else if(st[k][i]<0)s++;});bv[i]=b;sv[i]=s;sc[i]=b-s;}
-  IND={c,mid,up,lo,macd,sig,hist,rsi,rsig,ev,st,bv,sv,sc};
+  IND={c,mid,up,lo,macd,sig,hist,rsi,rsig,ev,st,bv,sv,sc,MA,MAP};
   taps();
 }
 function taps(){BUY=[];SELL=[];for(let i=1;i<N;i++){if(IND.bv[i]>=TH&&IND.bv[i-1]<TH)BUY.push(i);if(IND.sv[i]>=TH&&IND.sv[i-1]<TH)SELL.push(i);}}
@@ -135,6 +150,10 @@ function render(){
   const ts=Math.max(1,Math.round(n/8));
   const X={ticks:{font:FONT,maxRotation:0,autoSkip:false,callback:function(v,i){return i%ts===0?fd(this.getLabelForValue(v)):'';}},grid:{display:false}};
   let ds=[],sc={x:X},leg='',note='',panel='';
+  // 지표 탭에 가격 흐름을 우축으로 겹쳐 보여준다
+  const priceOverlay={label:'종가',data:c,yAxisID:'yp',borderColor:'rgba(24,73,169,.45)',backgroundColor:'rgba(24,73,169,.05)',borderWidth:1.5,pointRadius:0,tension:.1,fill:true,order:30};
+  const priceAxis={position:'right',ticks:{font:FONT,color:'#7b8794',callback:v=>v>=1000?(v/1000)+'천':v},grid:{drawOnChartArea:false},title:{display:true,text:'종가',color:'#7b8794',font:FONT}};
+  const priceLeg='<span><i class="sw" style="background:rgba(24,73,169,.45)"></i>종가(우축)</span>';
 
   if(tab==='score'){
     const s=IND.sc.slice(a,b+1),bv=IND.bv.slice(a,b+1),sv=IND.sv.slice(a,b+1);
@@ -142,17 +161,18 @@ function render(){
         {label:'스코어',data:s,yAxisID:'y2',type:'bar',backgroundColor:s.map((v,i)=>bv[i]>=TH?'rgba(6,118,71,.6)':sv[i]>=TH?'rgba(180,35,24,.6)':'rgba(148,163,184,.32)'),order:20},
         pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0), pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
     sc.y={position:'left',ticks:{font:FONT,color:'#1849a9',callback:v=>v>=1000?(v/1000)+'천':v}};
-    sc.y2={position:'right',min:-4,max:4,ticks:{font:FONT,stepSize:1},grid:{drawOnChartArea:false},title:{display:true,text:'스코어(-4~+4)',font:FONT}};
+    sc.y2={position:'right',min:-5,max:5,ticks:{font:FONT,stepSize:1},grid:{drawOnChartArea:false},title:{display:true,text:'스코어(-5~+5)',font:FONT}};
     leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#067647"></i>▲매수</span><span><i class="sw" style="background:#d92d20"></i>▼매도</span>';
-    note='4개 지표가 현재 상태로 매수/매도/중립 한 표씩 던집니다. <b>매수표 '+TH+'개 이상</b>으로 올라서는 순간 ▲, <b>매도표 '+TH+'개 이상</b>이면 ▼. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.';
+    note='5개 지표가 현재 상태로 매수/매도/중립 한 표씩 던집니다. <b>매수표 '+TH+'개 이상</b>으로 올라서는 순간 ▲, <b>매도표 '+TH+'개 이상</b>이면 ▼. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.';
   } else if(tab==='stoch'){
     ds=[{label:'큰형',data:rows.map(r=>r[F.KK]),borderColor:'#d92d20',borderWidth:2,pointRadius:0,tension:.2,spanGaps:true},
         {label:'둘째',data:rows.map(r=>r[F.KD]),borderColor:'#f79009',borderWidth:1.6,pointRadius:0,tension:.2,spanGaps:true},
         {label:'막내',data:rows.map(r=>r[F.KM]),borderColor:'#12b76a',borderWidth:1.4,pointRadius:0,tension:.2,spanGaps:true}];
     const bu=[],se=[];for(let i=a;i<=b;i++){if(IND.ev.st[i]===1)bu.push(i);if(IND.ev.st[i]===-1)se.push(i);}
     ds.push(pts(bu,i=>SER[i][F.KM],a,b,n,'#067647',0),pts(se,i=>SER[i][F.KM],a,b,n,'#d92d20',180));
+    ds.push(priceOverlay); sc.yp=priceAxis;
     sc.y={min:0,max:100,ticks:{font:FONT,stepSize:20},grid:{color:g=>[20,50,80].includes(g.tick.value)?'#cfd4dc':'#f0f1f4'}};
-    leg='<span><i class="sw" style="background:#d92d20"></i>큰형(20·12)</span><span><i class="sw" style="background:#f79009"></i>둘째(10·6)</span><span><i class="sw" style="background:#12b76a"></i>막내(5·3)</span>';
+    leg='<span><i class="sw" style="background:#d92d20"></i>큰형(20·12)</span><span><i class="sw" style="background:#f79009"></i>둘째(10·6)</span><span><i class="sw" style="background:#12b76a"></i>막내(5·3)</span>'+priceLeg;
     note='막내가 과매도(25↓)에서 상승 전환하면 ▲, 과매수(75↑)에서 하락 전환하면 ▼. 80·50·20 기준선 표시.';
   } else if(tab==='boll'){
     ds=[{label:'종가',data:c,borderColor:'#1849a9',borderWidth:2,pointRadius:0,tension:.1,order:10},
@@ -171,17 +191,34 @@ function render(){
         {label:'히스토그램',data:h,type:'bar',backgroundColor:h.map(v=>v>=0?'rgba(6,118,71,.45)':'rgba(217,45,32,.45)'),order:20}];
     const bu=[],se=[];for(let i=a;i<=b;i++){if(IND.ev.ma[i]===1)bu.push(i);if(IND.ev.ma[i]===-1)se.push(i);}
     ds.push(pts(bu,i=>IND.macd[i],a,b,n,'#067647',0),pts(se,i=>IND.macd[i],a,b,n,'#d92d20',180));
+    ds.push(priceOverlay); sc.yp=priceAxis;
     sc.y={ticks:{font:FONT}};
-    leg='<span><i class="sw" style="background:#1849a9"></i>MACD(12·26)</span><span><i class="sw" style="background:#ea580c"></i>시그널(9)</span>';
+    leg='<span><i class="sw" style="background:#1849a9"></i>MACD(12·26)</span><span><i class="sw" style="background:#ea580c"></i>시그널(9)</span>'+priceLeg;
     note='MACD가 시그널을 상향 돌파하면 ▲, 하향이면 ▼. 0선 위/아래로 추세 방향도 함께 봅니다.';
   } else if(tab==='rsi'){
     ds=[{label:'RSI',data:IND.rsi.slice(a,b+1),borderColor:'#7c3aed',borderWidth:2,pointRadius:0,tension:.2,spanGaps:true},
         {label:'시그널',data:IND.rsig.slice(a,b+1),borderColor:'#ea580c',borderWidth:1.3,pointRadius:0,tension:.2,spanGaps:true}];
     const bu=[],se=[];for(let i=a;i<=b;i++){if(IND.ev.rs[i]===1)bu.push(i);if(IND.ev.rs[i]===-1)se.push(i);}
     ds.push(pts(bu,i=>IND.rsi[i],a,b,n,'#067647',0),pts(se,i=>IND.rsi[i],a,b,n,'#d92d20',180));
+    ds.push(priceOverlay); sc.yp=priceAxis;
     sc.y={min:0,max:100,ticks:{font:FONT,stepSize:10},grid:{color:g=>[30,70].includes(g.tick.value)?'#cfd4dc':'#f0f1f4'}};
-    leg='<span><i class="sw" style="background:#7c3aed"></i>RSI(14)</span><span><i class="sw" style="background:#ea580c"></i>시그널(6)</span>';
+    leg='<span><i class="sw" style="background:#7c3aed"></i>RSI(14)</span><span><i class="sw" style="background:#ea580c"></i>시그널(6)</span>'+priceLeg;
     note='RSI가 30 위로 올라서면 ▲, 70 아래로 내려서면 ▼.';
+  } else if(tab==='ma'){
+    const COL=['#12b76a','#1849a9','#f79009','#7c3aed','#0891b2','#b42318'];
+    ds=[{label:'종가',data:c,borderColor:'#0f172a',borderWidth:2.2,pointRadius:0,tension:.1,order:10}];
+    IND.MAP.forEach((p,k)=>ds.push({label:p+'일',data:IND.MA[k].slice(a,b+1),borderColor:COL[k],borderWidth:1.3,pointRadius:0,tension:.1,spanGaps:true,order:9-k}));
+    const bu=[],se=[];for(let i=a;i<=b;i++){if(IND.ev.mv[i]===1)bu.push(i);if(IND.ev.mv[i]===-1)se.push(i);}
+    ds.push(pts(bu,i=>SER[i][F.C],a,b,n,'#067647',0),pts(se,i=>SER[i][F.C],a,b,n,'#d92d20',180));
+    sc.y={ticks:{font:FONT,callback:v=>v>=1000?(v/1000)+'천':v}};
+    leg='<span><i class="sw" style="background:#0f172a;height:4px"></i>종가</span>'+IND.MAP.map((p,k)=>`<span><i class="sw" style="background:${COL[k]}"></i>${p}일</span>`).join('');
+    const i=N-1, cur=IND.MAP.map((p,k)=>({p,v:IND.MA[k][i]})).filter(x=>x.v!=null);
+    const stt=IND.st.mv[i], lab=stt>0?'<b class="buy">정배열</b>':(stt<0?'<b class="sell">역배열</b>':'혼조(배열 흐트러짐)');
+    panel=`<table><thead><tr><th>이평선</th>${cur.map(x=>`<th>${x.p}일</th>`).join('')}</tr></thead><tbody>
+      <tr><td class="l">값</td>${cur.map(x=>`<td>${Math.round(x.v).toLocaleString()}</td>`).join('')}</tr>
+      <tr><td class="l">종가 대비 이격</td>${cur.map(x=>{const d=(SER[i][F.C]/x.v-1)*100;return `<td class="${d>=0?'buy':'sell'}">${d>=0?'+':''}${d.toFixed(1)}%</td>`;}).join('')}</tr>
+      </tbody></table><p class="small">현재 배열: ${lab} · 계산된 선 ${cur.length}개(데이터가 부족한 장기선은 제외)</p>`;
+    note='단기→장기 순으로 <b>정배열</b>이면 매수 1표, <b>역배열</b>이면 매도 1표로 종합 스코어에 참여합니다. ▲▼는 배열이 새로 완성되는 순간입니다. 960일선은 1년 화면에서 거의 직선이라 이번에는 제외했습니다(5·20·60·120·240·480).';
   } else {
     ds=[{label:'종가',data:c,borderColor:'#1849a9',backgroundColor:'rgba(24,73,169,.06)',borderWidth:2,pointRadius:0,tension:.1,fill:true,order:10},
         pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0),pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
@@ -212,7 +249,7 @@ function backtest(){let rows='';[5,20,60].forEach(H=>{const b=fw(BUY,H,1),s=fw(S
 function verdict(){
   const i=N-1,b=IND.bv[i],s=IND.sv[i],cl=b>=TH?'buy':(s>=TH?'sell':'neu');
   const w=b>=TH?'지금: 매수 우위':(s>=TH?'지금: 매도 우위':'지금: 중립');
-  const nm=[['st','스토캐스틱'],['bo','볼린저'],['ma','MACD'],['rs','RSI']];
+  const nm=[['st','스토캐스틱'],['bo','볼린저'],['ma','MACD'],['rs','RSI'],['mv','이평선']];
   const chips=nm.map(([k,t])=>{const v=IND.st[k][i],c2=v>0?'buy':(v<0?'sell':'neu');return `<span class="chip ${c2}">${t} ${v>0?'매수':(v<0?'매도':'중립')}</span>`;}).join('');
   $('verdict').className='vb '+cl;
   $('verdict').innerHTML=`<div><div class="big ${cl}">${w}</div><div class="meta">${$('sel').value} · ${fd(SER[i][F.D])} 기준 · 매수표 <b>${b}</b> / 매도표 <b>${s}</b> (임계 ${TH}) · 확률적 참고치</div></div><div class="ind">${chips}</div>`;
