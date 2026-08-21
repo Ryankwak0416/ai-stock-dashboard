@@ -226,7 +226,7 @@ function render(){
     sc.y={ticks:{font:FONT,callback:v=>v>=1000?(v/1000)+'천':v}};
     leg='<span><i class="sw" style="background:#067647"></i>▲매수</span><span><i class="sw" style="background:#d92d20"></i>▼매도</span>';
     panel=backtest();
-    note='타점 다음 봉 종가로 진입해 N일 뒤 종가까지의 수익률을 전체 구간에서 집계한 단순 백테스트(수수료·슬리피지 미반영). <b>매수 평균이 벤치(무작위 진입 평균)보다 높으면</b> 그 타점이 통했다는 뜻입니다.';
+    note='<b>차이(%p)가 양수면 그 타점이 무작위 진입보다 나았다는 뜻</b>입니다. 화면 확대 구간과 무관하게 <b>전체 데이터 구간</b>으로 계산하며, 수수료·슬리피지는 반영하지 않았습니다. 표본이 적으면 우연일 수 있습니다.';
   }
 
   const tapPlug={id:'tapPlug',beforeDatasetsDraw(ch){
@@ -264,12 +264,30 @@ function tapTable(){
 function fw(idx,H,dir){const r=[];idx.forEach(i=>{const e=i+1,x=i+1+H;if(x<N)r.push((SER[x][F.C]/SER[e][F.C]-1)*100);});
   if(!r.length)return null;const n=r.length,av=r.reduce((s,v)=>s+v,0)/n;const w=dir>0?r.filter(v=>v>0).length/n*100:r.filter(v=>v<0).length/n*100;return{n,av,w};}
 function bench(H){let s=0,c=0;for(let i=0;i+1+H<N;i++){s+=(SER[i+1+H][F.C]/SER[i+1][F.C]-1)*100;c++;}return c?s/c:0;}
-function backtest(){let rows='';[5,20,60].forEach(H=>{const b=fw(BUY,H,1),s=fw(SELL,H,-1),m=bench(H);
-  const cl=b&&b.av>m?'buy':'sell';
-  rows+=`<tr><td><b>${H}일</b></td><td>${b?b.n:0}</td><td>${b?b.w.toFixed(0)+'%':'-'}</td><td class="${cl}">${b?(b.av>=0?'+':'')+b.av.toFixed(2)+'%':'-'}</td>
-  <td>${s?s.n:0}</td><td>${s?s.w.toFixed(0)+'%':'-'}</td><td>${s?(s.av>=0?'+':'')+s.av.toFixed(2)+'%':'-'}</td><td class="small">${(m>=0?'+':'')+m.toFixed(2)}%</td></tr>`;});
-  return `<table><thead><tr><th rowspan=2>보유</th><th colspan=3>▲매수 (${BUY.length}건)</th><th colspan=3>▼매도 (${SELL.length}건)</th><th rowspan=2>벤치</th></tr>
-  <tr><th>건수</th><th>상승승률</th><th>평균</th><th>건수</th><th>하락적중</th><th>평균</th></tr></thead><tbody>${rows}</tbody></table>`;}
+function bt1(idx,dir){return [5,20,60].map(H=>{const r=fw(idx,H,dir),m=bench(H);
+  if(!r)return{H,n:0};return{H,n:r.n,av:r.av,w:r.w,m,ex:dir>0?r.av-m:m-r.av};});}
+function btTable(rows,dir){
+  const t=rows.map(o=>{if(!o.n)return `<tr><td><b>${o.H}일</b></td><td colspan="5" class="small">데이터 부족</td></tr>`;
+    const ok=o.ex>0;
+    return `<tr><td><b>${o.H}일 보유</b></td><td>${o.n}건</td><td>${(o.av>=0?'+':'')+o.av.toFixed(2)}%</td>
+      <td class="small">${(o.m>=0?'+':'')+o.m.toFixed(2)}%</td>
+      <td class="${ok?'buy':'sell'}">${(o.ex>=0?'+':'')+o.ex.toFixed(2)}%p</td>
+      <td class="${ok?'buy':'sell'}">${ok?'✓ 나았다':'✗ 못했다'}</td></tr>`;}).join('');
+  return `<table><thead><tr><th>기간</th><th>타점 수</th><th>${dir>0?'타점에 샀을 때 평균':'신호 후 평균'}</th><th>아무 날이나 샀을 때</th><th>차이</th><th>판정</th></tr></thead><tbody>${t}</tbody></table>`;}
+function backtest(){
+  const B=bt1(BUY,1),S=bt1(SELL,-1);
+  const bw=B.filter(o=>o.n&&o.ex>0).length, bn=B.filter(o=>o.n).length;
+  const sw=S.filter(o=>o.n&&o.ex>0).length, sn=S.filter(o=>o.n).length;
+  const few=Math.max(BUY.length,SELL.length)<20;
+  const msg = bn===0 ? '타점이 없어 검증할 수 없습니다. 합의 임계를 낮춰보세요.'
+    : `<b>매수 규칙</b>은 ${bn}개 기간 중 <b class="${bw?'buy':'sell'}">${bw}개</b>에서 무작위 진입보다 나았고, <b>매도 규칙</b>은 ${sn}개 중 <b class="${sw?'buy':'sell'}">${sw}개</b>에서 하락을 피하는 데 도움이 됐습니다.`;
+  const kw = bn===0?'':(bw===bn&&sw===sn?'<b class="buy">이 종목에서는 규칙이 대체로 통했습니다.</b>':(bw===0&&sw===0?'<b class="sell">이 종목에서는 규칙이 통하지 않았습니다.</b>':'일부 기간에서만 통했습니다 — 신뢰하기 이릅니다.'));
+  return `<div class="note" style="background:#f1f5f9;border-color:#cbd5e1;border-left-color:#475467;margin:10px 0 4px">
+      <b>이 화면이 답하는 질문</b> — "이 타점대로 샀으면, 아무 날이나 산 것보다 나았을까?"<br>
+      타점의 성적을 <b>무작위 진입 평균(벤치)</b>과 맞대어 그 차이만 봅니다. 상승장에서는 아무렇게나 사도 승률이 높으니, 승률이 아니라 <b>차이(%p)</b>가 판단 기준입니다.<br>
+      ${msg} ${kw}${few?'<br><b class="sell">주의: 타점 표본이 20건 미만이라 통계적 결론으로 쓰기엔 부족합니다.</b>':''}</div>
+    <p class="small" style="margin:12px 0 2px"><b>▲ 매수 타점 검증</b> — 타점 다음 봉 종가로 사서 N일 뒤 종가에 팔았다고 가정</p>${btTable(B,1)}
+    <p class="small" style="margin:14px 0 2px"><b>▼ 매도 타점 검증</b> — 신호 뒤 실제로 덜 올랐는지(차이가 +면 회피 효과 있음)</p>${btTable(S,-1)}`;}
 function verdict(){
   const i=N-1,b=IND.bv[i],s=IND.sv[i],cl=b>=TH?'buy':(s>=TH?'sell':'neu');
   const w=b>=TH?'지금: 매수 우위':(s>=TH?'지금: 매도 우위':'지금: 중립');
