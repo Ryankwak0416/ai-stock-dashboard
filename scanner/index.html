@@ -141,7 +141,7 @@ function refresh(){const s=cs();pos=Math.max(0,Math.min(pos,N-s));const e=$('sc'
 let raf=false;const draw=()=>{if(raf)return;raf=true;requestAnimationFrame(()=>{raf=false;render();});};
 
 function pts(idx,fn,a,b,n,col,rot){const arr=Array(n).fill(null);idx.forEach(i=>{if(i>=a&&i<=b){const v=fn(i);if(v!=null)arr[i-a]=v;}});
-  return{data:arr,borderColor:col,backgroundColor:col,pointRadius:6,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:1.2,showLine:false,order:1};}
+  return{data:arr,borderColor:col,backgroundColor:col,pointRadius:9,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:2,showLine:false,order:1};}
 
 function render(){
   if(!N)return;
@@ -162,8 +162,9 @@ function render(){
         pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0), pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
     sc.y={position:'left',ticks:{font:FONT,color:'#1849a9',callback:v=>v>=1000?(v/1000)+'천':v}};
     sc.y2={position:'right',min:-5,max:5,ticks:{font:FONT,stepSize:1},grid:{drawOnChartArea:false},title:{display:true,text:'스코어(-5~+5)',font:FONT}};
-    leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#067647"></i>▲매수</span><span><i class="sw" style="background:#d92d20"></i>▼매도</span>';
-    note='5개 지표가 현재 상태로 매수/매도/중립 한 표씩 던집니다. <b>매수표 '+TH+'개 이상</b>으로 올라서는 순간 ▲, <b>매도표 '+TH+'개 이상</b>이면 ▼. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.';
+    leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#067647"></i>▲매수 타점</span><span><i class="sw" style="background:#d92d20"></i>▼매도 타점</span><span><i class="sw" style="background:repeating-linear-gradient(90deg,#98a2b3 0 4px,transparent 4px 8px)"></i>타점 세로선(전 탭 공통)</span>';
+    panel=tapTable();
+    note='<b>매수 조건</b> — ①막내 스토캐스틱 %D&lt;30 ②종가≤볼린저 하단(20·2σ) ③MACD&gt;시그널 ④RSI(14)&lt;35 ⑤이평 20&gt;60&gt;120 정배열. 각 지표가 한 표씩 던집니다. <b>매수표 '+TH+'개 이상</b>으로 올라서는 순간 ▲, <b>매도표 '+TH+'개 이상</b>이면 ▼. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.';
   } else if(tab==='stoch'){
     ds=[{label:'큰형',data:rows.map(r=>r[F.KK]),borderColor:'#d92d20',borderWidth:2,pointRadius:0,tension:.2,spanGaps:true},
         {label:'둘째',data:rows.map(r=>r[F.KD]),borderColor:'#f79009',borderWidth:1.6,pointRadius:0,tension:.2,spanGaps:true},
@@ -228,14 +229,37 @@ function render(){
     note='타점 다음 봉 종가로 진입해 N일 뒤 종가까지의 수익률을 전체 구간에서 집계한 단순 백테스트(수수료·슬리피지 미반영). <b>매수 평균이 벤치(무작위 진입 평균)보다 높으면</b> 그 타점이 통했다는 뜻입니다.';
   }
 
+  const tapPlug={id:'tapPlug',beforeDatasetsDraw(ch){
+    const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
+    const mark=(list,line,fill,dir)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
+      g.save();g.strokeStyle=line;g.lineWidth=1.4;g.setLineDash([5,4]);g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();
+      g.setLineDash([]);g.fillStyle=fill;g.beginPath();
+      if(dir>0){g.moveTo(x,ca.top+2);g.lineTo(x-6,ca.top+13);g.lineTo(x+6,ca.top+13);}
+      else{g.moveTo(x,ca.bottom-2);g.lineTo(x-6,ca.bottom-13);g.lineTo(x+6,ca.bottom-13);}
+      g.closePath();g.fill();g.restore();});};
+    mark(BUY,'rgba(6,118,71,.55)','#067647',1);mark(SELL,'rgba(217,45,32,.55)','#d92d20',-1);
+  }};
   if(chart)chart.destroy();
-  chart=new Chart($('cv'),{data:{labels,datasets:ds.map(d=>({type:d.type||'line',...d}))},
+  chart=new Chart($('cv'),{data:{labels,datasets:ds.map(d=>({type:d.type||'line',...d}))},plugins:[tapPlug],
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>fd(i[0].label)}}},scales:sc}});
   $('leg').innerHTML=leg;$('tabnote').innerHTML=note;$('panel').innerHTML=panel;
   $('d0').textContent=fd(SER[a][F.D]);$('d1').textContent=fd(SER[b][F.D]);
   $('info').textContent='폭 '+n+'봉 · 매수 '+BUY.filter(i=>i>=a&&i<=b).length+' · 매도 '+SELL.filter(i=>i>=a&&i<=b).length;
   verdict();
+}
+function tapTable(){
+  const all=BUY.map(i=>({i,t:'buy'})).concat(SELL.map(i=>({i,t:'sell'}))).sort((x,y)=>y.i-x.i).slice(0,10);
+  if(!all.length)return '<p class="small">이 종목에서 임계 '+TH+'표 조건을 만족한 타점이 없습니다. 임계를 낮춰보세요.</p>';
+  const r=all.map(o=>{const i=o.i,e=i+1;
+    const f=H=>{const x=e+H;return(x<N&&e<N)?((SER[x][F.C]/SER[e][F.C]-1)*100):null;};
+    const cell=v=>v==null?'<td class="small">-</td>':`<td class="${v>=0?'buy':'sell'}">${v>=0?'+':''}${v.toFixed(1)}%</td>`;
+    const ago=N-1-i;
+    return `<tr><td>${fd(SER[i][F.D])}</td><td class="${o.t}">${o.t==='buy'?'▲ 매수':'▼ 매도'}</td>
+      <td>${SER[i][F.C].toLocaleString()}</td><td>${o.t==='buy'?IND.bv[i]:IND.sv[i]}표</td>
+      ${cell(f(5))}${cell(f(20))}<td class="small">${ago===0?'오늘':ago+'봉 전'}</td></tr>`;}).join('');
+  return `<p class="small" style="margin:8px 0 2px"><b>최근 타점 10개</b> (임계 ${TH}표 · 진입은 다음 봉 종가 기준)</p>
+    <table><thead><tr><th>날짜</th><th>구분</th><th>종가</th><th>표수</th><th>+5일</th><th>+20일</th><th>경과</th></tr></thead><tbody>${r}</tbody></table>`;
 }
 function fw(idx,H,dir){const r=[];idx.forEach(i=>{const e=i+1,x=i+1+H;if(x<N)r.push((SER[x][F.C]/SER[e][F.C]-1)*100);});
   if(!r.length)return null;const n=r.length,av=r.reduce((s,v)=>s+v,0)/n;const w=dir>0?r.filter(v=>v>0).length/n*100:r.filter(v=>v<0).length/n*100;return{n,av,w};}
