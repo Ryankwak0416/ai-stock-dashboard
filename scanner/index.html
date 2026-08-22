@@ -83,7 +83,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 <b>기계적 타점은 규칙이 발화한 지점일 뿐 수익을 보장하지 않습니다.</b></p>
 </div>
 <script>
-const DATA_DIR='../stoch/data/';
+const DATA_DIR='../stoch/data/', MIN_DIR='../stoch/min/';
 let LIST=[],SER=[],N=0,span=252,pos=0,tab='score',TH=3,chart=null,IND={},BUY=[],SELL=[],CACHE={};
 let TF='D',TFD={},CODE='';
 const AX=[['M','월봉',3],['W','주봉',2],['D','일봉',2],['m240','240분',1],['m120','120분',1],['m60','60분',1],['m30','30분',1],['m15','15분',1],['m10','10분',1],['m5','5분',1]];
@@ -371,7 +371,12 @@ async function load(code,name){
     const j=await r.json(),d=j.dates||[],c=j.close||[],s=j.stoch||{};
     const g=(x,i)=>(x&&x[i]!=null&&isFinite(x[i]))?Math.round(x[i]):null;
     const rows=[];for(let i=0;i<d.length;i++){if(c[i]==null)continue;rows.push([d[i].slice(2),+(+c[i]).toFixed(2),g(s.D20,i),g(s.D10,i),g(s.D5,i)]);}
-    CACHE[code]=rows; TFD[code]=j.tf||null;
+    CACHE[code]=rows;
+    const tf=Object.assign({}, j.tf||{});
+    try{ const rm=await fetch(MIN_DIR+'tf_'+code+'.json',{cache:'no-store'});
+      if(rm.ok){ const m=await rm.json(); Object.keys(m||{}).forEach(k=>{ if(m[k]&&m[k].k5&&m[k].k5.length) tf[k]=m[k]; }); }
+    }catch(e){}
+    TFD[code]=tf;
   }
   CODE=code;
   SER=CACHE[code];N=SER.length;span=252;pos=Math.max(0,N-span);
