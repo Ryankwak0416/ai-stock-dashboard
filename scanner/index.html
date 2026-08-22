@@ -69,6 +69,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
   <div class="tab" data-t="macd">MACD</div>
   <div class="tab" data-t="rsi">RSI</div>
   <div class="tab" data-t="ma">이동평균선</div>
+  <div class="tab" data-t="mtf">10축 점수판</div>
   <div class="tab" data-t="bt">백테스트</div>
 </div>
 <div class="card" style="border-radius:0 12px 12px 12px">
@@ -85,6 +86,19 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 const DATA_DIR='../stoch/data/';
 let LIST=[],SER=[],N=0,span=252,pos=0,tab='score',TH=3,chart=null,IND={},BUY=[],SELL=[],CACHE={};
 let TF='D',TFD={},CODE='';
+const AX=[['M','월봉',3],['W','주봉',2],['D','일봉',2],['m240','240분',1],['m120','120분',1],['m60','60분',1],['m30','30분',1],['m15','15분',1],['m10','10분',1],['m5','5분',1]];
+let AXCFG=(()=>{try{const s=JSON.parse(localStorage.getItem('axcfg2'));if(s&&AX.every(a=>s[a[0]]))return s;}catch(e){}
+  const o={};AX.forEach(a=>o[a[0]]={w:a[2],lo:20,hi:80});return o;})();
+const axSave=()=>{try{localStorage.setItem('axcfg2',JSON.stringify(AXCFG));}catch(e){}};
+function axLast(k){
+  if(k==='D'){ if(!N)return null; const i=N-1; return {k5:SER[i][F.KM],k10:SER[i][F.KD],k20:SER[i][F.KK],date:SER[i][F.D]}; }
+  const b=(TFD[CODE]||{})[k]; if(!b||!b.k5||!b.k5.length)return null;
+  const j=b.k5.length-1; return {k5:b.k5[j],k10:b.k10[j],k20:b.k20[j],date:(b.dates||[])[j]};
+}
+function axState(v,c){ if(!v||v.k5==null||v.k10==null||v.k20==null)return 0;
+  if(v.k5<=c.lo&&v.k10<=c.lo&&v.k20<=c.lo)return 1;
+  if(v.k5>=c.hi&&v.k10>=c.hi&&v.k20>=c.hi)return -1; return 0; }
+function axRows(){return AX.map(a=>{const c=AXCFG[a[0]],v=axLast(a[0]);return{k:a[0],t:a[1],c,v,s:axState(v,c)};});}
 const F={D:0,C:1,KK:2,KD:3,KM:4};
 const FONT={family:'-apple-system,"Malgun Gothic",sans-serif'};
 const $=id=>document.getElementById(id);
@@ -239,6 +253,38 @@ function render(){
       <tr><td class="l">종가 대비 이격</td>${cur.map(x=>{const d=(SER[i][F.C]/x.v-1)*100;return `<td class="${d>=0?'buy':'sell'}">${d>=0?'+':''}${d.toFixed(1)}%</td>`;}).join('')}</tr>
       </tbody></table><p class="small">현재 배열: ${lab} · 계산된 선 ${cur.length}개(데이터가 부족한 장기선은 제외)</p>`;
     note='단기→장기 순으로 <b>정배열</b>이면 매수 1표, <b>역배열</b>이면 매도 1표로 종합 스코어에 참여합니다. ▲▼는 배열이 새로 완성되는 순간입니다. 20·60·120 세 선으로 판정합니다(240·480·960은 화면에서 거의 직선이라 제외).';
+  } else if(tab==='mtf'){
+    const R2=axRows();
+    labels=R2.map(o=>o.t);
+    ds=[{label:'점수',type:'bar',yAxisID:'y',data:R2.map(o=>o.s*o.c.w),
+      backgroundColor:R2.map(o=>o.s>0?'rgba(6,118,71,.75)':(o.s<0?'rgba(180,35,24,.75)':'rgba(148,163,184,.3)'))}];
+    const mw=Math.max(3,...R2.map(o=>o.c.w));
+    sc.x={ticks:{font:FONT,maxRotation:0,autoSkip:false},grid:{display:false}};
+    sc.y={min:-mw,max:mw,ticks:{font:FONT,stepSize:1},grid:{color:g=>g.tick.value===0?'#98a2b3':'#f0f1f4'}};
+    const bs=R2.filter(o=>o.s>0).reduce((t,o)=>t+o.c.w,0), ss=R2.filter(o=>o.s<0).reduce((t,o)=>t+o.c.w,0);
+    const tw=R2.filter(o=>o.v).reduce((t,o)=>t+o.c.w,0), miss=R2.filter(o=>!o.v).length;
+    const cl=bs>ss?'buy':(ss>bs?'sell':'neu'), wd=bs>ss?'매수 우세':(ss>bs?'매도 우세':'중립');
+    leg='<span><i class="sw" style="background:#067647"></i>매수권(3형제 동시 과매도)</span><span><i class="sw" style="background:#b42318"></i>매도권</span><span><i class="sw" style="background:#94a3b8"></i>중립</span>';
+    panel=`<div class="vb ${cl}" style="margin:10px 0 6px"><div><div class="big ${cl}">${wd}</div>
+        <div class="meta">매수 <b class="buy">${bs}</b>점 · 매도 <b class="sell">${ss}</b>점 · 판정 가능한 축 가중치 합 ${tw}${miss?' · 수집 대기 '+miss+'축':''}</div></div></div>
+      <table><thead><tr><th>시간축</th><th>큰형</th><th>둘째</th><th>막내</th><th>상태</th><th>매수 ≤</th><th>매도 ≥</th><th>가중치</th><th>점수</th><th>기준일</th></tr></thead><tbody>
+      ${R2.map(o=>{
+        if(!o.v)return `<tr><td class="l"><b>${o.t}</b></td><td colspan="4" class="small">데이터 수집 대기</td>
+          <td><input type="number" data-k="${o.k}" data-f="lo" value="${o.c.lo}" style="width:52px"></td>
+          <td><input type="number" data-k="${o.k}" data-f="hi" value="${o.c.hi}" style="width:52px"></td>
+          <td><input type="number" data-k="${o.k}" data-f="w" value="${o.c.w}" min="0" style="width:52px"></td>
+          <td class="small">-</td><td class="small">-</td></tr>`;
+        const lab=o.s>0?'<b class="buy">매수권</b>':(o.s<0?'<b class="sell">매도권</b>':'중립');
+        const num=x=>x==null?'-':Math.round(x);
+        return `<tr><td class="l"><b>${o.t}</b></td><td>${num(o.v.k20)}</td><td>${num(o.v.k10)}</td><td>${num(o.v.k5)}</td><td>${lab}</td>
+          <td><input type="number" data-k="${o.k}" data-f="lo" value="${o.c.lo}" style="width:52px"></td>
+          <td><input type="number" data-k="${o.k}" data-f="hi" value="${o.c.hi}" style="width:52px"></td>
+          <td><input type="number" data-k="${o.k}" data-f="w" value="${o.c.w}" min="0" style="width:52px"></td>
+          <td class="${o.s>0?'buy':(o.s<0?'sell':'')}">${o.s>0?'+'+o.c.w:(o.s<0?'-'+o.c.w:'0')}</td>
+          <td class="small">${o.v.date?fd(String(o.v.date).slice(-8)):'-'}</td></tr>`;}).join('')}
+      </tbody></table>
+      <p class="small">기준·가중치를 바꾸면 즉시 다시 계산되고 이 브라우저에 저장됩니다. 상위 시간축(월·주)의 가중치를 높이면 큰 흐름이 맞을 때만 점수가 쌓입니다.</p>`;
+    note='각 시간축에서 <b>3형제(큰형·둘째·막내)가 모두 매수 기준 이하</b>면 그 축이 매수권으로 판정되어 가중치만큼 점수를 냅니다. 축별 기준값은 표에서 직접 바꾸십시오. 분봉 7축은 수집기가 데이터를 쌓으면 자동으로 채워집니다.';
   } else {
     ds=[{label:'종가',data:c,borderColor:'#1849a9',backgroundColor:'rgba(24,73,169,.06)',borderWidth:2,pointRadius:0,tension:.1,fill:true,order:10},
         pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0),pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
@@ -249,7 +295,7 @@ function render(){
   }
 
   const tapPlug={id:'tapPlug',beforeDatasetsDraw(ch){
-    if(TFB)return;
+    if(TFB||tab==='mtf')return;
     const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
     const mark=(list,line,fill,dir)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
       g.save();g.strokeStyle=line;g.lineWidth=1.4;g.setLineDash([5,4]);g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();
@@ -262,9 +308,10 @@ function render(){
   if(chart)chart.destroy();
   chart=new Chart($('cv'),{data:{labels,datasets:ds.map(d=>({type:d.type||'line',...d}))},plugins:[tapPlug],
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>fd(i[0].label)}}},scales:sc}});
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>tab==='mtf'?i[0].label:fd(i[0].label)}}},scales:sc}});
   $('leg').innerHTML=leg;$('tabnote').innerHTML=note;$('panel').innerHTML=panel;
-  if(TFB){ $('d0').textContent=fd(labels[0]);$('d1').textContent=fd(labels[n-1]);$('info').textContent=(TF==='W'?'주봉 ':'월봉 ')+n+'봉 전체';}
+  if(tab==='mtf'){ const rr=axRows().filter(o=>o.v); $('d0').textContent='월봉';$('d1').textContent='5분봉';$('info').textContent='판정 '+rr.length+'축 / 전체 '+AX.length+'축'; }
+  else if(TFB){ $('d0').textContent=fd(labels[0]);$('d1').textContent=fd(labels[n-1]);$('info').textContent=(TF==='W'?'주봉 ':'월봉 ')+n+'봉 전체';}
   else{ $('d0').textContent=fd(SER[a][F.D]);$('d1').textContent=fd(SER[b][F.D]);
     $('info').textContent='폭 '+n+'봉 · 매수 '+BUY.filter(i=>i>=a&&i<=b).length+' · 매도 '+SELL.filter(i=>i>=a&&i<=b).length;}
   verdict();
@@ -346,6 +393,8 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   $('q').oninput=fill;
   $('th').onchange=e=>{TH=+e.target.value;taps();draw();};
   $('leg').onclick=e=>{const t=e.target.closest('[data-tf]');if(!t)return;TF=t.dataset.tf;draw();};
+  $('panel').onchange=e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;const v=+t.value;
+    if(!isFinite(v))return; AXCFG[t.dataset.k][t.dataset.f]=v; axSave(); draw();};
   $('tabs').onclick=e=>{const t=e.target.closest('.tab');if(!t)return;tab=t.dataset.t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));draw();};
   $('spans').onclick=e=>{const b=e.target.closest('.pre');if(!b)return;const c=pos+cs()/2;span=+b.dataset.b;if(span>0)pos=Math.round(c-span/2);mark(span);refresh();};
   $('sc').oninput=()=>{pos=+$('sc').value;draw();};
