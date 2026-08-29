@@ -20,6 +20,12 @@ import urllib.request
 import pandas as pd
 import FinanceDataReader as fdr
 
+try:
+    import indicators106
+except ImportError:                      # 스크립트를 다른 위치에서 실행한 경우
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import indicators106
+
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 YEARS = 12                     # 월봉 20개(+슬로잉12) 워밍업 위해 넉넉히
 KEEP_DAYS = 500                # 일봉 보관 봉수
@@ -141,23 +147,41 @@ def process(code, name, market, start, mrule):
     if df is None or len(df) < 60:
         raise ValueError(f"데이터 부족 ({0 if df is None else len(df)}행)")
     df = df.dropna(subset=["Close"])
-    for c in ("High", "Low"):
+    for c in ("High", "Low", "Open"):
         if c not in df.columns or df[c].isna().all():
             df[c] = df["Close"]
-    df["High"] = df["High"].fillna(df["Close"])
-    df["Low"] = df["Low"].fillna(df["Close"])
+    for c in ("High", "Low", "Open"):
+        df[c] = df[c].fillna(df["Close"])
+    if "Volume" not in df.columns:
+        df["Volume"] = float("nan")
 
     tail = df.tail(KEEP_DAYS)
+
+    def num(series, nd=2):
+        return [None if pd.isna(v) else round(float(v), nd) for v in series]
+
     out = {
         "code": code,
         "name": name,
         "market": market,
         "dates": [d.strftime("%Y-%m-%d") for d in tail.index],
-        "close": [None if pd.isna(v) else round(float(v), 2) for v in tail["Close"]],
+        "close": num(tail["Close"]),
+        # 106지표 계산에 필요한 원천 OHLCV (기존 close 는 호환 위해 유지)
+        "open": num(tail["Open"]),
+        "high": num(tail["High"]),
+        "low": num(tail["Low"]),
+        "vol": [None if pd.isna(v) else int(v) for v in tail["Volume"].fillna(0)],
         "stoch": {},
         "tf": {},
         "rows": int(len(df)),
     }
+
+    # ── 106 보조지표 종합점수 ──
+    try:
+        out["ind"] = indicators106.compute(df, keep=KEEP_DAYS)
+    except Exception as e:
+        out["ind"] = None
+        print(f"  [경고] {code} 106지표 실패: {e}")
 
     # 일봉 3형제 (기존 라벨 유지)
     for lab, n, s in TRIO:
@@ -206,6 +230,13 @@ def main():
     meta = {
         "built": pd.Timestamp.now(tz="Asia/Seoul").strftime("%Y-%m-%d %H:%M KST"),
         "count": ok,
+        "ind106": {
+            "n": 106,
+            "category_w": indicators106.CATEGORY_W,
+            "rank_win": indicators106.RANK_WIN,
+            "buy_th": indicators106.BUY_TH,
+            "sell_th": indicators106.SELL_TH,
+        },
         "settings": [
             {"tf": tf, "label": lab, "n": n, "slowing": s}
             for tf in ("D", "W", "M") for lab, n, s in TRIO
