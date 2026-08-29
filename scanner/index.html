@@ -70,6 +70,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
   <div class="tab" data-t="rsi">RSI</div>
   <div class="tab" data-t="ma">이동평균선</div>
   <div class="tab" data-t="mtf">10축 점수판</div>
+  <div class="tab" data-t="scr">종목 스크리너</div>
   <div class="tab" data-t="bt">백테스트</div>
 </div>
 <div class="card" style="border-radius:0 12px 12px 12px">
@@ -180,8 +181,44 @@ function tfSwitch(){return '<span style="margin-left:auto;display:inline-flex;ga
 function pts(idx,fn,a,b,n,col,rot){const arr=Array(n).fill(null);idx.forEach(i=>{if(i>=a&&i<=b){const v=fn(i);if(v!=null)arr[i-a]=v;}});
   return{data:arr,borderColor:col,backgroundColor:col,pointRadius:9,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:2,showLine:false,order:1};}
 
+// ── 종목 스크리너 : index.json 하나로 전 종목 106지표 점수를 줄세운다 ──
+let SCF='all', SCS='s';
+function screener(){
+  const scored=LIST.filter(t=>typeof t.s==='number');
+  if(!scored.length)return `<div class="note">아직 전 종목 점수가 없습니다. 수집기(<code>update-stoch</code>)를 한 번 더 돌리면
+    <code>index.json</code>에 종목별 최신 106지표 점수가 실려 이 표가 채워집니다. 그때까지는 종목을 하나씩 골라서 보십시오.</div>`;
+  const F2={all:()=>true, buy:t=>t.s>=TH6.buy, sell:t=>t.s<=TH6.sell,
+            up:t=>typeof t.d==='number'&&t.d>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ'};
+  let rows=scored.filter(F2[SCF]||F2.all);
+  rows.sort((a,b)=> SCS==='d' ? ((b.d??-99)-(a.d??-99)) : (b.s-a.s));
+  const N2=rows.length; rows=rows.slice(0,60);
+  const btn=(k,t)=>`<button class="pre${SCF===k?' on':''}" data-scf="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
+  const sbtn=(k,t)=>`<button class="pre${SCS===k?' on':''}" data-scs="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
+  const top=t=>{if(!t.c)return '-';const e=Object.entries(t.c).filter(x=>x[1]!=null).sort((x,y)=>y[1]-x[1]);
+    return e.length?`<span class="${c6(e[0][1])}">${e[0][0]} ${e[0][1]}</span> · <span class="${c6(e[e.length-1][1])}">${e[e.length-1][0]} ${e[e.length-1][1]}</span>`:'-';};
+  const dv=t=>t.d==null?'-':(t.d>0?`<span class="buy">▲${t.d.toFixed(1)}</span>`:(t.d<0?`<span class="sell">▼${Math.abs(t.d).toFixed(1)}</span>`:'→'));
+  const body=rows.map((t,i)=>`<tr data-go="${t.code}" style="cursor:pointer">
+    <td class="small">${i+1}</td><td class="l"><b>${t.name}</b> <span class="small">${t.code}</span></td>
+    <td class="small">${t.market||'-'}</td><td>${t.p!=null?(+t.p).toLocaleString():'-'}</td>
+    <td class="${c6(t.s)}"><b>${t.s.toFixed(1)}</b></td><td>${g6(t.s)}</td><td>${dv(t)}</td>
+    <td class="small"><span class="buy">${t.n?.buy??'-'}</span>/${t.n?.hold??'-'}/<span class="sell">${t.n?.sell??'-'}</span></td>
+    <td class="small">${top(t)}</td></tr>`).join('');
+  return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''} · 행을 누르면 그 종목으로 이동</p>
+    <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수권 '+TH6.buy+'↑')}${btn('sell','매도권 '+TH6.sell+'↓')}${btn('up','전일 대비 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
+      <span style="width:12px"></span>${sbtn('s','점수순')}${sbtn('d','상승폭순')}</div>
+    <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>종합</th><th>등급</th><th>전일대비</th><th>매수/보합/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
+    <p class="small">점수는 각 종목의 <b>자기 과거 250일 대비</b> 백분위입니다. 종목 간 절대 비교가 아니라 "평소의 자기 자신보다 지금 어떤 상태인가"의 줄세우기입니다.</p>`;
+}
+
 function render(){
   if(!N)return;
+  $('box').style.display = (tab==='scr') ? 'none' : '';
+  if(tab==='scr'){
+    $('leg').innerHTML=''; $('panel').innerHTML=screener();
+    $('tabnote').innerHTML='<b>스크리너</b>는 <code>stoch/data/index.json</code>에 실린 종목별 최신 종합점수만 읽습니다(파일 하나, 즉시 로딩). 개별 지표 106개는 종목을 선택해 <b>종합 스코어</b> 탭에서 봅니다.';
+    $('d0').textContent='-';$('d1').textContent='-';$('info').textContent=LIST.length+'종목';
+    verdict(); return;
+  }
   let [a,b]=win(),n=b-a+1;const rows=SER.slice(a,b+1);
   let labels=rows.map(r=>r[F.D]), c=rows.map(r=>r[F.C]);
   const TFB=(tab==='stoch'&&TF!=='D')?((TFD[CODE]||{})[TF]||null):null;
@@ -483,6 +520,15 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   $('q').oninput=fill;
   $('th').onchange=e=>{TH6.buy=+e.target.value;TH6.sell=100-TH6.buy;taps();verdict();draw();};
   $('leg').onclick=e=>{const t=e.target.closest('[data-tf]');if(!t)return;TF=t.dataset.tf;draw();};
+  $('panel').onclick=async e=>{
+    const f=e.target.closest('[data-scf]'); if(f){SCF=f.dataset.scf;draw();return;}
+    const s=e.target.closest('[data-scs]'); if(s){SCS=s.dataset.scs;draw();return;}
+    const g=e.target.closest('[data-go]');
+    if(g){ const code=g.dataset.go; $('q').value=''; fill(); $('sel').value=code;
+      try{ await load(code); }catch(err){ alert('불러오기 실패: '+err); return; }
+      tab='score'; document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.t==='score'));
+      window.scrollTo({top:0,behavior:'smooth'}); draw(); }
+  };
   $('panel').onchange=e=>{const t=e.target;if(!t.dataset||!t.dataset.k)return;const v=+t.value;
     if(!isFinite(v))return; AXCFG[t.dataset.k][t.dataset.f]=v; axSave(); draw();};
   $('tabs').onclick=e=>{const t=e.target.closest('.tab');if(!t)return;tab=t.dataset.t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));draw();};
