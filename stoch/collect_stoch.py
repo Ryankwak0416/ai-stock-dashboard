@@ -217,7 +217,18 @@ def main():
             data = process(code, name, market, start, mrule)
             with open(os.path.join(OUT_DIR, f"{code}.json"), "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-            index.append({"code": code, "name": name, "market": market})
+            row = {"code": code, "name": name, "market": market}
+            # 스크리너용 최신 106지표 요약 (index.json 하나만 읽어도 전 종목 순위가 나오게)
+            ix = data.get("ind")
+            if ix and ix.get("score"):
+                sc = next((v for v in reversed(ix["score"]) if v is not None), None)
+                prv = [v for v in ix["score"] if v is not None]
+                row["s"] = sc
+                row["d"] = None if len(prv) < 2 else round(prv[-1] - prv[-2], 1)
+                row["c"] = {k: (v[-1] if v else None) for k, v in ix["cat"].items()}
+                row["n"] = {k: (v[-1] if v else None) for k, v in ix["cnt"].items()}
+                row["p"] = data["close"][-1] if data["close"] else None
+            index.append(row)
             ok += 1
             if i % 25 == 0 or i <= 3:
                 w = len(data["tf"].get("W", {}).get("dates", []))
