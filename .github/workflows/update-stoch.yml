@@ -29,7 +29,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install deps
-        run: pip install finance-datareader pandas lxml requests
+        run: pip install finance-datareader pandas numpy lxml requests
 
       - name: Collect stochastic data
         env:
