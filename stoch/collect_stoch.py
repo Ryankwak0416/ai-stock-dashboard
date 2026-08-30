@@ -230,7 +230,15 @@ def main():
                 row["s"] = sc
                 row["d"] = None if len(prv) < 2 else round(prv[-1] - prv[-2], 1)
                 row["c"] = {k: (v[-1] if v else None) for k, v in ix["cat"].items()}
-                row["n"] = {k: (v[-1] if v else None) for k, v in ix["cnt"].items()}
+                # 관행 판정 집계 — 스크리너의 본체
+                st = ix.get("std") or {}
+                row["n"] = {k: (st[k][-1] if st.get(k) else None) for k in ("buy", "hold", "sell")}
+                row["n"]["dir"] = st.get("dir")
+                ag = ix.get("agree") or []
+                row["a"] = next((x for x in reversed(ag) if x is not None), None)   # 합의도
+                prv = [x for x in ag if x is not None]
+                row["ad"] = None if len(prv) < 2 else prv[-1] - prv[-2]             # 합의도 전일대비
+                row["ca"] = {k: (v[-1] if v else None) for k, v in (ix.get("cagree") or {}).items()}
                 row["p"] = data["close"][-1] if data["close"] else None
             index.append(row)
             ok += 1

@@ -198,8 +198,9 @@ def _build(df):
         ("VWMA20", "VWMA 20", 20, _vwma(c, v, 20), "MA_M"),
     ]
     for key, nm, span, series, grp in ma_defs:
-        slope = (series - series.shift(max(3, span // 4))) / p    # 기울기(가격 대비)
-        add(key, nm + " 기울기", "이동평균", grp, "rank", series, slope)
+        # 백분위 점수는 MA 기울기로, 관행 판정은 "종가가 MA 위냐"로 본다(STD_RULE 'above').
+        slope = (series - series.shift(max(3, span // 4))) / p
+        add(key, nm, "이동평균", grp, "rank", series, slope)
 
     s5, s20, s60 = _sma(c, 5), _sma(c, 20), _sma(c, 60)
     s50, s200 = _sma(c, 50), _sma(c, 200)
@@ -452,6 +453,101 @@ def _build(df):
     return ind
 
 
+# ══════════════════════ 관행 판정 (핵심 레이어) ══════════════════════
+# 이 도구의 본질은 "각 지표가 교과서 규칙대로 매수/매도를 말하고, 그것이 겹치는 지점을
+# 잡아내는 것"이다. 아래 표가 그 교과서 규칙이다. 백분위 점수(_normalize)는 종목 간
+# 비교를 위한 보조 지표일 뿐, 합의를 세는 근거는 여기다.
+#
+# 규칙 종류
+#   ('sign',)          값 > 0 매수 / < 0 매도            (MACD, CMF, ROC …)
+#   ('band', lo, hi)   값 ≤ lo 매수 / ≥ hi 매도          (RSI·스토캐스틱 등 과매수과매도형)
+#   ('bandup', lo, hi) 값 ≥ hi 매수 / ≤ lo 매도          (돈치안 돌파·52주 위치 등 추세추종형)
+#   ('above',)         종가 > 지표값 매수                 (이동평균·PSAR·VWAP·피벗 …)
+#   ('sma', n)         값 > 자기 SMA(n) 매수              (OBV·NVI)
+#   ('rise', n)        값이 n봉 전보다 높으면 매수        (OBV추세·PVT·AD Line)
+#   ('direct',)        값이 이미 −1/0/+1                  (슈퍼트렌드·구름대·캔들패턴)
+#   ('none',)          관행상 방향 신호가 없는 지표        (변동성 크기·추세강도·통계)
+STD_RULE = {
+    # ── 이동평균 23 : MA 자체는 "종가가 위냐", 크로스·이격은 부호
+    **{k: ('above',) for k in
+       ("SMA5","SMA10","SMA20","SMA50","SMA60","SMA120","SMA200",
+        "EMA12","EMA20","EMA26","EMA50","EMA200","WMA20","WMA200",
+        "DEMA20","TEMA20","VWMA20")},
+    "X_5_20": ('sign',), "X_20_60": ('sign',), "X_GMA": ('sign',),
+    "P_SMA20": ('sign',), "P_SMA60": ('sign',), "P_SMA200": ('sign',),
+    # ── 모멘텀 25
+    "RSI7": ('band', 30, 70), "RSI14": ('band', 30, 70), "RSI21": ('band', 30, 70),
+    "STOCH_K": ('band', 20, 80), "STOCH_D": ('band', 20, 80),
+    "STOCHRSI_K": ('band', 20, 80), "STOCHRSI_D": ('band', 20, 80),
+    "MACD_SIG": ('sign',), "MACD_HIST": ('sign',), "MACD_LINE": ('sign',),
+    "CCI20": ('band', -100, 100), "WILLR": ('band', -80, -20),
+    "ROC12": ('sign',), "ROC25": ('sign',), "MOM10": ('sign',),
+    "AO": ('sign',), "TSI": ('sign',), "UO": ('band', 30, 70),
+    "SQUEEZE": ('none',),                      # 스퀴즈는 변동성 압축, 방향 없음
+    "KDJ": ('band', 20, 80), "CMO14": ('band', -50, 50),
+    "PPO": ('sign',), "FISHER": ('sign',), "COPPOCK": ('sign',), "RVGI": ('sign',),
+    # ── 추세 18
+    "ADX_DI": ('sign',),                       # DI+ > DI− 매수
+    "ADX": ('none',), "DI_P": ('none',), "DI_M": ('none',),   # 강도만, 방향은 ADX_DI 가 말함
+    "AROON_OSC": ('sign',),
+    "AROON_UP": ('bandup', 30, 70), "AROON_DN": ('band', 30, 70),
+    "VORTEX": ('sign',), "ICH_TK": ('sign',),
+    "ICH_CLOUD": ('direct',), "ICH_TREND": ('sign',),
+    "SUPERTREND": ('direct',), "PSAR": ('above',),
+    "DPO20": ('sign',), "CHOP": ('none',),     # 추세/횡보만 구분, 방향 없음
+    "TRIX": ('sign',), "LINREG": ('sign',), "QSTICK": ('sign',),
+    # ── 변동성 13 : 밴드 위치만 방향을 가진다. 변동성 "크기"는 방향이 없다.
+    "BB_PCTB": ('band', 20, 80),               # 볼린저는 역추세: 하단 매수
+    "KC_POS": ('band', 20, 80),
+    "DC_POS": ('bandup', 20, 80),              # 돈치안은 추세추종: 상단 돌파 매수
+    "CE_LONG": ('above',), "CE_SHORT": ('above',),
+    **{k: ('none',) for k in
+       ("ATR14","NATR","HV20","HV60","STDDEV20","TRUERANGE","MASS","ULCER")},
+    # ── 거래량 12
+    "OBV_SMA": ('sma', 20), "OBV_TREND": ('rise', 10),
+    "VWAP": ('above',), "CMF20": ('sign',), "MFI14": ('band', 20, 80),
+    "PVT": ('rise', 10), "NVI": ('sma', 60), "ADOSC": ('sign',),
+    "VOL_RATIO": ('none',), "KVO": ('sign',), "VOL_SMA_RATIO": ('none',),
+    "ADLINE": ('rise', 10),
+    # ── 지지저항 5 : 피벗 위면 매수, 52주는 위치
+    "PIVOT": ('above',), "FIB": ('above',), "CAMARILLA": ('above',), "WOODIE": ('above',),
+    "WEEK52": ('bandup', 20, 80),
+    # ── 통계 5 : Z-Score 만 방향을 가진다
+    "ZSCORE20": ('band', -2, 2),
+    **{k: ('none',) for k in ("SKEW","KURT","VARIANCE","ENTROPY")},
+    # ── 캔들패턴 5
+    "HA_TREND": ('direct',), "ENGULFING": ('direct',),
+    "HAMMER": ('direct',), "CANDLE": ('direct',),
+    "DOJI": ('none',),                         # 도지는 반전 예고일 뿐 방향은 미정
+}
+
+
+def _std_signal(key, val, close):
+    """지표 하나의 관행 판정 → -1(매도) / 0(중립) / +1(매수) 시리즈"""
+    r = STD_RULE.get(key, ('none',))
+    v = pd.Series(val).astype(float).replace([np.inf, -np.inf], np.nan)
+    kind = r[0]
+    if kind == 'none':
+        return pd.Series(0.0, index=v.index)
+    if kind == 'direct':
+        return v.clip(-1, 1).fillna(0)
+    if kind == 'sign':
+        return np.sign(v).fillna(0)
+    if kind == 'band':                 # 낮으면 매수(과매도), 높으면 매도(과매수)
+        lo, hi = r[1], r[2]
+        return pd.Series(np.where(v <= lo, 1.0, np.where(v >= hi, -1.0, 0.0)), index=v.index)
+    if kind == 'bandup':               # 높으면 매수(돌파), 낮으면 매도
+        lo, hi = r[1], r[2]
+        return pd.Series(np.where(v >= hi, 1.0, np.where(v <= lo, -1.0, 0.0)), index=v.index)
+    if kind == 'above':                # 종가가 지표값 위면 매수
+        return np.sign(close - v).fillna(0)
+    if kind == 'sma':
+        return np.sign(v - _sma(v, r[1])).fillna(0)
+    if kind == 'rise':
+        return np.sign(v - v.shift(r[1])).fillna(0)
+    return pd.Series(0.0, index=v.index)
+
+
 # ────────────────────────── 점수화 ──────────────────────────
 def _normalize(bull, mode):
     b = pd.Series(bull).astype(float).replace([np.inf, -np.inf], np.nan)
@@ -487,6 +583,10 @@ def compute(df, keep=None, keep_detail=250):
 
     rows, cat_num, cat_den = [], {}, {}
     buy = pd.Series(0.0, idx); hold = pd.Series(0.0, idx); sell = pd.Series(0.0, idx)
+    # 관행 판정 집계 — 이 도구의 본체
+    sbuy = pd.Series(0.0, idx); ssell = pd.Series(0.0, idx); sdir = pd.Series(0.0, idx)
+    cbuy, csell, cdir = {}, {}, {}       # 카테고리별 관행 매수/매도/방향성지표 수
+    close = df["Close"]
 
     for key, name, cat, grp, mode, val, bull in ind:
         sc = _normalize(bull, mode).reindex(idx)
@@ -496,7 +596,17 @@ def compute(df, keep=None, keep_detail=250):
         buy = buy.add((sc >= BUY_TH).astype(float), fill_value=0)
         sell = sell.add((sc <= SELL_TH).astype(float), fill_value=0)
         hold = hold.add(((sc > SELL_TH) & (sc < BUY_TH)).astype(float), fill_value=0)
-        rows.append((key, name, cat, grp, round(w, 4), val, sc))
+
+        st = _std_signal(key, val, close).reindex(idx).fillna(0)
+        directional = STD_RULE.get(key, ('none',))[0] != 'none'
+        sbuy = sbuy.add((st > 0).astype(float), fill_value=0)
+        ssell = ssell.add((st < 0).astype(float), fill_value=0)
+        if directional:
+            sdir = sdir.add(1.0, fill_value=0)
+            cdir[cat] = cdir.get(cat, 0) + 1
+            cbuy[cat] = cbuy.get(cat, pd.Series(0.0, idx)).add((st > 0).astype(float), fill_value=0)
+            csell[cat] = csell.get(cat, pd.Series(0.0, idx)).add((st < 0).astype(float), fill_value=0)
+        rows.append((key, name, cat, grp, round(w, 4), val, sc, st))
 
     cats_raw = {k: (cat_num[k] / cat_den[k]) for k in cat_num}
     # ── 카테고리 분산 균등화 ──
@@ -514,6 +624,8 @@ def compute(df, keep=None, keep_detail=250):
     nd_ = min(keep_detail or n, n)
     sl = slice(len(idx) - n, len(idx))
     sl2 = slice(len(idx) - nd_, len(idx))
+    n3 = min(250, n)
+    sl3 = slice(len(idx) - n3, len(idx))     # 카테고리 합의도는 250봉만(용량)
 
     def arr(s, nd=1, s_=None):
         seq = s.iloc[s_ or sl]
@@ -521,23 +633,39 @@ def compute(df, keep=None, keep_detail=250):
             return [None if pd.isna(x) else int(round(float(x))) for x in seq]
         return [None if pd.isna(x) else round(float(x), nd) for x in seq]
 
+    # 합의도 : 방향성을 가진 지표들 중 매수 비율 − 매도 비율 (-100 ~ +100)
+    sdir_safe = sdir.replace(0, np.nan)
+    agree = (sbuy - ssell) / sdir_safe * 100
+    # 카테고리별 합의도 (같은 정의)
+    cagree = {k: ((cbuy[k] - csell[k]) / cdir[k] * 100) for k in cbuy if cdir.get(k)}
+
     last = []
-    for key, name, cat, grp, w, val, sc in rows:
+    for key, name, cat, grp, w, val, sc, st in rows:
         v = val.iloc[-1] if len(val) else np.nan
         s = sc.iloc[-1] if len(sc) else np.nan
         s_ = None if pd.isna(s) else round(float(s), 1)
+        t = st.iloc[-1] if len(st) else 0
         last.append({
             "k": key, "n": name, "c": cat, "g": grp, "w": w,
             "v": None if pd.isna(v) else round(float(v), 4),
             "s": s_,
             "j": 0 if s_ is None else (1 if s_ >= BUY_TH else (-1 if s_ <= SELL_TH else 0)),
+            "t": 0 if pd.isna(t) else int(t),          # 관행 판정 -1/0/+1
+            "r": STD_RULE.get(key, ('none',))[0],       # 어떤 규칙으로 판정했는지
         })
 
     return {
         "score": arr(score),
         "detail_n": nd_,
         "cat": {k: arr(cats[k], 0, sl2) for k in cats},
-        "cnt": {"buy": arr(buy, 0, sl2), "hold": arr(hold, 0, sl2), "sell": arr(sell, 0, sl2)},
+        # ── 관행 판정(이 도구의 본체) ──
+        # cnt(백분위 65/35 기준 카운트)는 관행 판정으로 대체되어 제거했다.
+        "std": {"buy": arr(sbuy, 0, sl2), "sell": arr(ssell, 0, sl2),
+                "hold": arr(sdir - sbuy - ssell, 0, sl2),
+                "dir": int(sdir.iloc[-1]) if len(sdir) else 0},
+        "agree": arr(agree, 0),                       # 합의도 -100~+100 (keep 전 구간)
+        "cagree": {k: arr(v, 0, sl3) for k, v in cagree.items()},   # 카테고리 합의도(250봉)
+        "cdir": cdir,
         "last": last,
         "w": {"category": CATEGORY_W, "group_size": gsize,
               "rank_win": RANK_WIN, "buy_th": BUY_TH, "sell_th": SELL_TH},
