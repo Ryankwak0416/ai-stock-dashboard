@@ -383,17 +383,24 @@ def _build(df):
     add("ADLINE", "A/D Line 추세", "거래량", "OBV", "rank", adl, adl.diff(10))
 
     # ───────── 지지저항 5 ─────────
+    # 피벗 4종의 bull 은 (종가−피벗)을 ATR 로 정규화하고 5일 평활한다.
+    # 원값 그대로 쓰면 사실상 "전일 대비 하루 등락률"을 네 번 세는 것이 되어
+    # 어제 급등한 종목이 이 카테고리를 독식한다 (2026-08-29 실데이터에서 확인).
     ph, pl_, pc_ = h.shift(1), l.shift(1), c.shift(1)
+    atr_n = atr14.replace(0, np.nan)
+    def _pivsm(dist):
+        return (dist / atr_n).rolling(5, min_periods=3).mean()
     pp = (ph + pl_ + pc_) / 3
-    add("PIVOT", "피벗 포인트", "지지저항", "PIV", "rank", pp, (c - pp) / p)
+    add("PIVOT", "피벗 포인트", "지지저항", "PIV", "rank", pp, _pivsm(c - pp))
     rng1 = (ph - pl_)
     fib_p = pp
     add("FIB", "피보나치 피벗", "지지저항", "PIV", "rank", fib_p,
-        (c - (pp - 0.382 * rng1)) / (0.764 * rng1).replace(0, np.nan) - 0.5)
+        ((c - (pp - 0.382 * rng1)) / (0.764 * rng1).replace(0, np.nan) - 0.5)
+        .rolling(5, min_periods=3).mean())
     cam = pc_ + rng1 * 1.1 / 12
-    add("CAMARILLA", "카마릴라 피벗", "지지저항", "PIV", "rank", cam, (c - cam) / p)
+    add("CAMARILLA", "카마릴라 피벗", "지지저항", "PIV", "rank", cam, _pivsm(c - cam))
     wood = (ph + pl_ + 2 * c) / 4
-    add("WOODIE", "우디 피벗", "지지저항", "PIV", "rank", wood, (c - wood) / p)
+    add("WOODIE", "우디 피벗", "지지저항", "PIV", "rank", wood, _pivsm(c - wood))
     w52h = c.rolling(252, min_periods=60).max(); w52l = c.rolling(252, min_periods=60).min()
     add("WEEK52", "52주 위치", "지지저항", "IND", "rank", (c - w52l) / (w52h - w52l).replace(0, np.nan) * 100,
         (c - w52l) / (w52h - w52l).replace(0, np.nan))
@@ -491,9 +498,17 @@ def compute(df, keep=None, keep_detail=250):
         hold = hold.add(((sc > SELL_TH) & (sc < BUY_TH)).astype(float), fill_value=0)
         rows.append((key, name, cat, grp, round(w, 4), val, sc))
 
-    cats = {k: (cat_num[k] / cat_den[k]) for k in cat_num}
+    cats_raw = {k: (cat_num[k] / cat_den[k]) for k in cat_num}
+    # ── 카테고리 분산 균등화 ──
+    # 지표 수가 적은 카테고리(지지저항·캔들패턴)는 점수 표준편차가 20을 넘고
+    # 지표가 많은 카테고리(모멘텀)는 5 안팎이라, 명시한 가중치와 무관하게
+    # 변동폭 큰 카테고리가 종합을 흔든다 (2026-08-29 실데이터: 지지저항 σ22 vs 모멘텀 σ5.5).
+    # 각 카테고리 점수를 자기 과거 RANK_WIN일 백분위로 한 번 더 정규화해
+    # 모든 카테고리가 같은 폭(0~100 균등분포)을 갖게 한 뒤 가중 평균한다.
+    cats = {k: v.rolling(RANK_WIN, min_periods=RANK_MIN).rank(pct=True) * 100
+            for k, v in cats_raw.items()}
     tw = sum(CATEGORY_W[k] for k in cats)
-    score = sum(cats[k] * CATEGORY_W[k] for k in cats) / tw
+    score = sum(cats[k].fillna(cats_raw[k]) * CATEGORY_W[k] for k in cats) / tw
 
     n = len(idx) if keep is None else min(keep, len(idx))
     nd_ = min(keep_detail or n, n)
