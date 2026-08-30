@@ -178,7 +178,11 @@ def process(code, name, market, start, mrule):
 
     # ── 106 보조지표 종합점수 ──
     try:
-        out["ind"] = indicators106.compute(df, keep=KEEP_DAYS)
+        # keep_detail 을 KEEP_DAYS 와 같게 둔다.
+        # 250봉만 저장하면 카테고리 백테스트 관측창이 46회로 줄어 결론을 확정할 수 없다.
+        # 500봉이면 84회 → 선별점수(이평+추세+거래량) 우위를 두 배 표본으로 재검증 가능.
+        # 대가는 종목 JSON 76KB → 약 84KB.
+        out["ind"] = indicators106.compute(df, keep=KEEP_DAYS, keep_detail=KEEP_DAYS)
     except Exception as e:
         out["ind"] = None
         print(f"  [경고] {code} 106지표 실패: {e}")
