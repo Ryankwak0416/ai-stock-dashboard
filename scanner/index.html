@@ -54,8 +54,8 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
         <button class="pre on" data-b="252">1년</button><button class="pre" data-b="504">2년</button>
         <button class="pre" data-b="0">전체</button>
       </div></div>
-    <div class="f"><label>타점 임계(종합점수)</label>
-      <select id="th"><option value="60">60 이상 / 40 이하</option><option value="65" selected>65 이상 / 35 이하 (기본)</option><option value="70">70 이상 / 30 이하</option><option value="75">75 이상 / 25 이하 (엄격)</option></select></div>
+    <div class="f"><label>타점 임계(합의도)</label>
+      <select id="th"><option value="30">+30 / −30 (느슨)</option><option value="50" selected>+50 / −50 (기본)</option><option value="70">+70 / −70 (엄격)</option><option value="85">+85 / −85 (만장일치급)</option></select></div>
   </div>
   <div class="lbl"><span>구간: <b id="d0">-</b> ~ <b id="d1">-</b></span><span id="info"></span></div>
   <div class="scrollrow"><button class="step" id="prev">◀</button><input type="range" id="sc" min="0" max="0" value="0"><button class="step" id="next">▶</button></div>
@@ -104,7 +104,8 @@ const F={D:0,C:1,KK:2,KD:3,KM:4,S6:5};
 // ── 106지표 ──
 const R6={};                       // code → {cat:{}, cnt:{}, last:[], off:정렬 오프셋}
 let S6=[], IN6=null;               // 현재 종목 스코어 배열 / 상세
-const TH6={buy:65,sell:35};        // indicators106.py 의 BUY_TH / SELL_TH 와 동일
+let AG6=[];                        // 현재 종목 합의도 배열 (-100~+100)
+const TH6={buy:50,sell:-50};       // 합의도 타점 임계 (화면에서 조절)
 const CATS=['추세','모멘텀','이동평균','거래량','변동성','지지저항','통계','캔들패턴'];
 const g6=s=>s==null?'-':(s>=70?'강세':s>=55?'상승우위':s>=45?'중립':s>=30?'하락우위':'약세');
 const c6=s=>s==null?'neu':(s>=55?'buy':s<45?'sell':'neu');
@@ -163,11 +164,17 @@ function recompute(){
   taps();
 }
 function has6(){return S6.some(v=>v!=null);}
+function hasAg(){return AG6.some(v=>v!=null);}
 function taps(){BUY=[];SELL=[];
-  if(has6()){   // 106지표 종합 스코어가 임계선을 위/아래로 통과하는 순간
-    for(let i=1;i<N;i++){const a=S6[i-1],b=S6[i];if(a==null||b==null)continue;
+  if(hasAg()){  // 합의도가 임계선을 위/아래로 통과 = "여러 지표가 같은 방향으로 겹치기 시작한 순간"
+    for(let i=1;i<N;i++){const a=AG6[i-1],b=AG6[i];if(a==null||b==null)continue;
       if(b>=TH6.buy&&a<TH6.buy)BUY.push(i);
       if(b<=TH6.sell&&a>TH6.sell)SELL.push(i);}
+    return;}
+  if(has6()){
+    for(let i=1;i<N;i++){const a=S6[i-1],b=S6[i];if(a==null||b==null)continue;
+      if(b>=65&&a<65)BUY.push(i);
+      if(b<=35&&a>35)SELL.push(i);}
     return;}
   for(let i=1;i<N;i++){if(IND.bv[i]>=TH&&IND.bv[i-1]<TH)BUY.push(i);if(IND.sv[i]>=TH&&IND.sv[i-1]<TH)SELL.push(i);}}
 
@@ -182,40 +189,49 @@ function pts(idx,fn,a,b,n,col,rot){const arr=Array(n).fill(null);idx.forEach(i=>
   return{data:arr,borderColor:col,backgroundColor:col,pointRadius:9,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:2,showLine:false,order:1};}
 
 // ── 종목 스크리너 : index.json 하나로 전 종목 106지표 점수를 줄세운다 ──
-let SCF='all', SCS='p';
+let SCF='all', SCS='a';
 // 선별점수 = 이동평균·추세·거래량 3개 카테고리 평균.
 // 백테스트(496종목·500일·20일보유·비중첩 리밸런싱·왕복비용 0.4% 차감)에서
 // 종합점수 상위50 +46.2% vs 선별점수 상위50 +54.2% (유니버스 +43.1%).
 // 종합점수는 하락장에서 선별력이 0.03%p로 사라지는데 선별점수는 +1.37%p 유지.
 const sel3=t=>{if(!t.c)return null;const a=t.c['이동평균'],b=t.c['추세'],d=t.c['거래량'];
   return (a==null||b==null||d==null)?null:Math.round((a+b+d)/3*10)/10;};
+// 합의도 = (관행상 매수 지표 수 − 매도 지표 수) / 방향성 지표 수 × 100
+const agv=t=>(typeof t.a==='number')?t.a:null;
+const agc=x=>x==null?'neu':(x>=25?'buy':(x<=-25?'sell':'neu'));
 function screener(){
   const scored=LIST.filter(t=>typeof t.s==='number');
   if(!scored.length)return `<div class="note">아직 전 종목 점수가 없습니다. 수집기(<code>update-stoch</code>)를 한 번 더 돌리면
     <code>index.json</code>에 종목별 최신 106지표 점수가 실려 이 표가 채워집니다. 그때까지는 종목을 하나씩 골라서 보십시오.</div>`;
-  const F2={all:()=>true, buy:t=>t.s>=TH6.buy, sell:t=>t.s<=TH6.sell,
-            up:t=>typeof t.d==='number'&&t.d>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ'};
+  const F2={all:()=>true, buy:t=>agv(t)!=null&&agv(t)>=50, sell:t=>agv(t)!=null&&agv(t)<=-50,
+            up:t=>typeof t.ad==='number'&&t.ad>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ'};
   let rows=scored.filter(F2[SCF]||F2.all);
-  rows.sort((a,b)=> SCS==='d' ? ((b.d??-99)-(a.d??-99))
+  rows.sort((a,b)=> SCS==='d' ? ((b.ad??-999)-(a.ad??-999))
+                  : SCS==='a' ? ((agv(b)??-999)-(agv(a)??-999))
                   : SCS==='p' ? ((sel3(b)??-99)-(sel3(a)??-99)) : (b.s-a.s));
   const N2=rows.length; rows=rows.slice(0,60);
   const btn=(k,t)=>`<button class="pre${SCF===k?' on':''}" data-scf="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
   const sbtn=(k,t)=>`<button class="pre${SCS===k?' on':''}" data-scs="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
   const top=t=>{if(!t.c)return '-';const e=Object.entries(t.c).filter(x=>x[1]!=null).sort((x,y)=>y[1]-x[1]);
     return e.length?`<span class="${c6(e[0][1])}">${e[0][0]} ${e[0][1]}</span> · <span class="${c6(e[e.length-1][1])}">${e[e.length-1][0]} ${e[e.length-1][1]}</span>`:'-';};
-  const dv=t=>t.d==null?'-':(t.d>0?`<span class="buy">▲${t.d.toFixed(1)}</span>`:(t.d<0?`<span class="sell">▼${Math.abs(t.d).toFixed(1)}</span>`:'→'));
+  const dv=t=>t.ad==null?'-':(t.ad>0?`<span class="buy">▲${t.ad}</span>`:(t.ad<0?`<span class="sell">▼${Math.abs(t.ad)}</span>`:'→'));
   const body=rows.map((t,i)=>`<tr data-go="${t.code}" style="cursor:pointer">
     <td class="small">${i+1}</td><td class="l"><b>${t.name}</b> <span class="small">${t.code}</span></td>
     <td class="small">${t.market||'-'}</td><td>${t.p!=null?(+t.p).toLocaleString():'-'}</td>
-    <td class="${c6(sel3(t))}"><b>${sel3(t)==null?'-':sel3(t).toFixed(1)}</b></td>
-    <td class="${c6(t.s)}">${t.s.toFixed(1)}</td><td>${g6(t.s)}</td><td>${dv(t)}</td>
+    <td class="${agc(agv(t))}"><b>${agv(t)==null?'-':(agv(t)>0?'+':'')+agv(t)}</b></td>
+    <td>${dv(t)}</td>
+    <td class="${c6(sel3(t))}">${sel3(t)==null?'-':sel3(t).toFixed(1)}</td>
+    <td class="${c6(t.s)}">${t.s.toFixed(1)}</td>
     <td class="small"><span class="buy">${t.n?.buy??'-'}</span>/${t.n?.hold??'-'}/<span class="sell">${t.n?.sell??'-'}</span></td>
     <td class="small">${top(t)}</td></tr>`).join('');
-  return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''} · 행을 누르면 그 종목으로 이동</p>
-    <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수권 '+TH6.buy+'↑')}${btn('sell','매도권 '+TH6.sell+'↓')}${btn('up','전일 대비 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
-      <span style="width:12px"></span>${sbtn('p','선별점수순 (권장)')}${sbtn('s','종합점수순')}${sbtn('d','상승폭순')}</div>
-    <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>선별</th><th>종합</th><th>등급</th><th>전일대비</th><th>매수/보합/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
-    <p class="small"><b>선별점수</b> = 이동평균·추세·거래량 3개 카테고리 평균. 백테스트에서 종합점수보다 일관되게 나았습니다
+  return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 합의 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''} · 행을 누르면 그 종목으로 이동</p>
+    <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수 합의 +50↑')}${btn('sell','매도 합의 −50↓')}${btn('up','합의 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
+      <span style="width:12px"></span>${sbtn('a','합의도순')}${sbtn('p','선별점수순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}</div>
+    <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>합의도</th><th>전일대비</th><th>선별</th><th>종합</th><th>매수/중립/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
+    <p class="small"><b>합의도</b> = (관행상 매수라고 말하는 지표 수 − 매도라고 말하는 지표 수) ÷ 방향성 지표 수 × 100.
+    각 지표는 교과서 규칙대로 판정합니다(RSI 30↓ 매수, MACD&gt;시그널 매수, 종가&gt;이동평균 매수 …).
+    +100이면 방향을 말하는 지표가 전부 매수, −100이면 전부 매도입니다. 여러 지표가 같은 방향으로 겹치는 종목을 찾는 것이 이 표의 목적입니다.<br>
+    <b>선별점수</b> = 이동평균·추세·거래량 3개 카테고리 평균(백분위). 백테스트에서 종합점수보다 일관되게 나았습니다
     (496종목·500일·20일 보유·비중첩 리밸런싱·왕복비용 0.4% 차감 기준 <b>+54.2%</b> vs 종합점수 +46.2% vs 유니버스 +43.1%).
     종합점수는 모멘텀·통계·변동성 카테고리가 섞여 있는데 이 셋은 백테스트에서 초과수익이 음수였고, 특히 <b>하락장에서 종합점수의 선별력은 +0.03%p로 사라지는 반면 선별점수는 +1.37%p를 유지</b>했습니다.
     점수는 각 종목의 <b>자기 과거 250일 대비</b> 백분위입니다. 종목 간 절대 비교가 아니라 "평소의 자기 자신보다 지금 어떤 상태인가"의 줄세우기입니다.</p>`;
@@ -243,18 +259,23 @@ function render(){
   const priceLeg='<span><i class="sw" style="background:rgba(24,73,169,.45)"></i>종가(우축)</span>';
 
   if(tab==='score'){
-    if(has6()){
-      const s6=S6.slice(a,b+1);
+    if(hasAg()||has6()){
+      const g6a=AG6.slice(a,b+1), useAg=hasAg();
+      const main=useAg?g6a:S6.slice(a,b+1);
       ds=[{label:'종가',data:c,yAxisID:'y',borderColor:'#1849a9',backgroundColor:'rgba(24,73,169,.06)',borderWidth:2,pointRadius:0,tension:.1,fill:true,order:10},
-          {label:'106지표 종합',data:s6,yAxisID:'y2',borderColor:'#7a5af8',backgroundColor:'rgba(122,90,248,.10)',borderWidth:2,pointRadius:0,tension:.15,spanGaps:true,fill:true,order:20},
-          {label:'매수선 65',data:s6.map(()=>TH6.buy),yAxisID:'y2',borderColor:'rgba(6,118,71,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
-          {label:'매도선 35',data:s6.map(()=>TH6.sell),yAxisID:'y2',borderColor:'rgba(180,35,24,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
+          {label:useAg?'합의도':'106지표 종합',data:main,yAxisID:'y2',borderColor:'#7a5af8',backgroundColor:'rgba(122,90,248,.10)',borderWidth:2,pointRadius:0,tension:.15,spanGaps:true,fill:true,order:20},
+          {label:'매수선',data:main.map(()=>useAg?TH6.buy:65),yAxisID:'y2',borderColor:'rgba(6,118,71,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
+          {label:'매도선',data:main.map(()=>useAg?TH6.sell:35),yAxisID:'y2',borderColor:'rgba(180,35,24,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
+          {label:'0선',data:main.map(()=>useAg?0:50),yAxisID:'y2',borderColor:'rgba(148,163,184,.45)',borderWidth:1,pointRadius:0,order:24},
           pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0), pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
       sc.y={position:'left',ticks:{font:FONT,color:'#1849a9',callback:v=>v>=1000?(v/1000)+'천':v}};
-      sc.y2={position:'right',min:0,max:100,ticks:{font:FONT,stepSize:20},grid:{drawOnChartArea:false},title:{display:true,text:'106지표 종합(0~100)',font:FONT}};
-      leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#7a5af8;height:4px"></i>106지표 종합(우축)</span><span><i class="sw" style="background:#067647"></i>▲매수 타점</span><span><i class="sw" style="background:#d92d20"></i>▼매도 타점</span>';
+      sc.y2=useAg?{position:'right',min:-100,max:100,ticks:{font:FONT,stepSize:50},grid:{drawOnChartArea:false},title:{display:true,text:'합의도(−100~+100)',font:FONT}}
+                 :{position:'right',min:0,max:100,ticks:{font:FONT,stepSize:20},grid:{drawOnChartArea:false},title:{display:true,text:'106지표 종합(0~100)',font:FONT}};
+      leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#7a5af8;height:4px"></i>'+(useAg?'합의도(우축)':'106지표 종합(우축)')+'</span><span><i class="sw" style="background:#067647"></i>▲매수 타점</span><span><i class="sw" style="background:#d92d20"></i>▼매도 타점</span>';
       panel=cat6()+ind6()+tapTable();
-      note='<b>106개 보조지표</b>를 각각 과거 250일 백분위로 정규화해 0~100 점수로 만든 뒤, 중복군 가중치(1/그룹크기)와 카테고리 가중치로 평균낸 값입니다. 종합이 <b>65를 위로 통과</b>하면 ▲, <b>35를 아래로 통과</b>하면 ▼. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.';
+      note=useAg
+        ? '<b>합의도</b> = (관행상 매수라고 말하는 지표 수 − 매도라고 말하는 지표 수) ÷ 방향을 말하는 지표 수 × 100. 각 지표는 교과서 규칙대로 판정합니다 — RSI 30 이하 매수·70 이상 매도, MACD가 시그널 위면 매수, 종가가 이동평균 위면 매수 같은 식입니다. 합의도가 <b>+'+TH6.buy+'를 위로 통과</b>하면 ▲, <b>'+TH6.sell+'을 아래로 통과</b>하면 ▼ — 여러 지표의 매수(매도)가 겹치기 시작한 지점입니다. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.'
+        : '이 종목은 아직 합의도가 계산되지 않아 백분위 종합점수로 표시합니다(수집기 재실행 필요).';
     } else {
       const s=IND.sc.slice(a,b+1),bv=IND.bv.slice(a,b+1),sv=IND.sv.slice(a,b+1);
       ds=[{label:'종가',data:c,yAxisID:'y',borderColor:'#1849a9',backgroundColor:'rgba(24,73,169,.06)',borderWidth:2,pointRadius:0,tension:.1,fill:true,order:10},
@@ -396,41 +417,56 @@ const bar6=(v,col)=>`<div style="background:#eef1f5;border-radius:4px;height:8px
 function cat6(){
   if(!IN6)return '';
   const i=win()[1], W=(IN6.w&&IN6.w.category)||{};
-  const s=S6[i], cnt=IN6.cnt||{};
+  const s=S6[i], cnt=IN6.cnt||{}, CA=IN6.cag||{}, CD=(IN6.w&&IN6.w.category)?null:null;
+  const ac=x=>x==null?'neu':(x>=25?'buy':(x<=-25?'sell':'neu'));
   const rows=CATS.map(k=>{const a=IN6.cat[k];const v=a?a[i]:null;
-    const col=v==null?'#98a2b3':(v>=55?'#12b76a':v<45?'#f04438':'#98a2b3');
-    return `<tr><td class="l">${k}</td><td style="width:38%">${bar6(v,col)}</td>
-      <td class="${c6(v)}">${v==null?'-':v}</td><td>${g6(v)}</td><td class="small">${(W[k]!=null?W[k].toFixed(2):'-')}</td></tr>`;}).join('');
+    const g=CA[k]?CA[k][i]:null;
+    const col=g==null?'#98a2b3':(g>=25?'#12b76a':g<=-25?'#f04438':'#98a2b3');
+    return `<tr><td class="l">${k}</td><td style="width:32%">${bar6(g==null?null:(g+100)/2,col)}</td>
+      <td class="${ac(g)}"><b>${g==null?'-':(g>0?'+':'')+g}</b></td>
+      <td class="${c6(v)}">${v==null?'-':v}</td><td class="small">${(W[k]!=null?W[k].toFixed(2):'-')}</td></tr>`;}).join('');
   const b=cnt.buy?cnt.buy[i]:null,h=cnt.hold?cnt.hold[i]:null,se=cnt.sell?cnt.sell[i]:null;
-  return `<p class="small" style="margin:12px 0 2px"><b>카테고리별 점수</b> — ${fd(SER[i][F.D])} 기준 · 종합 <b class="${c6(s)}">${s==null?'-':s}</b> (${g6(s)})
-    · 106개 판정 <b class="buy">매수 ${b??'-'}</b> / 보합 ${h??'-'} / <b class="sell">매도 ${se??'-'}</b></p>
-  <table><tr><th>카테고리</th><th>점수(0~100)</th><th></th><th>등급</th><th>가중치</th></tr>${rows}</table>`;
+  return `<p class="small" style="margin:12px 0 2px"><b>카테고리별 합의</b> — ${fd(SER[i][F.D])} 기준 ·
+    방향성 지표 ${IN6.dir||0}개 중 <b class="buy">매수 ${b??'-'}</b> / 중립 ${h??'-'} / <b class="sell">매도 ${se??'-'}</b>
+    · 참고 점수 <b class="${c6(s)}">${s==null?'-':s}</b> (${g6(s)})</p>
+  <table><tr><th>카테고리</th><th>합의도(−100~+100)</th><th>합의</th><th>참고점수</th><th>가중치</th></tr>${rows}</table>
+  <p class="small">합의도 = (관행상 매수 지표 수 − 매도 지표 수) ÷ 방향성 지표 수 × 100.
+  +100이면 그 카테고리 지표가 전부 매수, −100이면 전부 매도입니다. 변동성 크기·추세강도·통계처럼
+  관행상 방향을 말하지 않는 지표 20개는 분모에서 뺐습니다.</p>`;
 }
 function ind6(){
   if(!IN6||!IN6.last||!IN6.last.length)return '';
   const jt=j=>j>0?'<span class="buy">매수</span>':(j<0?'<span class="sell">매도</span>':'중립');
+  const RN={sign:'부호',band:'과매수/과매도',bandup:'돌파',above:'종가 대비',sma:'자기평균 대비',rise:'상승 여부',direct:'방향',none:'방향 없음'};
   const fv=v=>v==null?'-':(Math.abs(v)>=10000?(v/1000).toFixed(0)+'천':(Math.abs(v)>=100?v.toFixed(0):v.toFixed(3)));
   let out='';
   CATS.forEach(k=>{const g=IN6.last.filter(d=>d.c===k);if(!g.length)return;
     out+=`<tr><td colspan="5" class="l" style="background:#f8fafc;font-weight:700">${k} (${g.length}개)</td></tr>`;
-    out+=g.map(d=>`<tr><td class="l">${d.n}</td><td>${fv(d.v)}</td><td class="${c6(d.s)}">${d.s==null?'-':d.s}</td><td>${jt(d.j)}</td><td class="small">${d.w}</td></tr>`).join('');});
+    out+=g.map(d=>`<tr><td class="l">${d.n}</td><td>${fv(d.v)}</td>
+      <td><b>${(d.r==null||d.r==='none')?'<span class="small">-</span>':jt(d.t||0)}</b></td>
+      <td class="small">${RN[d.r]||'-'}</td>
+      <td class="small ${c6(d.s)}">${d.s==null?'-':d.s}</td><td class="small">${d.w}</td></tr>`).join('');});
   return `<details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:700">106개 지표 전체 보기 (최신 봉 기준)</summary>
-    <table style="margin-top:6px"><tr><th style="width:34%">지표</th><th>값</th><th>정규화 점수</th><th>판정</th><th>가중치</th></tr>${out}</table>
-    <p class="small">가중치는 <b>1/중복군 크기</b>입니다. 예를 들어 SMA·EMA 계열 기울기 10개가 한 군으로 묶이면 각 0.1점씩만 반영돼, 같은 정보가 10번 세어지는 왜곡이 사라집니다.</p></details>`;
+    <table style="margin-top:6px"><tr><th style="width:30%">지표</th><th>값</th><th>관행 판정</th><th>판정 기준</th><th>참고점수</th><th>가중치</th></tr>${out}</table>
+    <p class="small"><b>관행 판정</b>은 각 지표의 교과서 규칙 그대로입니다 — RSI 30 이하 매수·70 이상 매도, MACD가 시그널 위면 매수,
+    종가가 이동평균 위면 매수, 볼린저는 하단에서 매수(역추세)인데 돈치안은 상단 돌파에서 매수(추세추종), 같은 식입니다.
+    <b>방향 없음</b>으로 표시된 20개(ATR·표준편차 등 변동성 크기, ADX 추세강도, 왜도·첨도 등 통계)는
+    관행상 매수·매도를 말하지 않는 지표라 합의 계산에서 제외했습니다.
+    참고점수는 과거 250일 백분위이고, 가중치는 1/중복군 크기입니다.</p></details>`;
 }
 function tapTable(){
   const all=BUY.map(i=>({i,t:'buy'})).concat(SELL.map(i=>({i,t:'sell'}))).sort((x,y)=>y.i-x.i).slice(0,10);
-  const six=has6();
+  const six=hasAg()||has6(); const useAg=hasAg();
   if(!all.length)return '<p class="small">이 종목에서 '+(six?('종합점수 '+TH6.buy+' / '+TH6.sell+' 통과'):('임계 '+TH+'표'))+' 조건을 만족한 타점이 없습니다. 임계를 낮춰보세요.</p>';
   const r=all.map(o=>{const i=o.i,e=i+1;
     const f=H=>{const x=e+H;return(x<N&&e<N)?((SER[x][F.C]/SER[e][F.C]-1)*100):null;};
     const cell=v=>v==null?'<td class="small">-</td>':`<td class="${v>=0?'buy':'sell'}">${v>=0?'+':''}${v.toFixed(1)}%</td>`;
     const ago=N-1-i;
     return `<tr><td>${fd(SER[i][F.D])}</td><td class="${o.t}">${o.t==='buy'?'▲ 매수':'▼ 매도'}</td>
-      <td>${SER[i][F.C].toLocaleString()}</td><td>${six?(S6[i]==null?'-':S6[i].toFixed(1)):((o.t==='buy'?IND.bv[i]:IND.sv[i])+'표')}</td>
+      <td>${SER[i][F.C].toLocaleString()}</td><td>${useAg?(AG6[i]==null?'-':(AG6[i]>0?'+':'')+AG6[i]):(six?(S6[i]==null?'-':S6[i].toFixed(1)):((o.t==='buy'?IND.bv[i]:IND.sv[i])+'표'))}</td>
       ${cell(f(5))}${cell(f(20))}<td class="small">${ago===0?'오늘':ago+'봉 전'}</td></tr>`;}).join('');
-  return `<p class="small" style="margin:8px 0 2px"><b>최근 타점 10개</b> (${six?`종합점수 ${TH6.buy} 상향 / ${TH6.sell} 하향 통과`:`임계 ${TH}표`} · 진입은 다음 봉 종가 기준)</p>
-    <table><thead><tr><th>날짜</th><th>구분</th><th>종가</th><th>${six?'종합점수':'표수'}</th><th>+5일</th><th>+20일</th><th>경과</th></tr></thead><tbody>${r}</tbody></table>`;
+  return `<p class="small" style="margin:8px 0 2px"><b>최근 타점 10개</b> (${useAg?`합의도 +${TH6.buy} 상향 / ${TH6.sell} 하향 통과`:(six?`종합점수 65 상향 / 35 하향 통과`:`임계 ${TH}표`)} · 진입은 다음 봉 종가 기준)</p>
+    <table><thead><tr><th>날짜</th><th>구분</th><th>종가</th><th>${useAg?'합의도':(six?'종합점수':'표수')}</th><th>+5일</th><th>+20일</th><th>경과</th></tr></thead><tbody>${r}</tbody></table>`;
 }
 function fw(idx,H,dir){const r=[];idx.forEach(i=>{const e=i+1,x=i+1+H;if(x<N)r.push((SER[x][F.C]/SER[e][F.C]-1)*100);});
   if(!r.length)return null;const n=r.length,av=r.reduce((s,v)=>s+v,0)/n;const w=dir>0?r.filter(v=>v>0).length/n*100:r.filter(v=>v<0).length/n*100;return{n,av,w};}
@@ -461,17 +497,22 @@ function backtest(){
     <p class="small" style="margin:14px 0 2px"><b>▼ 매도 타점 검증</b> — 신호 뒤 실제로 덜 올랐는지(차이가 +면 회피 효과 있음)</p>${btTable(S,-1)}`;}
 function verdict(){
   if(has6()&&IN6){
-    const i=N-1,s=S6[i],cnt=IN6.cnt||{};
+    const i=N-1,s=S6[i],cnt=IN6.cnt||{},AG=IN6.ag||[],DIR=IN6.dir||0;
+    const ag=AG[i];
     const cl=s==null?'neu':(s>=TH6.buy?'buy':(s<=TH6.sell?'sell':(s>=55?'buy':s<45?'sell':'neu')));
     const chips=CATS.map(k=>{const a=IN6.cat[k],v=a?a[i]:null;
       return `<span class="chip ${c6(v)}">${k} ${v==null?'-':v}</span>`;}).join('');
     const b=cnt.buy?cnt.buy[i]:'-',h=cnt.hold?cnt.hold[i]:'-',se=cnt.sell?cnt.sell[i]:'-';
-    const prev=(()=>{for(let k=i-1;k>=Math.max(0,i-5);k--)if(S6[k]!=null)return S6[k];return null;})();
-    const dv=(prev!=null&&s!=null)?(s-prev):null;
-    const arrow=dv==null?'':(dv>0.05?` <span class="buy">▲${dv.toFixed(1)}</span>`:(dv<-0.05?` <span class="sell">▼${Math.abs(dv).toFixed(1)}</span>`:' →'));
-    $('verdict').className='vb '+cl;
-    $('verdict').innerHTML=`<div><div class="big ${cl}">${s==null?'-':s.toFixed(1)} · ${g6(s)}${arrow}</div>
-      <div class="meta">${$('sel').value} · ${fd(SER[i][F.D])} 기준 · 106지표 중 <b class="buy">매수 ${b}</b> / 보합 ${h} / <b class="sell">매도 ${se}</b> · 확률적 참고치</div></div><div class="ind">${chips}</div>`;
+    const agc=ag==null?'neu':(ag>=25?'buy':(ag<=-25?'sell':'neu'));
+    const agt=ag==null?'-':(ag>=50?'강한 매수 합의':ag>=25?'매수 우위':ag<=-50?'강한 매도 합의':ag<=-25?'매도 우위':'합의 없음');
+    const pa=(()=>{for(let k=i-1;k>=Math.max(0,i-5);k--)if(AG[k]!=null)return AG[k];return null;})();
+    const da=(pa!=null&&ag!=null)?(ag-pa):null;
+    const arrow=da==null?'':(da>0?` <span class="buy">▲${da}</span>`:(da<0?` <span class="sell">▼${Math.abs(da)}</span>`:' →'));
+    $('verdict').className='vb '+agc;
+    $('verdict').innerHTML=`<div><div class="big ${agc}">${agt} ${ag==null?'':(ag>0?'+':'')+ag}${arrow}</div>
+      <div class="meta">${$('sel').value} · ${fd(SER[i][F.D])} 기준 · 방향성 지표 ${DIR}개 중
+      <b class="buy">매수 ${b}</b> / 중립 ${h} / <b class="sell">매도 ${se}</b>
+      · 참고 점수 ${s==null?'-':s.toFixed(1)}(${g6(s)}) · 확률적 참고치</div></div><div class="ind">${chips}</div>`;
     return;
   }
   const i=N-1,b=IND.bv[i],s=IND.sv[i],cl=b>=TH?'buy':(s>=TH?'sell':'neu');
@@ -499,10 +540,19 @@ async function load(code,name){
     if(ix){                                   // cat/cnt 를 rows 인덱스에 맞춰 재정렬
       const re=src=>{const o=Array(rows.length).fill(null);
         keep.forEach((oi,ri)=>{const k=oi-dof;if(k>=0&&src&&src[k]!=null)o[ri]=src[k];});return o;};
-      const cat={},cnt={};
+      const cat={},cnt={},cag={};
       CATS.forEach(k=>{if(ix.cat&&ix.cat[k])cat[k]=re(ix.cat[k]);});
-      ['buy','hold','sell'].forEach(k=>{if(ix.cnt&&ix.cnt[k])cnt[k]=re(ix.cnt[k]);});
-      R6[code]={cat,cnt,last:ix.last||[],w:ix.w||null};
+      // 관행 판정 집계(std) — 이 도구의 본체. 예전 cnt(백분위 컷)는 폐기됨.
+      ['buy','hold','sell'].forEach(k=>{if(ix.std&&ix.std[k])cnt[k]=re(ix.std[k]);});
+      // 카테고리 합의도는 250봉만 저장 → 별도 오프셋
+      const cn=(ix.cagree&&ix.cagree['추세'])?ix.cagree['추세'].length:0, cof=d.length-cn;
+      const reC=src=>{const o=Array(rows.length).fill(null);
+        keep.forEach((oi,ri)=>{const k=oi-cof;if(k>=0&&src&&src[k]!=null)o[ri]=src[k];});return o;};
+      CATS.forEach(k=>{if(ix.cagree&&ix.cagree[k])cag[k]=reC(ix.cagree[k]);});
+      const so2=ix.agree?d.length-ix.agree.length:0;
+      const ag=Array(rows.length).fill(null);
+      keep.forEach((oi,ri)=>{const k=oi-so2;if(k>=0&&ix.agree&&ix.agree[k]!=null)ag[ri]=ix.agree[k];});
+      R6[code]={cat,cnt,cag,ag,dir:(ix.std&&ix.std.dir)||0,last:ix.last||[],w:ix.w||null};
     } else R6[code]=null;
     const tf=Object.assign({}, j.tf||{});
     try{ const rm=await fetch(MIN_DIR+'tf_'+code+'.json',{cache:'no-store'});
@@ -512,7 +562,7 @@ async function load(code,name){
   }
   CODE=code;
   SER=CACHE[code];N=SER.length;span=252;pos=Math.max(0,N-span);
-  S6=SER.map(r=>r[F.S6]); IN6=R6[code]||null;
+  S6=SER.map(r=>r[F.S6]); IN6=R6[code]||null; AG6=(IN6&&IN6.ag)?IN6.ag:[];
   recompute();mark(252);refresh();
 }
 function mark(b){document.querySelectorAll('#spans .pre').forEach(x=>x.classList.toggle('on',b!==null&&+x.dataset.b===b));}
@@ -529,7 +579,7 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   }catch(e){$('verdict').innerHTML='<div><div class="big sell">데이터를 불러오지 못했습니다</div><div class="meta">'+e+'</div></div>';return;}
   $('sel').onchange=async()=>{try{await load($('sel').value);}catch(e){alert('불러오기 실패: '+e);}};
   $('q').oninput=fill;
-  $('th').onchange=e=>{TH6.buy=+e.target.value;TH6.sell=100-TH6.buy;taps();verdict();draw();};
+  $('th').onchange=e=>{TH6.buy=+e.target.value;TH6.sell=-TH6.buy;taps();verdict();draw();};
   $('leg').onclick=e=>{const t=e.target.closest('[data-tf]');if(!t)return;TF=t.dataset.tf;draw();};
   $('panel').onclick=async e=>{
     const f=e.target.closest('[data-scf]'); if(f){SCF=f.dataset.scf;draw();return;}
