@@ -189,13 +189,19 @@ function pts(idx,fn,a,b,n,col,rot){const arr=Array(n).fill(null);idx.forEach(i=>
   return{data:arr,borderColor:col,backgroundColor:col,pointRadius:9,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:2,showLine:false,order:1};}
 
 // ── 종목 스크리너 : index.json 하나로 전 종목 106지표 점수를 줄세운다 ──
-let SCF='all', SCS='a';
+let SCF='all', SCS='p', MOX=true;
 // 선별점수 = 이동평균·추세·거래량 3개 카테고리 평균.
-// 백테스트(496종목·500일·20일보유·비중첩 리밸런싱·왕복비용 0.4% 차감)에서
-// 종합점수 상위50 +46.2% vs 선별점수 상위50 +54.2% (유니버스 +43.1%).
-// 종합점수는 하락장에서 선별력이 0.03%p로 사라지는데 선별점수는 +1.37%p 유지.
+// 84회 관측창 재검증(513종목·500일·상위50·20일보유·왕복비용 0.4%):
+//   현행 종합점수 +0.99%p / 선별점수 +1.54%p / ★선별 ∩ 모멘텀 과매도 제외 +1.91%p.
+// 모멘텀 카테고리는 오실레이터를 역추세로 뒤집어 놔서 "점수 높음 = 과매도"인데,
+// 단독 초과수익이 −0.80%p·승률 37%다. 이평·추세·거래량이 좋은데 오실레이터만
+// 바닥을 가리키면 그건 강세가 아니라 강세주가 급락 중이라는 뜻이라 걸러낸다.
 const sel3=t=>{if(!t.c)return null;const a=t.c['이동평균'],b=t.c['추세'],d=t.c['거래량'];
   return (a==null||b==null||d==null)?null:Math.round((a+b+d)/3*10)/10;};
+const mov=t=>(t.c&&typeof t.c['모멘텀']==='number')?t.c['모멘텀']:null;
+// 모멘텀 횡단면 중앙값 — 이 위(과매도 쪽)를 버린다
+function moMed(list){const v=list.map(mov).filter(x=>x!=null).sort((a,b)=>a-b);
+  return v.length?v[Math.floor(v.length/2)]:null;}
 // 합의도 = (관행상 매수 지표 수 − 매도 지표 수) / 방향성 지표 수 × 100
 const agv=t=>(typeof t.a==='number')?t.a:null;
 const agc=x=>x==null?'neu':(x>=25?'buy':(x<=-25?'sell':'neu'));
@@ -205,7 +211,9 @@ function screener(){
     <code>index.json</code>에 종목별 최신 106지표 점수가 실려 이 표가 채워집니다. 그때까지는 종목을 하나씩 골라서 보십시오.</div>`;
   const F2={all:()=>true, buy:t=>agv(t)!=null&&agv(t)>=50, sell:t=>agv(t)!=null&&agv(t)<=-50,
             up:t=>typeof t.ad==='number'&&t.ad>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ'};
+  const MM=moMed(scored);
   let rows=scored.filter(F2[SCF]||F2.all);
+  if(MOX&&MM!=null) rows=rows.filter(t=>mov(t)!=null&&mov(t)<=MM);
   rows.sort((a,b)=> SCS==='d' ? ((b.ad??-999)-(a.ad??-999))
                   : SCS==='a' ? ((agv(b)??-999)-(agv(a)??-999))
                   : SCS==='p' ? ((sel3(b)??-99)-(sel3(a)??-99)) : (b.s-a.s));
@@ -220,21 +228,31 @@ function screener(){
     <td class="small">${t.market||'-'}</td><td>${t.p!=null?(+t.p).toLocaleString():'-'}</td>
     <td class="${agc(agv(t))}"><b>${agv(t)==null?'-':(agv(t)>0?'+':'')+agv(t)}</b></td>
     <td>${dv(t)}</td>
-    <td class="${c6(sel3(t))}">${sel3(t)==null?'-':sel3(t).toFixed(1)}</td>
+    <td class="${c6(sel3(t))}"><b>${sel3(t)==null?'-':sel3(t).toFixed(1)}</b></td>
+    <td class="small">${mov(t)==null?'-':mov(t)}</td>
     <td class="${c6(t.s)}">${t.s.toFixed(1)}</td>
     <td class="small"><span class="buy">${t.n?.buy??'-'}</span>/${t.n?.hold??'-'}/<span class="sell">${t.n?.sell??'-'}</span></td>
     <td class="small">${top(t)}</td></tr>`).join('');
-  return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 합의 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''} · 행을 누르면 그 종목으로 이동</p>
+  const mbtn=`<button class="pre${MOX?' on':''}" data-mox="1" style="padding:4px 10px;font-size:12px">모멘텀 과매도 제외${MOX?' ✓':''}</button>`;
+  return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''}${MOX?` · 모멘텀 ${MM} 초과(과매도) 제외됨`:''} · 행을 누르면 그 종목으로 이동</p>
     <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수 합의 +50↑')}${btn('sell','매도 합의 −50↓')}${btn('up','합의 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
-      <span style="width:12px"></span>${sbtn('a','합의도순')}${sbtn('p','선별점수순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}</div>
-    <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>합의도</th><th>전일대비</th><th>선별</th><th>종합</th><th>매수/중립/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
-    <p class="small"><b>합의도</b> = (관행상 매수라고 말하는 지표 수 − 매도라고 말하는 지표 수) ÷ 방향성 지표 수 × 100.
-    각 지표는 교과서 규칙대로 판정합니다(RSI 30↓ 매수, MACD&gt;시그널 매수, 종가&gt;이동평균 매수 …).
-    +100이면 방향을 말하는 지표가 전부 매수, −100이면 전부 매도입니다. 여러 지표가 같은 방향으로 겹치는 종목을 찾는 것이 이 표의 목적입니다.<br>
-    <b>선별점수</b> = 이동평균·추세·거래량 3개 카테고리 평균(백분위). 백테스트에서 종합점수보다 일관되게 나았습니다
-    (496종목·500일·20일 보유·비중첩 리밸런싱·왕복비용 0.4% 차감 기준 <b>+54.2%</b> vs 종합점수 +46.2% vs 유니버스 +43.1%).
-    종합점수는 모멘텀·통계·변동성 카테고리가 섞여 있는데 이 셋은 백테스트에서 초과수익이 음수였고, 특히 <b>하락장에서 종합점수의 선별력은 +0.03%p로 사라지는 반면 선별점수는 +1.37%p를 유지</b>했습니다.
-    점수는 각 종목의 <b>자기 과거 250일 대비</b> 백분위입니다. 종목 간 절대 비교가 아니라 "평소의 자기 자신보다 지금 어떤 상태인가"의 줄세우기입니다.</p>`;
+      <span style="width:12px"></span>${mbtn}</div>
+    <div class="pres" style="margin-bottom:6px">${sbtn('p','선별점수순')}${sbtn('a','합의도순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}</div>
+    <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>합의도</th><th>전일대비</th><th>선별</th><th>모멘텀</th><th>종합</th><th>매수/중립/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
+    <p class="small"><b>선별점수</b>(기본 정렬) = 이동평균·추세·거래량 3개 카테고리 평균.
+    <b>모멘텀 과매도 제외</b>는 모멘텀 카테고리 점수가 전 종목 중앙값보다 높은 절반을 버립니다.
+    모멘텀 25개는 RSI·스토캐스틱 같은 오실레이터를 역추세로 뒤집어 놓은 것이라 <b>점수가 높다 = 과매도</b>인데,
+    이 카테고리 단독 초과수익이 −0.80%p·승률 37%입니다. 이평·추세·거래량이 다 좋은데 오실레이터만 바닥을 가리키면
+    강세가 아니라 강세주가 급락 중이라는 뜻이라 걸러냅니다.<br>
+    84회 관측창 검증(513종목·상위50·20일 보유·왕복비용 0.4%): <b>선별+과매도제외 +1.91%p·승률 61%</b> ·
+    선별점수 단독 +1.54%p · 종합점수 +0.99%p · 합의도 +0.32%p.
+    하락장에서도 +0.99%p를 유지합니다(종합점수는 −0.01%p로 선별력이 사라집니다).
+    전반 42창 +1.82 / 후반 42창 +2.00으로 두 구간 모두에서 이겼습니다.<br>
+    <b>합의도</b> = (관행상 매수라고 말하는 지표 수 − 매도라고 말하는 지표 수) ÷ 방향성 지표 수 × 100.
+    각 지표를 교과서 규칙으로 판정한 것이라 읽기는 좋지만 <b>종목 선별력은 약합니다</b>(+0.32%p).
+    "왜 이 종목이 상위인가"를 확인하는 용도로 쓰십시오.<br>
+    점수는 각 종목의 <b>자기 과거 250일 대비</b> 백분위입니다. 종목 간 절대 비교가 아니라 "평소의 자기 자신보다 지금 어떤 상태인가"의 줄세우기입니다.
+    카테고리 rank-IC는 t값이 전부 |1| 미만이라 통계적으로 유의하지 않습니다 — 선별력은 상위 꼬리에서만 나타나는 현상이니 과신하지 마십시오.</p>`;
 }
 
 function render(){
@@ -584,6 +602,7 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   $('panel').onclick=async e=>{
     const f=e.target.closest('[data-scf]'); if(f){SCF=f.dataset.scf;draw();return;}
     const s=e.target.closest('[data-scs]'); if(s){SCS=s.dataset.scs;draw();return;}
+    const mx=e.target.closest('[data-mox]'); if(mx){MOX=!MOX;draw();return;}
     const g=e.target.closest('[data-go]');
     if(g){ const code=g.dataset.go; $('q').value=''; fill(); $('sel').value=code;
       try{ await load(code); }catch(err){ alert('불러오기 실패: '+err); return; }
