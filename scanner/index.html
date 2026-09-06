@@ -522,7 +522,7 @@ function verdict(){
       return `<span class="chip ${c6(v)}">${k} ${v==null?'-':v}</span>`;}).join('');
     const b=cnt.buy?cnt.buy[i]:'-',h=cnt.hold?cnt.hold[i]:'-',se=cnt.sell?cnt.sell[i]:'-';
     const agc=ag==null?'neu':(ag>=25?'buy':(ag<=-25?'sell':'neu'));
-    const agt=ag==null?'-':(ag>=50?'강한 매수 합의':ag>=25?'매수 우위':ag<=-50?'강한 매도 합의':ag<=-25?'매도 우위':'합의 없음');
+    const agt=ag==null?'-':(ag>=50?'강한 매수 합의':ag>=25?'매수 우위':ag<=-50?'강한 매도 합의':ag<=-25?'매도 우위':'지표 합의 없음');
     const pa=(()=>{for(let k=i-1;k>=Math.max(0,i-5);k--)if(AG[k]!=null)return AG[k];return null;})();
     const da=(pa!=null&&ag!=null)?(ag-pa):null;
     const arrow=da==null?'':(da>0?` <span class="buy">▲${da}</span>`:(da<0?` <span class="sell">▼${Math.abs(da)}</span>`:' →'));
