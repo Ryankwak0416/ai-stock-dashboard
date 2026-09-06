@@ -189,7 +189,7 @@ function pts(idx,fn,a,b,n,col,rot){const arr=Array(n).fill(null);idx.forEach(i=>
   return{data:arr,borderColor:col,backgroundColor:col,pointRadius:9,pointStyle:'triangle',rotation:rot,pointBorderColor:'#fff',pointBorderWidth:2,showLine:false,order:1};}
 
 // ── 종목 스크리너 : index.json 하나로 전 종목 106지표 점수를 줄세운다 ──
-let SCF='all', SCS='p', MOX=true;
+let SCF='all', SCS='p', MOX=true, SCTOP=[];
 // 선별점수 = 이동평균·추세·거래량 3개 카테고리 평균.
 // 84회 관측창 재검증(513종목·500일·상위50·20일보유·왕복비용 0.4%):
 //   현행 종합점수 +0.99%p / 선별점수 +1.54%p / ★선별 ∩ 모멘텀 과매도 제외 +1.91%p.
@@ -217,7 +217,7 @@ function screener(){
   rows.sort((a,b)=> SCS==='d' ? ((b.ad??-999)-(a.ad??-999))
                   : SCS==='a' ? ((agv(b)??-999)-(agv(a)??-999))
                   : SCS==='p' ? ((sel3(b)??-99)-(sel3(a)??-99)) : (b.s-a.s));
-  const N2=rows.length; rows=rows.slice(0,60);
+  const N2=rows.length; SCTOP=rows.slice(0,50).map(t=>t.code); rows=rows.slice(0,60);
   const btn=(k,t)=>`<button class="pre${SCF===k?' on':''}" data-scf="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
   const sbtn=(k,t)=>`<button class="pre${SCS===k?' on':''}" data-scs="${k}" style="padding:4px 10px;font-size:12px">${t}</button>`;
   const top=t=>{if(!t.c)return '-';const e=Object.entries(t.c).filter(x=>x[1]!=null).sort((x,y)=>y[1]-x[1]);
@@ -237,7 +237,8 @@ function screener(){
   return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''}${MOX?` · 모멘텀 ${MM} 초과(과매도) 제외됨`:''} · 행을 누르면 그 종목으로 이동</p>
     <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수 합의 +50↑')}${btn('sell','매도 합의 −50↓')}${btn('up','합의 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
       <span style="width:12px"></span>${mbtn}</div>
-    <div class="pres" style="margin-bottom:6px">${sbtn('p','선별점수순')}${sbtn('a','합의도순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}</div>
+    <div class="pres" style="margin-bottom:6px">${sbtn('p','선별점수순')}${sbtn('a','합의도순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}
+      <span style="width:12px"></span><button class="pre" data-cp="c" style="padding:4px 10px;font-size:12px">상위 50 코드 복사 (쉼표)</button><button class="pre" data-cp="n" style="padding:4px 10px;font-size:12px">상위 50 코드 복사 (줄바꿈)</button></div>
     <table><thead><tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>합의도</th><th>전일대비</th><th>선별</th><th>모멘텀</th><th>종합</th><th>매수/중립/매도</th><th>최고·최저 카테고리</th></tr></thead><tbody>${body}</tbody></table>
     <p class="small"><b>선별점수</b>(기본 정렬) = 이동평균·추세·거래량 3개 카테고리 평균.
     <b>모멘텀 과매도 제외</b>는 모멘텀 카테고리 점수가 전 종목 중앙값보다 높은 절반을 버립니다.
@@ -603,6 +604,13 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
     const f=e.target.closest('[data-scf]'); if(f){SCF=f.dataset.scf;draw();return;}
     const s=e.target.closest('[data-scs]'); if(s){SCS=s.dataset.scs;draw();return;}
     const mx=e.target.closest('[data-mox]'); if(mx){MOX=!MOX;draw();return;}
+    const cp=e.target.closest('[data-cp]'); if(cp){
+      const txt=SCTOP.join(cp.dataset.cp==='n'?'\n':',');
+      const done=()=>{const o=cp.textContent;cp.textContent=`복사됨 ✓ ${SCTOP.length}종목`;setTimeout(()=>{cp.textContent=o;},1600);};
+      const fb=()=>{const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+        document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(_){cp.textContent='복사 실패';}document.body.removeChild(ta);};
+      if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(done).catch(fb); else fb();
+      return;}
     const g=e.target.closest('[data-go]');
     if(g){ const code=g.dataset.go; $('q').value=''; fill(); $('sel').value=code;
       try{ await load(code); }catch(err){ alert('불러오기 실패: '+err); return; }
