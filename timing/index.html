@@ -78,8 +78,8 @@ tr.avg{border-top:2px solid #cbd2d9}
   <span><i style="background:#e03131"></i>막내 5·3·3</span>
   <span><i style="background:#2f9e44"></i>둘째 10·6·6</span>
   <span><i style="background:#1971c2"></i>큰형 20·12·12</span>
-  <span>▲ 적극매수 성립 · ▼ 적극매도 성립 · 세로 붉은 띠 = 3형제 동시 과매도 · 푸른 띠 = 동시 과매수</span>
-  <span>아래 가로 띠 = 이평 배열(붉은칸 정배열 · 푸른칸 역배열 · 갈색칸 수렴중)</span>
+  <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
+  <span>바탕색 = 이평 배열(붉은 정배열 · 푸른 역배열) · 아래 갈색칸 = 이평 수렴중</span>
 </div>
 
 <p class="note" id="foot"></p>
@@ -133,8 +133,10 @@ const CVR=2.0;   // 이평 폭 / 최근 20봉 평균 변동폭
 function maCalc(c,i){
   const m=[5,10,20,60].map(p=>{if(i+1<p)return null;let s=0;for(let j=i-p+1;j<=i;j++)s+=c[j];return s/p;});
   if(m[2]==null||m[3]==null)return{a:0,cv:false};
-  const px=c[i];let a=0;
-  if(px>m[2]&&m[2]>m[3])a=1;else if(px<m[2]&&m[2]<m[3])a=-1;
+  const px=c[i];
+  // 배열은 20·60 두 선의 위아래만 본다. 가격 위치까지 걸면 잔파동에 「중립」이 절반 가까이 나와
+  // 분봉 칸이 계속 「—」로 비어 보인다.
+  const a=(m[2]>m[3])?1:((m[2]<m[3])?-1:0);
   let cv=false;
   if(i>=20){let v=0;for(let j=i-19;j<=i;j++)v+=Math.abs(c[j]-c[j-1])/c[j];v/=20;
     if(v>0)cv=((Math.max(...m)-Math.min(...m))/px)/v<CVR;}
@@ -231,16 +233,12 @@ function render(){
   const a=POS,b=a+span-1;
   const sc=document.getElementById('sc');sc.max=Math.max(0,N-span);sc.value=POS;sc.disabled=(span>=N);
 
-  const BUY=[],SELL=[],ZB=[],ZS=[];
-  let cb=null,cs2=null;
+  const BUY=[],SELL=[];
   for(let i=0;i<N;i++){const q=stateAt(r.K,i),p=i?stateAt(r.K,i-1):{s:0};
-    if(!q.lack&&q.s===2){if(p.s!==2){BUY.push(i);cb=i;}}
-    else if(cb!=null){ZB.push([cb,i-1]);cb=null;}
-    if(!q.lack&&q.s===-2){if(p.s!==-2){SELL.push(i);cs2=i;}}
-    else if(cs2!=null){ZS.push([cs2,i-1]);cs2=null;}}
-  if(cb!=null)ZB.push([cb,N-1]); if(cs2!=null)ZS.push([cs2,N-1]);
-  const MAB=new Array(N).fill(0);
-  for(let i=Math.max(0,a-1);i<=b&&i<N;i++)MAB[i]=maAt(r.c,i);
+    if(!q.lack&&q.s===2&&p.s!==2)BUY.push(i);
+    if(!q.lack&&q.s===-2&&p.s!==-2)SELL.push(i);}
+  const MAA=new Array(N).fill(0),MAC=new Array(N).fill(false);
+  for(let i=Math.max(0,a-1);i<=b&&i<N;i++){const m=maCalc(r.c,i);MAA[i]=m.a;MAC[i]=m.cv;}
 
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
@@ -256,29 +254,39 @@ function render(){
 
   const tap={id:'tap',beforeDatasetsDraw(ch){
     const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
-    const zone=(list,fill)=>{list.forEach(z=>{const s0=Math.max(z[0],a),e0=Math.min(z[1],b);
-      if(e0<a||s0>b)return;
-      const x1=xs.getPixelForValue(s0-a),x2=xs.getPixelForValue(e0-a);
-      g.save();g.fillStyle=fill;g.fillRect(x1-1,ca.top,Math.max(2,x2-x1+2),ca.bottom-ca.top);g.restore();});};
-    zone(ZB,'rgba(217,45,32,.13)');zone(ZS,'rgba(24,73,169,.13)');
-    // 이평 20·60 배열 띠 (차트 하단)
-    const SB=10, by0=ca.bottom-SB;
-    for(let i=a;i<=b;i++){const v=MAB[i];if(!v)continue;
+    // 배경 채움 = 이평 배열. 붉은 바탕 정배열 / 푸른 바탕 역배열 (매수·매도 타점은 화살표로만)
+    let i0=a;
+    while(i0<=b){const v=MAA[i0];let j=i0;
+      while(j+1<=b&&MAA[j+1]===v)j++;
+      if(v){const x1=xs.getPixelForValue(i0-a),x2=(j<b)?xs.getPixelForValue(j+1-a):xs.getPixelForValue(j-a)+2;
+        g.save();g.fillStyle=(v>0)?'rgba(217,45,32,.10)':'rgba(24,73,169,.10)';
+        g.fillRect(x1,ca.top,Math.max(2,x2-x1),ca.bottom-ca.top);g.restore();}
+      i0=j+1;}
+    // 수렴중 띠 (차트 하단)
+    const SB=9, by0=ca.bottom-SB;
+    for(let i=a;i<=b;i++){if(!MAC[i])continue;
       const x1=xs.getPixelForValue(i-a),x2=(i<b)?xs.getPixelForValue(i+1-a):x1+2;
-      g.save();g.fillStyle=(v===2)?'rgba(180,83,9,.45)':(v>0)?'rgba(217,45,32,.55)':'rgba(24,73,169,.55)';
+      g.save();g.fillStyle='rgba(180,83,9,.55)';
       g.fillRect(x1,by0,Math.max(1.5,x2-x1),SB);g.restore();}
     g.save();g.font='10px -apple-system,Malgun Gothic,sans-serif';g.fillStyle='#6b7280';
-    g.textAlign='left';g.fillText('이평  붉은칸 정배열 / 푸른칸 역배열 / 갈색칸 수렴중',ca.left+3,by0-3);g.restore();
-    const mark=(list,ln,fl,dir)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
+    g.textAlign='left';g.fillText('바탕 붉은색 정배열 / 푸른색 역배열   ·   아래 갈색칸 이평 수렴중',ca.left+3,by0-3);g.restore();
+    const mark=(list,ln,fl,dir,tx)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
       g.save();g.strokeStyle=ln;g.lineWidth=1.3;g.setLineDash([5,4]);
       g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
       g.fillStyle=fl;g.beginPath();
       if(dir>0){g.moveTo(x,by0-6);g.lineTo(x-8,by0-22);g.lineTo(x+8,by0-22);}
       else{g.moveTo(x,ca.top+4);g.lineTo(x-8,ca.top+20);g.lineTo(x+8,ca.top+20);}
       g.closePath();g.fill();
-      g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();g.restore();});};
-    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1);
-    mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1);}};
+      g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();
+      // 화살표 옆 글자
+      g.font='bold 11px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
+      const ty=(dir>0)?by0-26:ca.top+33;
+      const w=g.measureText(tx).width+8;
+      g.fillStyle='rgba(255,255,255,.85)';g.fillRect(x-w/2,ty-11,w,14);
+      g.fillStyle=fl;g.fillText(tx,x,ty);
+      g.restore();});};
+    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'적극매수');
+    mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1,'적극매도');}};
 
   if(chart)chart.destroy();
   chart=new Chart(document.getElementById('cv'),{type:'line',data:{labels,datasets:ds},plugins:[tap],
