@@ -74,10 +74,10 @@ tr.avg{border-top:2px solid #cbd2d9}
 <div class="scrollrow"><button class="sm" id="prev">◀</button><input type="range" id="sc" min="0" max="0" value="0"><button class="sm" id="next">▶</button></div>
 <div class="info"><span id="d0">-</span><span id="mid">-</span><span id="d1">-</span></div>
 <div class="lg">
-  <span><i style="background:#111;height:3px"></i>종가</span>
-  <span><i style="background:#e03131"></i>막내 5·3·3</span>
-  <span><i style="background:#2f9e44"></i>둘째 10·6·6</span>
-  <span><i style="background:#1971c2"></i>큰형 20·12·12</span>
+  <span><i style="background:#0b1220;height:4px"></i>종가</span>
+  <span><i style="background:#e8590c"></i>막내 5·3·3</span>
+  <span><i style="background:#0ca678"></i>둘째 10·6·6</span>
+  <span><i style="background:#7048e8;height:3px"></i>큰형 20·12·12</span>
   <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
   <span>바탕색 = 이평 배열(붉은 정배열 · 푸른 역배열) · 아래 갈색칸 = 이평 수렴중</span>
 </div>
@@ -243,12 +243,14 @@ function render(){
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
-  const line=(d,col,w,ax)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:3});
+  const line=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:(o==null?3:o)});
   const ds=[];const NM=[];
-  if(SHOW.px){ds.push(line(px,'#111827',2.8,'y'));NM.push('종가');}
-  if(SHOW.k5){ds.push(line(k5,'#e03131',1,'y2'));NM.push('막내');}
-  if(SHOW.k10){ds.push(line(k10,'#2f9e44',1,'y2'));NM.push('둘째');}
-  if(SHOW.k20){ds.push(line(k20,'#1971c2',1.3,'y2'));NM.push('큰형');}
+  // 가격선은 굵게 맨 위에, 흰 테두리를 깔아 스토캐스틱 선과 확실히 떨어뜨린다
+  if(SHOW.px){ds.push(line(px,'rgba(255,255,255,.95)',7,'y',2));NM.push(null);
+              ds.push(line(px,'#0b1220',3.4,'y',1));NM.push('종가');}
+  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2'));NM.push('막내');}
+  if(SHOW.k10){ds.push(line(k10,'#0ca678',1.3,'y2'));NM.push('둘째');}
+  if(SHOW.k20){ds.push(line(k20,'#7048e8',1.7,'y2'));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
 
