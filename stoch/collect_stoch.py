@@ -53,12 +53,16 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 
 
 def slow_k(df, n, slowing):
-    """슬로 스토캐스틱 %K = SMA(fast %K, slowing)"""
+    """슬로 스토캐스틱 %K — HTS 정식.
+
+    Σ(종가 − n기간최저) / Σ(n기간최고 − n기간최저) × 100  (슬로잉 기간 합산).
+    사장님 HTS 내보내기 파일로 역산해 오차 0으로 맞춘 식이다(2026-09-17).
+    """
     low = df["Low"].rolling(n).min()
     high = df["High"].rolling(n).max()
-    rng = (high - low)
-    fast = (df["Close"] - low) / rng.where(rng != 0) * 100.0
-    return fast.rolling(slowing).mean()
+    num = (df["Close"] - low).rolling(slowing).sum()
+    den = (high - low).rolling(slowing).sum()
+    return (num / den.where(den != 0)) * 100.0
 
 
 def resample_ohlc(df, rule):

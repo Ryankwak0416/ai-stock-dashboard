@@ -50,13 +50,22 @@ TRIO = [("k5", 5, 3, 3), ("k10", 10, 6, 6), ("k20", 20, 12, 12)]   # 이름, 기
 
 
 def slow_stoch(high, low, close, n, slowing, dper):
-    """Slow %K / Slow %D. HTS 표준식."""
+    """Slow %K / Slow %D — HTS 정식.
+
+    2026-09-17에 사장님 HTS가 내보낸 60분봉 엑셀(KODEX 반도체레버리지, 900봉)로
+    역산해 오차 0.0000으로 맞춘 식이다. 이전에 쓰던 SMA(Fast %K) 방식은 평균 1.5~1.8,
+    최대 22포인트까지 벌어져 840봉 중 18봉에서 20/80 판정 자체가 달랐다.
+
+      Slow %K = Σ(종가 − n기간최저) / Σ(n기간최고 − n기간최저) × 100   (슬로잉 기간 합산)
+      Slow %D = Slow %K의 지수이동평균(EMA, α = 2/(dper+1))
+    """
     hh = high.rolling(n, min_periods=n).max()
     ll = low.rolling(n, min_periods=n).min()
-    rng = (hh - ll).replace(0, np.nan)
-    fast_k = (close - ll) / rng * 100.0
-    slow_k = fast_k.rolling(slowing, min_periods=slowing).mean()
-    slow_d = slow_k.rolling(dper, min_periods=dper).mean()
+    num = (close - ll).rolling(slowing, min_periods=slowing).sum()
+    den = (hh - ll).rolling(slowing, min_periods=slowing).sum()
+    slow_k = (num / den.replace(0, np.nan)) * 100.0
+    slow_d = slow_k.ewm(span=dper, adjust=False).mean()
+    slow_d = slow_d.where(slow_k.notna())
     return slow_k, slow_d
 
 
