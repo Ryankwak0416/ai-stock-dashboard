@@ -15,12 +15,18 @@
 한도를 넘는 구간은 매일 받아서 누적해야 늘어난다. 그래서 이 수집기는
 기존 파일을 읽어 새로 받은 봉과 합치고 중복을 제거한다.
 
+★ 야후 한국 분봉은 09:00~14:55까지만 준다(장 마감 35분 누락).
+  그래서 네이버 1분봉(09:00~15:30 전 구간, 종가만 제공)을 받아
+  15:00 이후 봉을 만들어 메운다. 고가·저가는 그 구간 1분 종가의
+  최대·최소로 채운다 — 1분 단위라 실제 고저와 거의 차이가 없다.
+
 산출물
   stoch/min/<code>.json
     raw  : {1m,5m,30m,60m} 원본 OHLC (재계산·누적용)
     sig  : {1m,5m,10m,30m,60m,120m,240m} 시각·종가·3형제 %K/%D
 """
-import os, sys, json, gzip, time, datetime, warnings
+import os, sys, json, gzip, time, datetime, warnings, re
+import urllib.request
 import pandas as pd
 import numpy as np
 
@@ -84,6 +90,48 @@ def fetch(yf, ticker, interval, period):
                 return pd.DataFrame()
             time.sleep(2)
     return pd.DataFrame()
+
+
+NAVER = "https://fchart.stock.naver.com/sise.nhn?symbol={}&timeframe=minute&count=3000&requestType=0"
+
+
+def fetch_naver_1m(code):
+    """네이버 1분봉(종가만). 09:00~15:30 전 구간을 준다."""
+    try:
+        req = urllib.request.Request(NAVER.format(code), headers={"User-Agent": "Mozilla/5.0"})
+        raw = urllib.request.urlopen(req, timeout=20).read().decode("euc-kr", "ignore")
+    except Exception as e:
+        print(f"    ! 네이버 실패: {str(e)[:50]}")
+        return pd.DataFrame()
+    ts, cs = [], []
+    for d in re.findall(r'data="([^"]+)"', raw):
+        f = d.split("|")
+        if len(f) < 5 or f[4] in ("null", ""):
+            continue
+        try:
+            ts.append(pd.Timestamp(f[0][:4] + "-" + f[0][4:6] + "-" + f[0][6:8] + " "
+                                   + f[0][8:10] + ":" + f[0][10:12], tz="Asia/Seoul"))
+            cs.append(float(f[4]))
+        except Exception:
+            continue
+    if not ts:
+        return pd.DataFrame()
+    return pd.DataFrame({"c": cs}, index=pd.DatetimeIndex(ts)).sort_index()
+
+
+def late_bars(nv, minutes):
+    """네이버 1분 종가로 15:00 이후 봉을 만든다. h/l는 1분 종가의 최대·최소."""
+    if nv.empty:
+        return pd.DataFrame()
+    late = nv[(nv.index.hour == 15) & (nv.index.minute <= 30)]   # 정규장 마감 15:30까지만
+    if late.empty:
+        return pd.DataFrame()
+    key = late.index.normalize() + pd.to_timedelta(
+        15 * 60 + ((late.index.hour - 15) * 60 + late.index.minute) // minutes * minutes, unit="m")
+    g = late.groupby(key)["c"]
+    out = pd.DataFrame({"h": g.max(), "l": g.min(), "c": g.last()})
+    out.index.name = None
+    return out
 
 
 def load_raw(code):
@@ -175,6 +223,7 @@ def main():
         path = os.path.join(OUT, f"{code}.json")
         raw = load_raw(code)
 
+        nv = fetch_naver_1m(code)
         got = []
         for label, interval, period in FETCH:
             new = fetch(yf, ticker, interval, period)
@@ -183,6 +232,17 @@ def main():
             raw[label] = merge(raw.get(label), new).tail(KEEP[label])
             got.append(f"{label}:{len(raw[label])}")
             time.sleep(0.4)
+
+        # 야후가 빠뜨린 15:00~15:30 구간을 네이버로 메운다
+        if not nv.empty:
+            one = pd.DataFrame({"h": nv["c"], "l": nv["c"], "c": nv["c"]})
+            lateMask = (one.index.hour == 15) & (one.index.minute <= 30)
+            raw["1m"] = merge(raw.get("1m"), one[lateMask]).tail(KEEP["1m"])
+            for label, mins in (("5m", 5), ("30m", 30), ("60m", 60)):
+                lb = late_bars(nv, mins)
+                if not lb.empty:
+                    raw[label] = merge(raw.get(label), lb).tail(KEEP[label])
+            got.append("naver:+" + str(int(((nv.index.hour == 15) & (nv.index.minute <= 30)).sum())))
 
         if not raw:
             print(f"[{i}/{len(wl)}] {code} {nm} — 데이터 없음")
