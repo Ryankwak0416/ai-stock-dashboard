@@ -341,7 +341,7 @@ function render(){
 }
 
 // ───────── 검증 (매수·매도 결과) ─────────
-let VHOLD=20, VROWS=null, VTAB=false;
+let VHOLD=20, VROWS=null, VTAB=false, VMODE='one', VALL=null;
 const HOLDS=[5,10,20,40];
 
 function dayKey(t){return Math.floor((t+32400)/86400);}   // KST 기준 날짜
@@ -419,16 +419,73 @@ function vTable(rows,want,hold){
       <th colspan="2" style="text-align:left">역배열에서 난 신호</th></tr></thead>
     <tbody>${body}</tbody></table>`;}
 
+// ── 관심종목 전체 합산 ──────────────────────────────
+// 한 종목 한 구간의 수십 건으로는 정배열 가점 같은 조건을 판정할 수 없다.
+// 관심종목 전부의 신호를 한 통에 모아야 숫자가 흔들리지 않는다.
+async function loadAll(prog){
+  const out=[];
+  const codes=WL.slice();
+  let done=0;
+  const work=async ()=>{
+    while(codes.length){
+      const c=codes.shift();
+      const r=await loadRawRows(c);
+      done++; if(prog)prog(done,WL.length);
+      if(r)out.push({code:c,rows:r});
+    }};
+  await Promise.all([work(),work(),work(),work()]);
+  return out;}
+
+function vTableAll(all,want,hold){
+  const title=want===2?'적극매수':'적극매도';
+  const byTf={};
+  for(const t of all)for(const r of t.rows){
+    (byTf[r.tf]=byTf[r.tf]||[]).push(...sigList(r,want,hold));}
+  let body='',tot=[],totP=[],totN=[];
+  for(const tf of MIN){
+    const L=byTf[tf]; if(!L||!L.length)continue;
+    const P=L.filter(x=>x.a>0),N=L.filter(x=>x.a<0);
+    tot=tot.concat(L);totP=totP.concat(P);totN=totN.concat(N);
+    body+=`<tr><td><b>${LBL[tf]}</b>${RTAG(tf)}</td>`+cell(agg(L))+cell(agg(P))+cell(agg(N))+'</tr>';}
+  body+=`<tr class="avg"><td><b>합계</b></td>`+cell(agg(tot))+cell(agg(totP))+cell(agg(totN))+'</tr>';
+  return `<h2>${title} 결과 · ${hold}봉 뒤 · ${all.length}종목 합산</h2>
+    <table><thead><tr><th>봉</th>
+      <th colspan="2" style="text-align:left">전체 (승률·표본 / 평균)</th>
+      <th colspan="2" style="text-align:left">정배열에서 난 신호</th>
+      <th colspan="2" style="text-align:left">역배열에서 난 신호</th></tr></thead>
+    <tbody>${body}</tbody></table>`;}
+
 async function renderV(){
   const el=document.getElementById('paneV');
+  const mb=`<button class="sm ${VMODE==='one'?'on':''}" data-vm="one">이 종목</button>`
+          +`<button class="sm ${VMODE==='all'?'on':''}" data-vm="all">관심 ${WL.length}종목 합산</button>`;
+  const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
+  const bar=`<div class="bar">${mb}<span class="sub" style="margin-left:10px">보유 기간</span>${hb}</div>`;
+  const wire=()=>{
+    el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});
+    el.querySelectorAll('[data-vm]').forEach(b=>b.onclick=()=>{VMODE=b.dataset.vm;renderV();});};
+
+  if(VMODE==='all'){
+    if(VALL===null){
+      el.innerHTML=bar+'<p class="sub">관심종목 누적 원본을 모으는 중… <span id="vp">0</span></p>';
+      wire();
+      const pe=document.getElementById('vp');
+      VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
+    el.innerHTML=bar+vTableAll(VALL,2,VHOLD)+vTableAll(VALL,-2,VHOLD)
+      +`<p class="note">관심종목 ${VALL.length}개의 분봉 신호를 한 통에 모은 것입니다. 한 종목 수십 건으로는
+         정배열·역배열 차이를 판정할 수 없어서, 조건을 고칠지 말지는 이 표를 보고 정합니다.
+         일·주·월봉은 합산에 넣지 않았습니다(종목별 파일을 따로 받아야 해서 무겁습니다).<br>
+         ⚠ 5분봉은 60일, 60분봉은 3년 구간입니다. <b>그 구간이 상승장이었다면 매수 쪽이 통째로 좋게 나옵니다.</b>
+         절대 수치보다 <b>칸끼리의 차이</b>를 보십시오. 수수료·세금은 넣지 않았습니다.</p>`;
+    wire(); return;}
+
   if(VROWS===null){
-    el.innerHTML='<p class="sub">누적 원본을 불러와 다시 계산하는 중…</p>';
+    el.innerHTML=bar+'<p class="sub">누적 원본을 불러와 다시 계산하는 중…</p>';
     const raw=await loadRawRows(CODE);
     const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
     const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
     VROWS={rows:mins.concat(dwm),raw:!!raw};}
-  const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
-  el.innerHTML=`<div class="bar"><span class="sub">보유 기간</span>${hb}</div>`
+  el.innerHTML=bar
     +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
     +`<p class="note">신호는 <b>조건이 새로 성립한 봉</b>만 셉니다(유지되는 동안은 한 번). 그 봉의 종가에 들어가
        ${VHOLD}봉 뒤 종가에 나온다고 보고 잰 값이며, <b>수수료·세금·미끄러짐은 넣지 않았습니다.</b>
@@ -438,8 +495,9 @@ async function renderV(){
        ${VROWS.raw?'분봉은 <b>누적 원본</b>으로 다시 계산했습니다(5분봉 60일·1분봉 8일부터 매일 쌓입니다).'
                   :'⚠ 누적 원본이 없어 <b>화면용 300봉</b>만 썼습니다. 표본이 적습니다.'}
        일·주·월봉은 일봉 500봉 기준입니다.<br>
-       ⚠ 한 종목의 한 구간일 뿐입니다. 표본이 수십 개 미만인 줄은 우연으로 뒤집힙니다.</p>`;
-  el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});}
+       ⚠ 한 종목의 한 구간일 뿐입니다. 표본이 수십 개 미만인 줄은 우연으로 뒤집힙니다.
+       조건을 고칠지 말지는 위의 <b>«관심 ${WL.length}종목 합산»</b>을 보고 정하십시오.</p>`;
+  wire();}
 
 function showTab(v){
   VTAB=v;
