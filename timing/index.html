@@ -508,6 +508,149 @@ function vTableAll(all,want,hold){
       <th colspan="2" style="text-align:left">역배열에서 난 신호</th></tr></thead>
     <tbody>${body}</tbody></table>`;}
 
+
+// ═══════════ 60분봉 매매세팅 검증 ═══════════
+// 기준① 단독(첫 봉 진입·고정 청산)이 아니라 «세팅 규칙 그대로» 잰다.
+//   진입 = 60분 큰형이 20 아래로 갔다가 20 위로 복귀하는 봉(반등 확인)
+//   청산 = 80 위에서 %K가 %D를 하향돌파(데드크로스)
+// 한 사이클은 다음 20↓ 진입 전까지다. 수수료·세금은 넣지 않았다.
+function g240At(r240,ts){
+  if(!r240)return null;
+  const T=r240.ts,K=r240.K.k20.k;
+  let lo=0,hi=T.length-1,idx=-1;
+  while(lo<=hi){const m=(lo+hi)>>1;if(T[m]<=ts){idx=m;lo=m+1;}else hi=m-1;}
+  return idx<0?null:K[idx];}
+
+function setCycles(r60,r240){
+  const K=r60.K.k20.k,D=r60.K.k20.d,C=r60.c,N=K.length,out=[];
+  let i=1;
+  while(i<N){
+    if(!(K[i]!=null&&K[i]<=20&&K[i-1]!=null&&K[i-1]>20)){i++;continue;}
+    const s=i;
+    let j=i+1;
+    while(j<N&&!(K[j]!=null&&K[j]>20&&K[j-1]!=null&&K[j-1]<=20))j++;
+    if(j>=N)break;
+    const e=j;
+    let lim=e+1;
+    while(lim<N&&!(K[lim]!=null&&K[lim]<=20&&K[lim-1]!=null&&K[lim-1]>20))lim++;
+    lim=Math.min(lim,N-1);
+    const f=(cond,frm)=>{for(let k=(frm==null?e:frm);k<=lim;k++)if(cond(k))return k;return null;};
+    const i80=f(k=>K[k]!=null&&K[k]>=80);
+    const dead=i80==null?null:f(k=>K[k]!=null&&D[k]!=null&&K[k-1]!=null&&D[k-1]!=null&&K[k]<D[k]&&K[k-1]>=D[k-1]&&K[k-1]>=80,i80);
+    const iout=i80==null?null:f(k=>K[k]!=null&&K[k]<80,i80);
+    const ibend=i80==null?null:f(k=>k>=3&&K[k]!=null&&K[k-3]!=null&&K[k]<K[k-3]&&K[k-3]>=80,i80);
+    let low=Infinity,peak=-Infinity;
+    for(let k=s;k<=e;k++)if(C[k]<low)low=C[k];
+    for(let k=e;k<=(dead==null?lim:dead);k++)if(C[k]>peak)peak=C[k];
+    // 무산(80 미도달) 사이클도 결과에 넣어야 공평하다. 두 가지로 센다.
+    //   hold — 사이클을 넘겨서라도 데드크로스가 올 때까지 기다린다(사람이 실제로 하는 쪽)
+    //   cut  — 다음 20↓ 진입 시점에 손절하고 새 사이클로 간다
+    let held=null;
+    for(let k=(i80==null?e:i80);k<N;k++){
+      if(K[k]==null||D[k]==null||K[k-1]==null||D[k-1]==null)continue;
+      if(K[k]<D[k]&&K[k-1]>=D[k-1]&&K[k-1]>=80){held=k;break;}}
+    out.push({s,e,i80,dead,iout,ibend,lim,held,ep:C[e],low,peak,g:g240At(r240,r60.ts[e])});
+    i=Math.max(e+1,lim);}
+  return out;}
+
+function pct(C,i,ep){return i==null?null:(C[i]-ep)/ep*100;}
+function stat(v){
+  if(!v.length)return null;
+  return {n:v.length,win:v.filter(x=>x>0).length/v.length*100,avg:v.reduce((a,b)=>a+b,0)/v.length,
+          worst:Math.min(...v),best:Math.max(...v)};}
+function scell(a){
+  if(!a)return '<td class="num small">-</td><td class="num small">-</td>';
+  return `<td class="num"><span class="${a.win>=50?'pos':'neg'}">${a.win.toFixed(0)}%</span> <span class="small">${a.n}</span></td>`
+        +`<td class="num ${a.avg>0?'pos':'neg'}">${a.avg>0?'+':''}${a.avg.toFixed(2)}%</td>`;}
+
+// 한 종목의 사이클을 규칙별·240분 수준별로 집계
+function setAgg(r60,r240){
+  const cy=setCycles(r60,r240),C=r60.c;
+  const R={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],
+           miss:0,n:cy.length,g:{lo:[],mid:[],hi:[],na:[]}};
+  for(const c of cy){
+    // ① 전체 사이클 — 무산 포함
+    const hd=pct(C,c.held,c.ep);
+    if(hd!=null)R.hold.push(hd);
+    const cutIdx=(c.dead!=null)?c.dead:c.lim;
+    const ct=pct(C,cutIdx,c.ep);
+    if(ct!=null){
+      R.cut.push(ct);
+      const g=c.g;
+      (g==null?R.g.na:(g<30?R.g.lo:(g>70?R.g.hi:R.g.mid))).push(ct);}
+    if(c.i80==null)R.miss++;
+    // ② 80에 닿은 사이클만 — 청산 규칙 비교용
+    const d=pct(C,c.dead,c.ep); if(d!=null)R.dead.push(d);
+    const o=pct(C,c.iout,c.ep); if(o!=null)R.out80.push(o);
+    const b=pct(C,c.ibend,c.ep); if(b!=null)R.bend.push(b);
+    const h=pct(C,c.i80,c.ep); if(h!=null)R.hit80.push(h);
+    if(c.peak>-Infinity&&c.dead!=null)R.peak.push((c.peak-c.ep)/c.ep*100);
+    if(c.low<Infinity)R.dd.push((c.low-c.ep)/c.ep*100);}
+  return {cy,R};}
+
+function setTables(list){   // list: [{code,r60,r240}]
+  const M={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[]},
+        G={lo:[],mid:[],hi:[]}, per=[]; let miss=0,tot=0;
+  for(const x of list){
+    const {R}=setAgg(x.r60,x.r240);
+    for(const k in M)M[k]=M[k].concat(R[k]);
+    for(const k of ['lo','mid','hi'])G[k]=G[k].concat(R.g[k]);
+    miss+=R.miss; tot+=R.n;
+    const st=stat(R.hold);
+    if(st)per.push({code:x.code,st});}
+  per.sort((a,b)=>b.st.avg-a.st.avg);
+  const row=(nm,a,note)=>`<tr><td><b>${nm}</b></td>${scell(a)}<td class="num small">${a?((a.worst>0?'+':'')+a.worst.toFixed(1)+'%'):'-'}</td><td class="small">${note||''}</td></tr>`;
+  let html=`<h2>전체 사이클 — 무산 포함</h2>
+    <table><thead><tr><th>무산 처리 방식</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">뜻</th></tr></thead><tbody>
+    ${row('끝까지 보유',stat(M.hold),'80에 못 닿아도 데드크로스가 올 때까지 기다린다')}
+    ${row('다음 20↓에서 손절',stat(M.cut),'무산되면 다음 사이클 진입 시점에 정리한다')}
+    </tbody></table>
+    <p class="note" style="margin:0 0 4px">사이클 ${tot}개 중 <b>${miss}개(${(miss/tot*100).toFixed(0)}%)가 80에 못 닿고 무산</b>됐습니다.
+    아래 «청산 규칙 비교»는 <b>80에 닿은 ${tot-miss}개만</b>으로 낸 것이라 승률이 높게 나옵니다 — 규칙끼리 견줄 때만 보십시오.</p>
+    <h2>청산 규칙 비교 · 80에 닿은 사이클만</h2>
+    <table><thead><tr><th>청산 규칙</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">비고</th></tr></thead><tbody>
+    ${row('데드크로스',stat(M.dead),'80 위에서 %K가 %D 하향돌파 — 세팅 기본값')}
+    ${row('80 이탈',stat(M.out80),'큰형이 80 아래로')}
+    ${row('큰형 3봉 꺾임',stat(M.bend),'')}
+    ${row('80 도달 즉시',stat(M.hit80),'가장 이르다')}
+    ${row('사이클 최고가',stat(M.peak),'도달 불가능한 상한 — 비교용')}
+    </tbody></table>`;
+  const dq=stat(M.dd);
+  html+=`<h2>240분 수준별 · 무산 포함(손절 방식)</h2>
+    <table><thead><tr><th>진입 시 240분 큰형</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th style="text-align:left">읽는 법</th></tr></thead><tbody>
+    <tr><td><b>30 미만</b></td>${scell(stat(G.lo))}<td class="small">상위도 같이 무너진 자리</td></tr>
+    <tr><td><b>30 ~ 70</b></td>${scell(stat(G.mid))}<td class="small">상위에 여력 있는 자리</td></tr>
+    <tr><td><b>70 초과</b></td>${scell(stat(G.hi))}<td class="small">상위가 이미 과열</td></tr>
+    </tbody></table>
+    <p class="note" style="margin-top:0">진입 후 반등까지 감수한 폭은 평균 ${dq?dq.avg.toFixed(1):'-'}%, 최악 ${dq?dq.worst.toFixed(1):'-'}%입니다 — 손절선의 근거입니다.</p>`;
+  if(per.length>1){
+    html+=`<h2>종목별 · 끝까지 보유</h2><table><thead><tr><th>종목</th>
+      <th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th>최고</th></tr></thead><tbody>`;
+    for(const x of per)html+=`<tr><td><b>${NAMES[x.code]||x.code}</b> <span class="small">${x.code}</span></td>${scell(x.st)}
+      <td class="num small">${x.st.worst.toFixed(1)}%</td><td class="num small">+${x.st.best.toFixed(1)}%</td></tr>`;
+    html+='</tbody></table>';}
+  return html;}
+
+function setCycleTable(r60,r240){
+  const {cy}=setAgg(r60,r240), C=r60.c;
+  const last=cy.slice(-14).reverse();
+  let b='';
+  for(const c of last){
+    const d=pct(C,c.dead,c.ep);
+    const g=c.g;
+    const gt=g==null?'-':(g<30?`<span class="neg">${g.toFixed(0)}</span>`:(g>70?`<span class="small">${g.toFixed(0)}</span>`:`<span class="pos">${g.toFixed(0)}</span>`));
+    b+=`<tr><td class="small">${fmtT(r60.ts[c.s])}</td><td class="small">${fmtT(r60.ts[c.e])}</td>
+      <td class="num">${(+c.ep).toLocaleString()}</td>
+      <td class="num small">${((c.low-c.ep)/c.ep*100).toFixed(1)}%</td>
+      <td class="num">${gt}</td>
+      <td class="small">${c.dead==null?(c.i80==null?'<span class="neg">무산</span>':'80 도달·청산 전'):fmtT(r60.ts[c.dead])}</td>
+      <td class="num ${d==null?'small':(d>0?'pos':'neg')}">${d==null?'-':((d>0?'+':'')+d.toFixed(2)+'%')}</td>
+      <td class="num small">+${((c.peak-c.ep)/c.ep*100).toFixed(1)}%</td></tr>`;}
+  return `<h2>최근 사이클 ${last.length}건</h2>
+    <table><thead><tr><th>20↓ 시작</th><th>진입(20↑)</th><th>진입가</th><th>진입전 최저</th>
+      <th>240분</th><th style="text-align:left">청산(데드크로스)</th><th>수익률</th><th>구간최고</th></tr></thead>
+    <tbody>${b}</tbody></table>`;}
+
 async function renderV(){
   const el=document.getElementById('paneV');
   const mb=`<button class="sm ${VMODE==='one'?'on':''}" data-vm="one">이 종목</button>`
@@ -524,7 +667,18 @@ async function renderV(){
       wire();
       const pe=document.getElementById('vp');
       VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
-    el.innerHTML=bar+vTableAll(VALL,2,VHOLD)+vTableAll(VALL,-2,VHOLD)
+    const LS=VALL.map(t=>({code:t.code,
+      r60:t.rows.find(r=>r.tf==='60m'), r240:t.rows.find(r=>r.tf==='240m')}))
+      .filter(x=>x.r60);
+    el.innerHTML=bar
+      +`<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${LS.length}종목 합산</h2>`
+      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 20 아래로 갔다가 <b>20 위로 복귀하는 봉</b>(반등 확인).
+         청산 = <b>80 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 20↓ 진입 전까지입니다.</p>`
+      +setTables(LS)
+      +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
+        <p class="note" style="margin:0 0 6px">3형제가 동시에 20 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.
+        세팅 규칙이 아니라 기준① 하나만 떼어 본 것입니다.</p>`
+      +vTableAll(VALL,2,VHOLD)+vTableAll(VALL,-2,VHOLD)
       +`<p class="note">관심종목 ${VALL.length}개의 분봉 신호를 한 통에 모은 것입니다. 한 종목 수십 건으로는
          정배열·역배열 차이를 판정할 수 없어서, 조건을 고칠지 말지는 이 표를 보고 정합니다.
          일·주·월봉은 합산에 넣지 않았습니다(종목별 파일을 따로 받아야 해서 무겁습니다).<br>
@@ -538,7 +692,17 @@ async function renderV(){
     const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
     const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
     VROWS={rows:mins.concat(dwm),raw:!!raw};}
-  el.innerHTML=bar
+  const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m');
+  const setHtml = r60
+    ? `<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${NAMES[CODE]||CODE}</h2>`
+      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 20 아래로 갔다가 <b>20 위로 복귀하는 봉</b>(반등 확인).
+         청산 = <b>80 위에서 %K가 %D를 하향돌파</b>. 60분봉 ${r60.c.length}봉 구간입니다.</p>`
+      +setTables([{code:CODE,r60,r240}])
+      +setCycleTable(r60,r240)
+    : '<div class="err">이 종목은 60분봉이 없어 세팅 검증을 할 수 없습니다.</div>';
+  el.innerHTML=bar+setHtml
+    +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
+      <p class="note" style="margin:0 0 6px">3형제가 동시에 20 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.</p>`
     +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
     +`<p class="note">신호는 <b>조건이 새로 성립한 봉</b>만 셉니다(유지되는 동안은 한 번). 그 봉의 종가에 들어가
        ${VHOLD}봉 뒤 종가에 나온다고 보고 잰 값이며, <b>수수료·세금·미끄러짐은 넣지 않았습니다.</b>
