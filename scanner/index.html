@@ -210,7 +210,7 @@ function screener(){
   if(!scored.length)return `<div class="note">아직 전 종목 점수가 없습니다. 수집기(<code>update-stoch</code>)를 한 번 더 돌리면
     <code>index.json</code>에 종목별 최신 106지표 점수가 실려 이 표가 채워집니다. 그때까지는 종목을 하나씩 골라서 보십시오.</div>`;
   const F2={all:()=>true, buy:t=>agv(t)!=null&&agv(t)>=50, sell:t=>agv(t)!=null&&agv(t)<=-50,
-            up:t=>typeof t.ad==='number'&&t.ad>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ'};
+            up:t=>typeof t.ad==='number'&&t.ad>0, ks:t=>t.market==='KOSPI', kq:t=>t.market==='KOSDAQ', etf:t=>t.market==='ETF'};
   const MM=moMed(scored);
   let rows=scored.filter(F2[SCF]||F2.all);
   if(MOX&&MM!=null) rows=rows.filter(t=>mov(t)!=null&&mov(t)<=MM);
@@ -235,7 +235,7 @@ function screener(){
     <td class="small">${top(t)}</td></tr>`).join('');
   const mbtn=`<button class="pre${MOX?' on':''}" data-mox="1" style="padding:4px 10px;font-size:12px">모멘텀 과매도 제외${MOX?' ✓':''}</button>`;
   return `<p class="small" style="margin:10px 0 4px"><b>전 종목 106지표 순위</b> — ${scored.length}종목 중 ${N2}개 해당${N2>60?' (상위 60개 표시)':''}${MOX?` · 모멘텀 ${MM} 초과(과매도) 제외됨`:''} · 행을 누르면 그 종목으로 이동</p>
-    <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수 합의 +50↑')}${btn('sell','매도 합의 −50↓')}${btn('up','합의 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}
+    <div class="pres" style="margin-bottom:6px">${btn('all','전체')}${btn('buy','매수 합의 +50↑')}${btn('sell','매도 합의 −50↓')}${btn('up','합의 상승')}${btn('ks','코스피')}${btn('kq','코스닥')}${btn('etf','ETF')}
       <span style="width:12px"></span>${mbtn}</div>
     <div class="pres" style="margin-bottom:6px">${sbtn('p','선별점수순')}${sbtn('a','합의도순')}${sbtn('s','종합점수순')}${sbtn('d','합의 상승순')}
       <span style="width:12px"></span><button class="pre" data-cp="c" style="padding:4px 10px;font-size:12px">상위 50 코드 복사 (쉼표)</button><button class="pre" data-cp="n" style="padding:4px 10px;font-size:12px">상위 50 코드 복사 (줄바꿈)</button></div>
