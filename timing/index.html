@@ -41,6 +41,12 @@ tr.avg{border-top:2px solid #cbd2d9}
 .role{display:inline-block;font-size:10px;padding:1px 6px;border-radius:999px;background:#1a1a1a;color:#fff;margin-left:5px;vertical-align:1px}
 .tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:#eef0f3;color:var(--sub);margin-left:3px}
 .tag.cv{background:#fef3c7;color:#92400e}
+input[type=text]{font:inherit;padding:5px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--fg);min-width:230px}
+.pane{display:none} .pane.on{display:block}
+h2{font-size:15px;margin:18px 0 6px}
+td.num{font-variant-numeric:tabular-nums}
+.pos{color:var(--buy);font-weight:600}.neg{color:var(--sell);font-weight:600}
+.small{font-size:11px;color:var(--sub)}
 .cbox{position:relative;height:340px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
 .scrollrow input[type=range]{flex:1;accent-color:#1849a9}
@@ -58,6 +64,8 @@ tr.avg{border-top:2px solid #cbd2d9}
 <p class="sub">막내(5,3) · 둘째(10,6) · 큰형(20,12) — 1분봉부터 월봉까지 같은 방식으로 판정합니다.</p>
 
 <div class="bar">
+  <input type="text" id="q" list="tk" placeholder="종목명 또는 코드 검색 (500종목)" autocomplete="off">
+  <datalist id="tk"></datalist>
   <select id="sel"></select>
   <span class="sub">컷</span>
   <select id="cut"><option value="20">20 / 80</option><option value="15">15 / 85</option><option value="25">25 / 75</option><option value="30">30 / 70</option></select>
@@ -65,6 +73,15 @@ tr.avg{border-top:2px solid #cbd2d9}
   <select id="tr"><option value="3">3봉 전 대비</option><option value="1">1봉 전</option><option value="5">5봉 전</option></select>
 </div>
 
+<div class="bar">
+  <button id="tabT" class="on">타이밍</button>
+  <button id="tabV">검증 (매수·매도 결과)</button>
+  <span class="sub" id="nomin"></span>
+</div>
+
+<div id="paneV" class="pane"></div>
+
+<div id="paneT" class="pane on">
 <div id="vd"></div>
 <div id="tbl"></div>
 
@@ -83,6 +100,7 @@ tr.avg{border-top:2px solid #cbd2d9}
 </div>
 
 <p class="note" id="foot"></p>
+</div>
 </div>
 <script>
 const MIN=['1m','5m','10m','30m','60m','120m','240m'];
@@ -322,21 +340,159 @@ function render(){
    +(DATA.mn&&DATA.mn.updated?DATA.mn.updated.replace('T',' ').slice(0,16)+' UTC':'-');
 }
 
+// ───────── 검증 (매수·매도 결과) ─────────
+let VHOLD=20, VROWS=null, VTAB=false;
+const HOLDS=[5,10,20,40];
+
+function dayKey(t){return Math.floor((t+32400)/86400);}   // KST 기준 날짜
+
+function chunkDay(o,k){
+  const ts=[],h=[],l=[],c=[];
+  let i=0;
+  while(i<o.ts.length){
+    const d=dayKey(o.ts[i]);
+    let j=i;
+    while(j<o.ts.length&&dayKey(o.ts[j])===d){
+      const e=Math.min(j+k,o.ts.length);
+      let hi=-1e18,lo=1e18;
+      let m=j;
+      for(;m<e&&dayKey(o.ts[m])===d;m++){if(o.h[m]>hi)hi=o.h[m];if(o.l[m]<lo)lo=o.l[m];}
+      ts.push(o.ts[j]);h.push(hi);l.push(lo);c.push(o.c[m-1]);
+      j=m;}
+    i=j;}
+  return {ts,h,l,c};}
+
+// 누적 원본(gz)을 받아 훨씬 긴 이력으로 다시 계산한다. 화면용 300봉으로는 표본이 모자란다.
+async function loadRawRows(code){
+  try{
+    const r=await fetch(`../stoch/min/raw/${code}.json.gz?t=${Date.now()}`);
+    if(!r.ok)return null;
+    const txt=await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
+    const d=JSON.parse(txt);
+    const o={};
+    for(const tf of ['1m','5m','30m','60m'])if(d[tf]&&d[tf].t&&d[tf].t.length>80)
+      o[tf]={ts:d[tf].t,h:d[tf].h,l:d[tf].l,c:d[tf].c};
+    if(o['5m'])o['10m']=chunkDay(o['5m'],2);
+    if(o['60m']){o['120m']=chunkDay(o['60m'],2);o['240m']=chunkDay(o['60m'],4);}
+    const out=[];
+    for(const tf of MIN)if(o[tf])out.push({tf,label:LBL[tf],ts:o[tf].ts,c:o[tf].c,K:trio(o[tf].h,o[tf].l,o[tf].c)});
+    return out.length?out:null;
+  }catch(e){return null;}}
+
+// 신호가 «새로» 성립한 봉만 골라 hold봉 뒤 수익률을 잰다. 매도는 부호를 뒤집어 「맞았는가」로 본다.
+function sigList(row,want,hold){
+  const K=row.K,c=row.c,n=c.length,out=[];
+  for(let i=1;i+hold<n;i++){
+    const q=stateAt(K,i);if(q.lack||q.s!==want)continue;
+    const p=stateAt(K,i-1);if(p.s===want)continue;
+    const ret=(c[i+hold]-c[i])/c[i]*100*(want===2?1:-1);
+    out.push({i,ret,a:maCalc(c,i).a});}
+  return out;}
+
+function agg(list){
+  if(!list.length)return null;
+  const w=list.filter(x=>x.ret>0).length;
+  const m=list.reduce((s,x)=>s+x.ret,0)/list.length;
+  return {n:list.length,win:w/list.length*100,avg:m};}
+
+function cell(a){
+  if(!a)return '<td class="num small">-</td><td class="num small">-</td>';
+  const wc=a.win>=50?'pos':'neg', ac=a.avg>0?'pos':'neg';
+  return `<td class="num"><span class="${wc}">${a.win.toFixed(0)}%</span> <span class="small">${a.n}</span></td>`
+        +`<td class="num ${ac}">${a.avg>0?'+':''}${a.avg.toFixed(2)}%</td>`;}
+
+function vTable(rows,want,hold){
+  const title=want===2?'적극매수':'적극매도';
+  let body='',tot=[],totP=[],totN=[];
+  for(const r of rows){
+    const L=sigList(r,want,hold);
+    tot=tot.concat(L);
+    const P=L.filter(x=>x.a>0),N=L.filter(x=>x.a<0);
+    totP=totP.concat(P);totN=totN.concat(N);
+    body+=`<tr><td><b>${r.label}</b>${RTAG(r.tf)}<span class="small"> ${r.c.length}봉</span></td>`
+        +cell(agg(L))+cell(agg(P))+cell(agg(N))+'</tr>';}
+  body+=`<tr class="avg"><td><b>합계</b></td>`+cell(agg(tot))+cell(agg(totP))+cell(agg(totN))+'</tr>';
+  return `<h2>${title} 결과 · ${hold}봉 뒤</h2>
+    <table><thead><tr><th>봉</th>
+      <th colspan="2" style="text-align:left">전체 (승률·표본 / 평균)</th>
+      <th colspan="2" style="text-align:left">정배열에서 난 신호</th>
+      <th colspan="2" style="text-align:left">역배열에서 난 신호</th></tr></thead>
+    <tbody>${body}</tbody></table>`;}
+
+async function renderV(){
+  const el=document.getElementById('paneV');
+  if(VROWS===null){
+    el.innerHTML='<p class="sub">누적 원본을 불러와 다시 계산하는 중…</p>';
+    const raw=await loadRawRows(CODE);
+    const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
+    const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
+    VROWS={rows:mins.concat(dwm),raw:!!raw};}
+  const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
+  el.innerHTML=`<div class="bar"><span class="sub">보유 기간</span>${hb}</div>`
+    +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
+    +`<p class="note">신호는 <b>조건이 새로 성립한 봉</b>만 셉니다(유지되는 동안은 한 번). 그 봉의 종가에 들어가
+       ${VHOLD}봉 뒤 종가에 나온다고 보고 잰 값이며, <b>수수료·세금·미끄러짐은 넣지 않았습니다.</b>
+       매도는 부호를 뒤집어 «내려갔으면 맞음»으로 셉니다.<br>
+       정배열·역배열은 <b>신호가 난 그 봉의 이평 20·60</b> 상태입니다. 기준서 §7의 «정배열이면 확률이 올라간다»가
+       이 종목에서 실제로 성립하는지 이 두 칸을 나란히 보면 됩니다.<br>
+       ${VROWS.raw?'분봉은 <b>누적 원본</b>으로 다시 계산했습니다(5분봉 60일·1분봉 8일부터 매일 쌓입니다).'
+                  :'⚠ 누적 원본이 없어 <b>화면용 300봉</b>만 썼습니다. 표본이 적습니다.'}
+       일·주·월봉은 일봉 500봉 기준입니다.<br>
+       ⚠ 한 종목의 한 구간일 뿐입니다. 표본이 수십 개 미만인 줄은 우연으로 뒤집힙니다.</p>`;
+  el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});}
+
+function showTab(v){
+  VTAB=v;
+  document.getElementById('paneT').className='pane'+(v?'':' on');
+  document.getElementById('paneV').className='pane'+(v?' on':'');
+  document.getElementById('tabT').className=v?'':'on';
+  document.getElementById('tabV').className=v?'on':'';
+  if(v)renderV();}
+
 async function go(){
   document.getElementById('vd').innerHTML='<p class="sub">불러오는 중…</p>';
-  try{DATA=await loadOne(CODE);POS=1e9;render();}
-  catch(e){document.getElementById('vd').innerHTML='<div class="err">오류: '+e.message+'</div>';}
+  VROWS=null;
+  try{
+    DATA=await loadOne(CODE);POS=1e9;
+    const hasMin=DATA.rows.some(r=>MIN.includes(r.tf));
+    if(!hasMin){TF='D';
+      document.getElementById('nomin').innerHTML=
+        '<span class="tag">분봉 없음 — 관심 20종목만 분봉을 모읍니다. 이 종목은 일·주·월봉만 나옵니다.</span>';}
+    else{document.getElementById('nomin').innerHTML='';
+      if(!DATA.rows.some(r=>r.tf===TF))TF='60m';}
+    render();
+    if(VTAB)renderV();
+  }catch(e){document.getElementById('vd').innerHTML='<div class="err">오류: '+e.message+'</div>';}
 }
 (async function(){
+  let ALL=[];
   try{const idx=await fetch('../stoch/data/index.json').then(r=>r.json());
-    (idx.tickers||[]).forEach(t=>NAMES[t.code]=t.name);}catch(e){}
+    ALL=(idx.tickers||[]).filter(t=>t.market!=='INDEX');
+    ALL.forEach(t=>NAMES[t.code]=t.name);}catch(e){}
   try{WL=await fetch('../stoch/watchlist.json').then(r=>r.json());}catch(e){WL=[];}
   const sel=document.getElementById('sel');
-  sel.innerHTML=WL.map(c=>`<option value="${c}">${NAMES[c]||c} (${c})</option>`).join('');
-  const q=new URLSearchParams(location.search).get('code');
-  CODE=(q&&WL.includes(q))?q:(WL[0]||'005930');
-  sel.value=CODE;
-  sel.onchange=()=>{CODE=sel.value;go();};
+  sel.innerHTML='<option value="">관심 20종목</option>'
+    +WL.map(c=>`<option value="${c}">${NAMES[c]||c} (${c})</option>`).join('');
+  document.getElementById('tk').innerHTML=
+    ALL.map(t=>`<option value="${t.name} (${t.code})">`).join('');
+  const qs=new URLSearchParams(location.search).get('code');
+  CODE=(qs&&/^\d{6}$/.test(qs))?qs:(WL[0]||'005930');
+  const qi=document.getElementById('q');
+  const setCode=c=>{if(!c||c===CODE)return;CODE=c;qi.value=(NAMES[c]||'')+' ('+c+')';
+    sel.value=WL.includes(c)?c:'';history.replaceState(null,'','?code='+c);go();};
+  qi.value=(NAMES[CODE]||'')+' ('+CODE+')';
+  sel.value=WL.includes(CODE)?CODE:'';
+  const pick=()=>{const v=qi.value.trim();if(!v)return;
+    let m=v.match(/(\d{6})/);
+    if(!m){const hit=ALL.find(t=>t.name===v)||ALL.find(t=>t.name.startsWith(v))
+             ||ALL.find(t=>t.name.indexOf(v)>=0);
+      if(hit)m=[0,hit.code];}
+    if(m)setCode(m[1]);};
+  qi.onchange=pick;
+  qi.onkeydown=e=>{if(e.key==='Enter')pick();};
+  sel.onchange=()=>{if(sel.value)setCode(sel.value);};
+  document.getElementById('tabT').onclick=()=>showTab(false);
+  document.getElementById('tabV').onclick=()=>showTab(true);
   document.getElementById('cut').onchange=e=>{CUT=+e.target.value;render();};
   document.getElementById('tr').onchange=e=>{TRN=+e.target.value;render();};
   document.getElementById('sc').oninput=e=>{POS=+e.target.value;render();};
