@@ -1,231 +1,218 @@
 # -*- coding: utf-8 -*-
 """
-KIS 분봉 수집기 — 한국투자증권 Open API로 당일 1분봉을 받아 저장소에 누적한다.
+분봉 수집기 — 스토캐스틱 주관 매수매도 타이밍용.
 
-KIS는 '당일 1분봉'만 제공하므로(과거 분봉 미제공) 매 거래일 모아 두는 방식으로
-5·10·15·30·60·120·240분봉 히스토리를 스스로 쌓는다.
+야후 파이낸스에서 1·5·30·60분봉을 받아 저장소에 누적하고,
+10·120·240분봉은 하루 안에서 봉을 묶어 만든다.
+각 시간축마다 3형제 Slow 스토캐스틱(%K·%D)을 계산해 저장한다.
+
+  막내 = Slow %K 5,3  / %D 3
+  둘째 = Slow %K 10,6 / %D 6
+  큰형 = Slow %K 20,12 / %D 12
+
+야후 보유 한도(2026-09 실측)
+  1분봉  8일   /  5분봉 60일  /  30분봉 60일  /  60분봉 730일
+한도를 넘는 구간은 매일 받아서 누적해야 늘어난다. 그래서 이 수집기는
+기존 파일을 읽어 새로 받은 봉과 합치고 중복을 제거한다.
 
 산출물
-  stoch/min/raw_<code>.json : 일자별 1분봉 원본 (재계산용, 최근 KEEP_RAW_DAYS일)
-  stoch/min/tf_<code>.json  : 시간축별 {dates, close, k5, k10, k20} (스캐너가 읽음)
-
-환경변수(Actions Secrets)
-  KIS_APPKEY, KIS_APPSECRET   필수
-  KIS_BASE                    선택, 기본 https://openapi.koreainvestment.com:9443
+  stoch/min/<code>.json
+    raw  : {1m,5m,30m,60m} 원본 OHLC (재계산·누적용)
+    sig  : {1m,5m,10m,30m,60m,120m,240m} 시각·종가·3형제 %K/%D
 """
-import os, sys, json, time, datetime
-import urllib.request, urllib.parse
+import os, sys, json, gzip, time, datetime, warnings
 import pandas as pd
+import numpy as np
+
+warnings.filterwarnings("ignore")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "min")
-BASE = os.environ.get("KIS_BASE", "https://openapi.koreainvestment.com:9443")
-APPKEY = os.environ.get("KIS_APPKEY", "").strip()
-APPSECRET = os.environ.get("KIS_APPSECRET", "").strip()
+RAW = os.path.join(OUT, "raw")
+SIG_BARS = 300          # 화면용으로 남길 봉 수 (백테스트는 raw에서 재계산)
+ACC = ("1m", "5m", "30m")   # 누적 대상. 60m은 야후가 3년을 주므로 매번 새로 받는다
 
-KEEP_RAW_DAYS = 40          # 1분봉 원본 보관 일수
-KEEP_BARS = 400             # 시간축별 보관 봉수
-TFS = [5, 10, 15, 30, 60, 120, 240]
-TRIO = [("k5", 5, 3), ("k10", 10, 6), ("k20", 20, 12)]
-OPEN_MIN = 9 * 60           # 09:00
-CLOSE_MIN = 15 * 60 + 30    # 15:30
-
-
-def kst_today():
-    return (datetime.datetime.utcnow() + datetime.timedelta(hours=9)).strftime("%Y%m%d")
+# 야후에서 직접 받는 시간축: (라벨, interval, period)
+FETCH = [("1m", "1m", "8d"), ("5m", "5m", "60d"), ("30m", "30m", "60d"), ("60m", "60m", "730d")]
+# 묶어서 만드는 시간축: (라벨, 원본라벨, 묶을 봉수)
+DERIVE = [("10m", "5m", 2), ("120m", "60m", 2), ("240m", "60m", 4)]
+# 시간축별 보관 봉수
+KEEP = {"1m": 7800, "5m": 4700, "10m": 2400, "30m": 1600, "60m": 4400, "120m": 2200, "240m": 1200}
+TRIO = [("k5", 5, 3, 3), ("k10", 10, 6, 6), ("k20", 20, 12, 12)]   # 이름, 기간n, 슬로잉, %D기간
 
 
-def post_json(url, payload, headers):
-    body = json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read().decode())
+def slow_stoch(high, low, close, n, slowing, dper):
+    """Slow %K / Slow %D. HTS 표준식."""
+    hh = high.rolling(n, min_periods=n).max()
+    ll = low.rolling(n, min_periods=n).min()
+    rng = (hh - ll).replace(0, np.nan)
+    fast_k = (close - ll) / rng * 100.0
+    slow_k = fast_k.rolling(slowing, min_periods=slowing).mean()
+    slow_d = slow_k.rolling(dper, min_periods=dper).mean()
+    return slow_k, slow_d
 
 
-def get_json(url, params, headers):
-    q = urllib.parse.urlencode(params)
-    req = urllib.request.Request(url + "?" + q, headers=headers)
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read().decode())
+def chunk_by_day(df, k):
+    """하루 안에서 앞에서부터 k개씩 묶는다. 캘린더 리샘플과 달리 09:00 기준이 안 어긋난다."""
+    if df.empty:
+        return df
+    out = []
+    for _, g in df.groupby(df.index.normalize(), sort=True):
+        g = g.sort_index()
+        for i in range(0, len(g), k):
+            b = g.iloc[i:i + k]
+            out.append((b.index[0], b["h"].max(), b["l"].min(), b["c"].iloc[-1]))
+    r = pd.DataFrame(out, columns=["t", "h", "l", "c"]).set_index("t")
+    return r.sort_index()
 
 
-def get_token():
-    if not APPKEY or not APPSECRET:
-        print("[중단] KIS_APPKEY / KIS_APPSECRET 시크릿이 없습니다.")
-        sys.exit(1)
-    d = post_json(BASE + "/oauth2/tokenP",
-                  {"grant_type": "client_credentials", "appkey": APPKEY, "appsecret": APPSECRET},
-                  {"content-type": "application/json"})
-    tok = d.get("access_token")
-    if not tok:
-        print("[중단] 토큰 발급 실패:", d)
-        sys.exit(1)
-    return tok
-
-
-def fetch_day_minutes(code, token):
-    """당일 1분봉 전체를 뒤에서부터 30건씩 페이징해 수집. {분: (o,h,l,c)}"""
-    url = BASE + "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice"
-    head = {"content-type": "application/json; charset=utf-8",
-            "authorization": "Bearer " + token,
-            "appkey": APPKEY, "appsecret": APPSECRET,
-            "tr_id": "FHKST03010200", "custtype": "P"}
-    bars, cursor, guard = {}, "153000", 0
-    while guard < 20:
-        guard += 1
-        p = {"FID_ETC_CLS_CODE": "", "FID_COND_MRKT_DIV_CODE": "J",
-             "FID_INPUT_ISCD": code, "FID_INPUT_HOUR_1": cursor, "FID_PW_DATA_INCU_YN": "N"}
+def fetch(yf, ticker, interval, period):
+    for attempt in range(3):
         try:
-            d = get_json(url, p, head)
+            df = yf.download(ticker, interval=interval, period=period,
+                             progress=False, auto_adjust=False, threads=False)
+            if df is None or df.empty:
+                return pd.DataFrame()
+            df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+            df = df.rename(columns={"Open": "o", "High": "h", "Low": "l", "Close": "c"})
+            df = df[["h", "l", "c"]].dropna()
+            df.index = pd.to_datetime(df.index)
+            return df
         except Exception as e:
-            print(f"  [경고] {code} {cursor} 호출 실패: {e}")
-            break
-        rows = d.get("output2") or []
-        if not rows:
-            break
-        got = 0
-        for r in rows:
-            hh = (r.get("stck_cntg_hour") or "").zfill(6)
-            if len(hh) < 4:
-                continue
-            m = int(hh[:2]) * 60 + int(hh[2:4])
-            if m < OPEN_MIN or m > CLOSE_MIN or m in bars:
-                continue
-            try:
-                o = float(r.get("stck_oprc") or 0); h = float(r.get("stck_hgpr") or 0)
-                l = float(r.get("stck_lwpr") or 0); c = float(r.get("stck_prpr") or 0)
-            except ValueError:
-                continue
-            if c <= 0:
-                continue
-            if o <= 0: o = c
-            if h <= 0: h = max(o, c)
-            if l <= 0: l = min(o, c)
-            bars[m] = (o, h, l, c)
-            got += 1
-        earliest = min(int(r["stck_cntg_hour"][:2]) * 60 + int(r["stck_cntg_hour"][2:4])
-                       for r in rows if (r.get("stck_cntg_hour") or "").strip())
-        if earliest <= OPEN_MIN or got == 0:
-            break
-        nxt = earliest - 1
-        cursor = f"{nxt // 60:02d}{nxt % 60:02d}00"
-        time.sleep(0.12)
-    return bars
+            if attempt == 2:
+                print(f"    ! {interval} 실패: {str(e)[:60]}")
+                return pd.DataFrame()
+            time.sleep(2)
+    return pd.DataFrame()
 
 
 def load_raw(code):
-    f = os.path.join(OUT, f"raw_{code}.json")
-    if os.path.exists(f):
-        try:
-            with open(f, encoding="utf-8") as fp:
-                return json.load(fp)
-        except Exception:
-            pass
-    return {"code": code, "days": {}}
-
-
-def save_json(path, obj):
-    with open(path, "w", encoding="utf-8") as fp:
-        json.dump(obj, fp, ensure_ascii=False, separators=(",", ":"))
-
-
-def slow_k(df, n, slowing):
-    low = df["l"].rolling(n).min()
-    high = df["h"].rolling(n).max()
-    rng = (high - low)
-    fast = (df["c"] - low) / rng.where(rng != 0) * 100.0
-    return fast.rolling(slowing).mean()
-
-
-def build_frames(raw):
-    """일자별 1분봉 → 연속 DataFrame"""
-    recs = []
-    for day in sorted(raw["days"].keys()):
-        d = raw["days"][day]
-        for i, m in enumerate(d["t"]):
-            recs.append((day, int(m), d["o"][i], d["h"][i], d["l"][i], d["c"][i]))
-    if not recs:
-        return None
-    df = pd.DataFrame(recs, columns=["day", "m", "o", "h", "l", "c"])
-    df = df.sort_values(["day", "m"]).reset_index(drop=True)
-    return df
-
-
-def resample_minutes(df, tf):
-    """장 시작(09:00) 기준 tf분 묶음. 일자 경계를 넘지 않는다."""
-    g = ((df["m"] - OPEN_MIN) // tf).astype(int)
-    key = df["day"] + "_" + g.astype(str)
-    agg = df.groupby(key, sort=False).agg(day=("day", "first"), m=("m", "first"),
-                                          o=("o", "first"), h=("h", "max"),
-                                          l=("l", "min"), c=("c", "last"))
-    agg = agg.sort_values(["day", "m"]).reset_index(drop=True)
-    return agg
-
-
-def tf_block(df, tf):
-    bars = resample_minutes(df, tf)
-    if len(bars) < 5:
-        return None
-    ks = {lab: slow_k(bars, n, s) for lab, n, s in TRIO}
-    tail = slice(max(0, len(bars) - KEEP_BARS), len(bars))
-    lab_dt = [f"{r.day[:4]}-{r.day[4:6]}-{r.day[6:]} {int(r.m)//60:02d}:{int(r.m)%60:02d}"
-              for r in bars.iloc[tail].itertuples()]
-    out = {"dates": lab_dt,
-           "close": [round(float(v), 2) for v in bars["c"].iloc[tail]]}
-    for lab, _, _ in TRIO:
-        out[lab] = [None if pd.isna(v) else round(float(v), 1) for v in ks[lab].iloc[tail]]
+    """누적 원본(gz)을 DataFrame으로 되살린다. 시각은 epoch 초."""
+    path = os.path.join(RAW, f"{code}.json.gz")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:
+        return {}
+    out = {}
+    for tf, v in (d or {}).items():
+        if not v.get("t"):
+            continue
+        df = pd.DataFrame({"h": v["h"], "l": v["l"], "c": v["c"]},
+                          index=pd.to_datetime(v["t"], unit="s", utc=True))
+        out[tf] = df.tz_convert("Asia/Seoul")
     return out
 
 
+def save_raw(code, raw):
+    os.makedirs(RAW, exist_ok=True)
+    doc = {tf: {"t": [int(t.timestamp()) for t in d.index],
+                "h": [round(float(x), 2) for x in d["h"]],
+                "l": [round(float(x), 2) for x in d["l"]],
+                "c": [round(float(x), 2) for x in d["c"]]}
+           for tf, d in raw.items() if tf in ACC and not d.empty}
+    with gzip.open(os.path.join(RAW, f"{code}.json.gz"), "wt", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def merge(old, new):
+    if old is None or old.empty:
+        return new
+    if new is None or new.empty:
+        return old
+    if old.index.tz is None:
+        old.index = old.index.tz_localize("Asia/Seoul")
+    if new.index.tz is None:
+        new.index = new.index.tz_localize("Asia/Seoul")
+    both = pd.concat([old, new])
+    both = both[~both.index.duplicated(keep="last")].sort_index()
+    return both
+
+
+def sig_block(df, keep):
+    """3형제 %K·%D를 계산해 저장용 dict로."""
+    if df.empty or len(df) < 40:
+        return None
+    o = {"t": [], "c": []}
+    k = {}
+    for name, n, sl, dp in TRIO:
+        sk, sd = slow_stoch(df["h"], df["l"], df["c"], n, sl, dp)
+        k[name + "k"] = sk
+        k[name + "d"] = sd
+    tail = df.tail(keep)
+    idx = tail.index
+    o["t"] = [int(t.timestamp()) for t in idx]
+    o["c"] = [round(float(x), 2) for x in tail["c"]]
+    for key, ser in k.items():
+        o[key] = [None if pd.isna(x) else int(round(float(x))) for x in ser.reindex(idx)]
+    return o
+
+
 def main():
-    os.makedirs(OUT, exist_ok=True)
-    wl_path = os.path.join(HERE, "watchlist.json")
     try:
-        with open(wl_path, encoding="utf-8") as f:
-            watch = json.load(f)
-    except Exception:
-        watch = ["005930"]
-    if not isinstance(watch, list) or not watch:
-        watch = ["005930"]
+        import yfinance as yf
+    except ImportError:
+        print("yfinance 없음 — pip install yfinance");  sys.exit(1)
 
-    token = get_token()
-    today = kst_today()
-    ok, empty = 0, 0
+    os.makedirs(OUT, exist_ok=True)
+    wl = json.load(open(os.path.join(HERE, "watchlist.json"), encoding="utf-8"))
+    names = {}
+    npath = os.path.join(HERE, "data", "index.json")
+    if os.path.exists(npath):
+        try:
+            for t in json.load(open(npath, encoding="utf-8")).get("tickers", []):
+                names[t["code"]] = (t.get("name"), t.get("market"))
+        except Exception:
+            pass
 
-    for i, code in enumerate(watch, 1):
-        code = str(code).zfill(6)
-        bars = fetch_day_minutes(code, token)
+    ok = 0
+    for i, code in enumerate(wl, 1):
+        nm, mk = names.get(code, (code, None))
+        suffix = ".KQ" if mk == "KOSDAQ" else ".KS"
+        ticker = code + suffix
+        path = os.path.join(OUT, f"{code}.json")
         raw = load_raw(code)
-        if bars:
-            ms = sorted(bars.keys())
-            raw["days"][today] = {"t": ms,
-                                  "o": [bars[m][0] for m in ms],
-                                  "h": [bars[m][1] for m in ms],
-                                  "l": [bars[m][2] for m in ms],
-                                  "c": [bars[m][3] for m in ms]}
-        else:
-            empty += 1
-        for d in sorted(raw["days"].keys())[:-KEEP_RAW_DAYS]:
-            raw["days"].pop(d, None)
-        save_json(os.path.join(OUT, f"raw_{code}.json"), raw)
 
-        df = build_frames(raw)
-        tfout = {}
-        if df is not None:
-            for tf in TFS:
-                b = tf_block(df, tf)
+        got = []
+        for label, interval, period in FETCH:
+            new = fetch(yf, ticker, interval, period)
+            if new.empty and label not in raw:
+                continue
+            raw[label] = merge(raw.get(label), new).tail(KEEP[label])
+            got.append(f"{label}:{len(raw[label])}")
+            time.sleep(0.4)
+
+        if not raw:
+            print(f"[{i}/{len(wl)}] {code} {nm} — 데이터 없음")
+            continue
+
+        # 파생 시간축
+        allt = dict(raw)
+        for label, src, k in DERIVE:
+            if src in raw and not raw[src].empty:
+                allt[label] = chunk_by_day(raw[src], k).tail(KEEP[label])
+
+        sig = {}
+        for label in ["1m", "5m", "10m", "30m", "60m", "120m", "240m"]:
+            if label in allt:
+                b = sig_block(allt[label], SIG_BARS)
                 if b:
-                    tfout["m" + str(tf)] = b
-        save_json(os.path.join(OUT, f"tf_{code}.json"), tfout)
-        ok += 1
-        have = ",".join(k for k in tfout)
-        print(f"  [{i}/{len(watch)}] {code} 당일 {len(bars)}분봉 · 누적 {len(raw['days'])}일 · 축 [{have}]")
-        time.sleep(0.15)
+                    sig[label] = b
 
-    idx = {"built": (datetime.datetime.utcnow() + datetime.timedelta(hours=9)).strftime("%Y-%m-%d %H:%M KST"),
-           "day": today, "codes": [str(c).zfill(6) for c in watch]}
-    save_json(os.path.join(OUT, "index.json"), idx)
-    print(f"\n[완료] {ok}종목 처리 · 당일 데이터 없음 {empty}종목")
+        save_raw(code, raw)
+        doc = {
+            "code": code, "name": nm, "market": mk,
+            "updated": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "bars": {tf: len(d) for tf, d in allt.items()},
+            "sig": sig,
+        }
+        json.dump(doc, open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        ok += 1
+        print(f"[{i}/{len(wl)}] {code} {nm} — {' '.join(got)} ({os.path.getsize(path)//1024}KB)")
+
+    print(f"완료: {ok}/{len(wl)}종목")
 
 
 if __name__ == "__main__":
