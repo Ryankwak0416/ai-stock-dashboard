@@ -38,6 +38,7 @@ tr.avg td{background:#f2f4f7;font-weight:600}
 tr.avg{border-top:2px solid #cbd2d9}
 .c0{color:var(--neu)}.cm1{color:var(--sell)}.cm2{background:var(--sell);color:#fff}
 .lo{color:var(--buy);font-weight:600}.hi{color:var(--sell);font-weight:600}
+.role{display:inline-block;font-size:10px;padding:1px 6px;border-radius:999px;background:#1a1a1a;color:#fff;margin-left:5px;vertical-align:1px}
 .tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:#eef0f3;color:var(--sub);margin-left:3px}
 .cbox{position:relative;height:340px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
@@ -74,9 +75,10 @@ tr.avg{border-top:2px solid #cbd2d9}
 <div class="lg">
   <span><i style="background:#111;height:3px"></i>종가</span>
   <span><i style="background:#e03131"></i>막내 5·3·3</span>
-  <span><i style="background:#f08c00"></i>둘째 10·6·6</span>
-  <span><i style="background:#1c7ed6"></i>큰형 20·12·12</span>
-  <span>«적극매수»·«적극매도» 글자 = 성립한 봉 · 붉은 띠 = 3형제 동시 과매도 구간 · 푸른 띠 = 동시 과매수 구간</span>
+  <span><i style="background:#2f9e44"></i>둘째 10·6·6</span>
+  <span><i style="background:#1971c2"></i>큰형 20·12·12</span>
+  <span>▲ 적극매수 성립 · ▼ 적극매도 성립 · 세로 붉은 띠 = 3형제 동시 과매도 · 푸른 띠 = 동시 과매수</span>
+  <span>아래 가로 띠 = 이평 20·60 배열(붉은칸 정배열 / 푸른칸 역배열)</span>
 </div>
 
 <p class="note" id="foot"></p>
@@ -85,6 +87,8 @@ tr.avg{border-top:2px solid #cbd2d9}
 const MIN=['1m','5m','10m','30m','60m','120m','240m'];
 const LBL={'1m':'1분','5m':'5분','10m':'10분','30m':'30분','60m':'60분','120m':'120분','240m':'240분','D':'일봉','W':'주봉','M':'월봉'};
 const SUPER=['5m','60m','240m'];
+const ROLE={'5m':'단타','60m':'스윙','240m':'추세'};
+const RTAG=tf=>ROLE[tf]?`<span class="role">${ROLE[tf]}</span>`:'';
 const SPANS=[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']];
 let CUT=20,TRN=3,CODE=null,TF='60m',SPAN=120,POS=1e9,NAMES={},WL=[],DATA=null,chart=null;
 let SHOW={px:true,k5:true,k10:true,k20:true};
@@ -121,6 +125,13 @@ function stateAt(K,i){
 function rowState(K){return stateAt(K,K.k5.k.length-1);}
 function baseCount(a,w){const n=a.length,st=Math.max(1,n-w);let c=0;
   for(let i=st;i<n;i++)if(a[i]!=null&&a[i-1]!=null&&a[i]<=CUT&&a[i-1]>CUT)c++;return c;}
+function maAt(c,i){
+  const m=[5,10,20,60].map(p=>{if(i+1<p)return null;let s=0;for(let j=i-p+1;j<=i;j++)s+=c[j];return s/p;});
+  if(m[2]==null||m[3]==null)return 0;
+  const px=c[i];
+  if(px>m[2]&&m[2]>m[3])return 1;
+  if(px<m[2]&&m[2]<m[3])return -1;
+  return 0;}
 function maState(c){const n=c.length;
   const m=[5,10,20,60].map(p=>{if(n<p)return null;let s=0;for(let i=n-p;i<n;i++)s+=c[i];return s/p;});
   if(m[2]==null||m[3]==null)return{a:0,cv:false};
@@ -177,7 +188,7 @@ function head(){
   const rowHtml=r=>{
     const s=st[r.tf],ma=maState(r.c),bc=baseCount(r.K.k5.k,60);
     return `<tr class="pick ${r.tf===TF?'sel':''}" data-tf="${r.tf}">
-      <td><b>${r.label}</b></td>
+      <td><b>${r.label}</b>${RTAG(r.tf)}</td>
       <td class="st ${SC[s.s]}">${s.lack?'<span class="c0">데이터 부족</span>':SN[s.s]}</td>
       <td>${kc(s.v[0])}</td><td>${kc(s.v[1])}</td><td>${kc(s.v[2])}</td>
       <td>${ma.a===1?'<span class="lo">정배열</span>':ma.a===-1?'<span class="hi">역배열</span>':'<span class="c0">—</span>'}${ma.cv?'<span class="tag">수렴</span>':''}</td>
@@ -199,13 +210,13 @@ function render(){
   if(!data.rows.some(r=>r.tf===TF))TF=data.rows[0].tf;
   head();
   document.getElementById('tfbar').innerHTML='<span class="sub">차트 봉</span>'+
-    data.rows.map(r=>`<button class="sm ${r.tf===TF?'on':''}" data-ctf="${r.tf}">${r.label}</button>`).join('');
+    data.rows.map(r=>`<button class="sm ${r.tf===TF?'on':''}" data-ctf="${r.tf}">${r.label}${ROLE[r.tf]?' · '+ROLE[r.tf]:''}</button>`).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
    +'<span class="sub" id="spl" style="min-width:52px">'+(SPAN===0?'전체':SPAN+'봉')+'</span>'
    +'<span style="width:14px"></span><span class="sub">표시</span>'
-   +[['px','가격','#111827'],['k5','막내 5·3·3','#e03131'],['k10','둘째 10·6·6','#f08c00'],['k20','큰형 20·12·12','#1c7ed6']]
+   +[['px','가격','#111827'],['k5','막내 5·3·3','#e03131'],['k10','둘째 10·6·6','#2f9e44'],['k20','큰형 20·12·12','#1971c2']]
      .map(o=>`<button class="sm ${SHOW[o[0]]?'on':''}" data-sh="${o[0]}" style="border-color:${o[2]};${SHOW[o[0]]?'':'color:'+o[2]}">${o[1]}</button>`).join('');
   const spEl=document.getElementById('sp');
   spEl.oninput=e=>{SPAN=SPANOPT[+e.target.value];POS=1e9;render();};
@@ -226,6 +237,8 @@ function render(){
     if(!q.lack&&q.s===-2){if(p.s!==-2){SELL.push(i);cs2=i;}}
     else if(cs2!=null){ZS.push([cs2,i-1]);cs2=null;}}
   if(cb!=null)ZB.push([cb,N-1]); if(cs2!=null)ZS.push([cs2,N-1]);
+  const MAB=new Array(N).fill(0);
+  for(let i=Math.max(0,a-1);i<=b&&i<N;i++)MAB[i]=maAt(r.c,i);
 
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
@@ -234,8 +247,8 @@ function render(){
   const ds=[];const NM=[];
   if(SHOW.px){ds.push(line(px,'#111827',2.8,'y'));NM.push('종가');}
   if(SHOW.k5){ds.push(line(k5,'#e03131',1,'y2'));NM.push('막내');}
-  if(SHOW.k10){ds.push(line(k10,'#f08c00',1,'y2'));NM.push('둘째');}
-  if(SHOW.k20){ds.push(line(k20,'#1c7ed6',1.3,'y2'));NM.push('큰형');}
+  if(SHOW.k10){ds.push(line(k10,'#2f9e44',1,'y2'));NM.push('둘째');}
+  if(SHOW.k20){ds.push(line(k20,'#1971c2',1.3,'y2'));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
 
@@ -246,15 +259,24 @@ function render(){
       const x1=xs.getPixelForValue(s0-a),x2=xs.getPixelForValue(e0-a);
       g.save();g.fillStyle=fill;g.fillRect(x1-1,ca.top,Math.max(2,x2-x1+2),ca.bottom-ca.top);g.restore();});};
     zone(ZB,'rgba(217,45,32,.13)');zone(ZS,'rgba(24,73,169,.13)');
-    const mark=(list,ln,fl,txt,dir)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
+    // 이평 20·60 배열 띠 (차트 하단)
+    const SB=10, by0=ca.bottom-SB;
+    for(let i=a;i<=b;i++){const v=MAB[i];if(!v)continue;
+      const x1=xs.getPixelForValue(i-a),x2=(i<b)?xs.getPixelForValue(i+1-a):x1+2;
+      g.save();g.fillStyle=(v>0)?'rgba(217,45,32,.55)':'rgba(24,73,169,.55)';
+      g.fillRect(x1,by0,Math.max(1.5,x2-x1),SB);g.restore();}
+    g.save();g.font='10px -apple-system,Malgun Gothic,sans-serif';g.fillStyle='#6b7280';
+    g.textAlign='left';g.fillText('이평 20·60  붉은칸 정배열 / 푸른칸 역배열',ca.left+3,by0-3);g.restore();
+    const mark=(list,ln,fl,dir)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
       g.save();g.strokeStyle=ln;g.lineWidth=1.3;g.setLineDash([5,4]);
       g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
-      g.font='bold 11px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
-      const w=g.measureText(txt).width+10,y=(dir>0)?ca.bottom-20:ca.top+6;
-      g.fillStyle=fl;g.beginPath();g.roundRect(x-w/2,y,w,16,8);g.fill();
-      g.fillStyle='#fff';g.fillText(txt,x,y+12);g.restore();});};
-    mark(BUY,'rgba(217,45,32,.6)','#d92d20','적극매수',1);
-    mark(SELL,'rgba(24,73,169,.6)','#1849a9','적극매도',-1);}};
+      g.fillStyle=fl;g.beginPath();
+      if(dir>0){g.moveTo(x,by0-6);g.lineTo(x-8,by0-22);g.lineTo(x+8,by0-22);}
+      else{g.moveTo(x,ca.top+4);g.lineTo(x-8,ca.top+20);g.lineTo(x+8,ca.top+20);}
+      g.closePath();g.fill();
+      g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();g.restore();});};
+    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1);
+    mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1);}};
 
   if(chart)chart.destroy();
   chart=new Chart(document.getElementById('cv'),{type:'line',data:{labels,datasets:ds},plugins:[tap],
@@ -273,12 +295,16 @@ function render(){
   document.getElementById('foot').innerHTML=
     `<b>적극매수</b> = 3형제 %K가 모두 ${CUT} 이하 · <b>적극매도</b> = 모두 ${100-CUT} 이상 · `
    +`<b>상승추세</b> = 셋 중 둘 이상이 ${TRN}봉 전보다 높음. 적극과 추세는 섞지 않고 개수도 따로 셉니다.<br>`
-   +'차트에 «적극매수»·«적극매도» 글자가 붙은 봉이 <b>조건이 새로 성립한 자리</b>이고, '
-   +'<b>색 띠는 조건이 유지되는 구간 전체</b>입니다. 3형제가 동시에 과매도면 붉은 띠, 동시에 과매수면 푸른 띠입니다.<br>'
+   +'차트의 <b>▲▼가 조건이 새로 성립한 자리</b>이고, <b>세로 색 띠는 조건이 유지되는 구간 전체</b>입니다. '
+   +'3형제 동시 과매도면 붉은 띠, 동시 과매수면 푸른 띠입니다. '
+   +'차트 맨 아래 가로 띠는 봉마다의 <b>이평 20·60 배열</b>이라, 신호가 정배열 구간에서 났는지 역배열 구간에서 났는지 바로 보입니다.<br>'
+   +'<b>봉 주기별 쓰임</b> — <b>5분봉 = 단타</b>, <b>60분봉 = 스윙</b>(사흘~2주), <b>240분봉 = 추세</b>(며칠~몇 주). '
+   +'스윙이면 60분봉에서 타점을 잡되 일봉이 어느 쪽인지 반드시 같이 보십시오.<br>'
    +'<b>★ 수퍼매수</b> = 5분·60분·240분봉 동시 적극매수. 간격을 크게 벌린 셋이라 서로 다른 시간대를 확인합니다.<br>'
    +`<b>다지기</b> = 최근 60봉에서 막내 %K가 ${CUT} 아래로 새로 내려간 횟수. 많이 다질수록 확률이 올라가되, `
    +'그동안 가격이 저점을 낮추지 않았어야 응축입니다. <b>이평</b> 정배열이면 신뢰도가 올라가고 역배열이면 내려갑니다.<br>'
-   +'⚠ 야후 분봉은 <b>09:00~14:55</b>까지만 제공되어 장 마감 35분이 빠집니다. 1분봉은 8일치부터 시작해 매일 쌓입니다.<br>'
+   +'· 야후 분봉이 14:55까지만 주는 구간은 <b>네이버 1분봉으로 15:30까지 메웁니다</b>(그 구간 고·저가는 1분 종가의 최대·최소). '
+   +'1분봉은 8일치부터 시작해 매일 쌓입니다.<br>'
    +'⚠ 월봉 큰형(20,12)은 일봉 500봉으로는 기간이 모자라 «데이터 부족»입니다.<br>'
    +'⚠ <b>아직 백테스트로 검증하지 않은 화면입니다.</b> 갱신 '
    +(DATA.mn&&DATA.mn.updated?DATA.mn.updated.replace('T',' ').slice(0,16)+' UTC':'-');
