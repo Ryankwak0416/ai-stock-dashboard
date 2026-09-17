@@ -32,6 +32,13 @@ KEEP_DAYS = 500                # 일봉 보관 봉수
 KEEP_WEEK = 300                # 주봉 보관 봉수(약 6년)
 KEEP_MONTH = 180               # 월봉 보관 봉수(15년)
 TOP_N = int(os.environ.get("TOP_N", "500"))   # 시총 상위 N (코스피+코스닥 합산)
+ETF_N = int(os.environ.get("ETF_N", "100"))   # 거래대금 상위 ETF N개
+
+ETF_API = "https://finance.naver.com/api/sise/etfItemList.nhn"
+# 금리·채권형 ETF는 값이 거의 움직이지 않는다. 스토캐스틱도 백분위도 뜻이 없고
+# 오히려 전 종목 순위의 분모만 흐려서 뺀다.
+ETF_SKIP = ("CD금리", "금리액티브", "머니마켓", "MMF", "통안", "국고채", "단기채",
+            "종합채권", "회사채", "KOFR", "머니마켓액티브", "금리투자")
 
 # (라벨, 기간, 슬로잉) — 모든 시간축 공통
 TRIO = [("k5", 5, 3), ("k10", 10, 6), ("k20", 20, 12)]
@@ -91,6 +98,28 @@ def naver_top(sosok, need):
         page += 1
         time.sleep(0.2)
     return out[:need]
+
+
+def naver_etf(need):
+    """네이버 ETF 목록에서 거래대금 상위 need개. 국내 ETF는 전부 코스피 상장이다."""
+    try:
+        req = urllib.request.Request(ETF_API, headers=dict(UA, Referer="https://finance.naver.com/sise/etf.naver"))
+        raw = urllib.request.urlopen(req, timeout=20).read().decode("euc-kr", "ignore")
+        lst = json.loads(raw)["result"]["etfItemList"]
+    except Exception as e:
+        print(f"[목록] ETF 실패: {str(e)[:60]}")
+        return []
+    lst.sort(key=lambda x: x.get("amonut") or 0, reverse=True)
+    out = []
+    for x in lst:
+        nm = str(x.get("itemname", "")).strip()
+        if not nm or any(k in nm for k in ETF_SKIP):
+            continue
+        out.append((str(x["itemcode"]).zfill(6), nm, "ETF"))
+        if len(out) >= need:
+            break
+    print(f"[목록] ETF 거래대금 상위 {len(out)}종목")
+    return out
 
 
 def build_universe():
@@ -213,7 +242,13 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     start = (pd.Timestamp.today() - pd.DateOffset(years=YEARS)).strftime("%Y-%m-%d")
     mrule = month_rule()
-    targets = [(c, n, m) for c, n, m in INDICES] + build_universe()
+    targets = [(c, n, m) for c, n, m in INDICES] + build_universe() + naver_etf(ETF_N)
+    seen, uniq = set(), []
+    for c, n, m in targets:
+        if c in seen:
+            continue
+        seen.add(c); uniq.append((c, n, m))
+    targets = uniq
 
     index, ok, fail = [], 0, []
     for i, (code, name, market) in enumerate(targets, 1):
