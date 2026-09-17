@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>스토캐스틱 주관 매수매도 타이밍</title>
+<style>
+:root{
+  --bg:#fff; --fg:#1a1a1a; --sub:#666; --line:#e3e3e3; --panel:#fafafa;
+  --buy:#c62828; --buy-bg:#ffebee; --buy-strong:#b71c1c;
+  --sell:#1565c0; --sell-bg:#e3f2fd; --sell-strong:#0d47a1;
+  --neu:#9e9e9e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕",sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:20px;margin:0 0 2px}
+.sub{color:var(--sub);font-size:12px;margin:0 0 18px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+select,input,button{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:inherit}
+button{cursor:pointer}
+button.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.verdict{border:2px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px;background:var(--panel)}
+.verdict .big{font-size:26px;font-weight:700;letter-spacing:-.5px}
+.verdict .meta{font-size:12px;color:var(--sub);margin-top:4px}
+.verdict.buy{border-color:var(--buy);background:var(--buy-bg)}
+.verdict.buy .big{color:var(--buy-strong)}
+.verdict.sell{border-color:var(--sell);background:var(--sell-bg)}
+.verdict.sell .big{color:var(--sell-strong)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:11px;color:var(--sub);font-weight:600;text-align:right;border-bottom:2px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+td.state{text-align:center;font-weight:600;border-radius:4px}
+.s2{background:var(--buy);color:#fff}
+.s1{background:var(--buy-bg);color:var(--buy)}
+.s0{color:var(--neu)}
+.sm1{background:var(--sell-bg);color:var(--sell)}
+.sm2{background:var(--sell);color:#fff}
+tr.avg td{background:#f2f2f2;font-weight:600}
+tr.sep td{border-top:2px solid #bbb}
+.k{font-variant-numeric:tabular-nums}
+.lo{color:var(--buy);font-weight:600}
+.hi{color:var(--sell);font-weight:600}
+.tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:#eee;color:#555;margin-left:3px}
+.note{font-size:12px;color:var(--sub);margin-top:18px;line-height:1.75}
+.note b{color:var(--fg)}
+.err{padding:20px;background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;font-size:13px}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161616;--fg:#eee;--sub:#999;--line:#333;--panel:#1e1e1e;
+    --buy-bg:#3a1a1a;--sell-bg:#12243a}
+  select,input,button{background:#222;border-color:#444;color:#eee}
+  button.on{background:#eee;color:#111}
+  tr.avg td{background:#242424}
+  .tag{background:#333;color:#aaa}
+  .err{background:#3a2a10;border-color:#8a6d3b}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>스토캐스틱 주관 매수매도 타이밍</h1>
+<p class="sub">막내(5,3) · 둘째(10,6) · 큰형(20,12) 세 형제를 1분봉부터 월봉까지 같은 방식으로 판정합니다.
+데이터: <code>stoch/min</code>(분봉) · <code>stoch/data</code>(일봉·주봉·월봉)</p>
+
+<div class="bar">
+  <select id="sel"></select>
+  <span style="width:10px"></span>
+  <span class="sub">과매도/과매수 컷</span>
+  <select id="cut"><option value="20">20 / 80 (기본)</option><option value="15">15 / 85</option><option value="25">25 / 75</option><option value="30">30 / 70</option></select>
+  <span class="sub">추세 판정</span>
+  <select id="tr"><option value="3">3봉 전 대비 (기본)</option><option value="1">1봉 전 대비</option><option value="5">5봉 전 대비</option></select>
+</div>
+
+<div id="out"></div>
+
+<p class="note" id="foot"></p>
+</div>
+
+<script>
+const MIN=['1m','5m','10m','30m','60m','120m','240m'];
+const LBL={'1m':'1분','5m':'5분','10m':'10분','30m':'30분','60m':'60분','120m':'120분','240m':'240분',
+           'D':'일봉','W':'주봉','M':'월봉'};
+const SUPER=['5m','60m','240m'];         // 수퍼매수 타이밍 = 이 셋이 겹칠 때
+let CUT=20, TRN=3, CODE=null, NAMES={}, WL=[];
+
+/* ── Slow 스토캐스틱 ───────────────────────────── */
+function sma(a,n){const o=Array(a.length).fill(null);let s=0,c=0;
+  for(let i=0;i<a.length;i++){const v=a[i];
+    if(v==null){s=0;c=0;o[i]=null;continue;}
+    s+=v;c++; if(c>n){s-=a[i-n];c=n;}
+    o[i]= c>=n ? s/n : null;}
+  return o;}
+function slowStoch(h,l,c,n,slowing,dper){
+  const fk=Array(c.length).fill(null);
+  for(let i=n-1;i<c.length;i++){
+    let hh=-1e18,ll=1e18;
+    for(let j=i-n+1;j<=i;j++){ if(h[j]>hh)hh=h[j]; if(l[j]<ll)ll=l[j]; }
+    fk[i]= (hh===ll)? null : (c[i]-ll)/(hh-ll)*100;
+  }
+  const k=sma(fk,slowing), d=sma(k,dper);
+  return {k,d};
+}
+function trio(h,l,c){
+  return {k5:slowStoch(h,l,c,5,3,3), k10:slowStoch(h,l,c,10,6,6), k20:slowStoch(h,l,c,20,12,12)};
+}
+
+/* ── 일봉 → 주봉·월봉 ──────────────────────────── */
+function regroup(dates,h,l,c,mode){
+  const H=[],L=[],C=[],T=[];let key=null;
+  const kf = mode==='W'
+    ? d=>{const x=new Date(d+'T00:00:00Z');const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day);return x.toISOString().slice(0,10);}
+    : d=>d.slice(0,7);
+  for(let i=0;i<dates.length;i++){
+    const k=kf(dates[i]);
+    if(k!==key){key=k;T.push(dates[i]);H.push(h[i]);L.push(l[i]);C.push(c[i]);}
+    else{const j=H.length-1; if(h[i]>H[j])H[j]=h[i]; if(l[i]<L[j])L[j]=l[i]; C[j]=c[i];}
+  }
+  return {t:T,h:H,l:L,c:C};
+}
+
+/* ── 상태 판정 ─────────────────────────────────── */
+function lastVal(a){for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null;}
+function rising(a,back){           // 지금이 back봉 전보다 높은가
+  const n=a.length; if(n<back+1) return 0;
+  const now=a[n-1], pre=a[n-1-back];
+  if(now==null||pre==null) return 0;
+  return now>pre?1:(now<pre?-1:0);
+}
+function rowState(K){              // K = {k5:{k,d}, k10:{...}, k20:{...}}
+  const ks=[K.k5.k,K.k10.k,K.k20.k];
+  const v=ks.map(lastVal);
+  if(v.some(x=>x==null)) return {s:0,v,up:0,dn:0,lack:true};
+  const lo=v.every(x=>x<=CUT), hi=v.every(x=>x>=100-CUT);
+  const dir=ks.map(a=>rising(a,TRN));
+  const up=dir.filter(x=>x>0).length, dn=dir.filter(x=>x<0).length;
+  let s=0;
+  if(lo) s=2; else if(hi) s=-2;
+  else if(up>=2) s=1; else if(dn>=2) s=-1;
+  return {s,v,up,dn,dir};
+}
+/* 바닥 다지기 = 최근 N봉에서 막내 %K가 컷 아래로 새로 내려간 횟수 */
+function baseCount(a,win){
+  const n=a.length,st=Math.max(1,n-win);let c=0;
+  for(let i=st;i<n;i++){ if(a[i]!=null&&a[i-1]!=null&&a[i]<=CUT&&a[i-1]>CUT) c++; }
+  return c;
+}
+/* 이평 배열 */
+function maState(c){
+  const n=c.length;
+  const m=[5,10,20,60].map(p=>{ if(n<p) return null;
+    let s=0; for(let i=n-p;i<n;i++) s+=c[i]; return s/p; });
+  const [m5,m10,m20,m60]=m;
+  if(m20==null||m60==null) return {a:0,cv:false};
+  const px=c[n-1];
+  let a=0;
+  if(px>m20&&m20>m60) a=1; else if(px<m20&&m20<m60) a=-1;
+  const vals=m.filter(x=>x!=null);
+  const cv=(Math.max(...vals)-Math.min(...vals))/px < 0.004;
+  return {a,cv};
+}
+
+/* ── 로드 ──────────────────────────────────────── */
+async function loadOne(code){
+  const [mn,dl]=await Promise.all([
+    fetch(`../stoch/min/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null),
+    fetch(`../stoch/data/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null)
+  ]);
+  const rows=[];
+  if(mn&&mn.sig){
+    for(const tf of MIN){
+      const s=mn.sig[tf]; if(!s) continue;
+      rows.push({tf,label:LBL[tf],
+        K:{k5:{k:s.k5k,d:s.k5d},k10:{k:s.k10k,d:s.k10d},k20:{k:s.k20k,d:s.k20d}},
+        c:s.c, t:s.t[s.t.length-1]});
+    }
+  }
+  if(dl&&dl.close){
+    const d={t:dl.dates,h:dl.high,l:dl.low,c:dl.close};
+    for(const md of ['D','W','M']){
+      const g = md==='D'? d : regroup(dl.dates,dl.high,dl.low,dl.close,md);
+      rows.push({tf:md,label:LBL[md],K:trio(g.h,g.l,g.c),c:g.c,t:g.t[g.t.length-1]});
+    }
+  }
+  return {mn,dl,rows};
+}
+
+/* ── 그리기 ────────────────────────────────────── */
+const SNAME={2:'적극매수',1:'상승추세',0:'중립','-1':'하락추세','-2':'적극매도'};
+const SCLS={2:'s2',1:'s1',0:'s0','-1':'sm1','-2':'sm2'};
+function fmtK(x){return x==null?'-':Math.round(x);}
+function fmtT(t){
+  if(t==null) return '-';
+  if(typeof t==='number'){
+    const d=new Date(t*1000);
+    const p=n=>String(n).padStart(2,'0');
+    return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  return String(t).replace('T',' ').slice(0,16);
+}
+function kcell(k,d){
+  const cls = k==null?'':(k<=CUT?'lo':(k>=100-CUT?'hi':''));
+  return `<span class="${cls}">${fmtK(k)}</span><span class="sub">/${fmtK(d)}</span>`;
+}
+
+function render(data){
+  const out=document.getElementById('out');
+  if(!data.rows.length){
+    out.innerHTML=`<div class="err">이 종목의 분봉·일봉 데이터가 아직 없습니다.
+      <code>stoch/watchlist.json</code>에 있는 종목만 분봉이 수집됩니다.</div>`;
+    return;
+  }
+  const st={}; data.rows.forEach(r=>{st[r.tf]=rowState(r.K)});
+
+  // 분봉 평균
+  const mrows=data.rows.filter(r=>MIN.includes(r.tf));
+  const mok = mrows.filter(r=>!st[r.tf].lack);
+  const mavg = mok.length? mok.reduce((a,r)=>a+st[r.tf].s,0)/mok.length : null;
+  const avgS = mavg==null?0:(mavg>=1.5?2:mavg>=0.5?1:mavg<=-1.5?-2:mavg<=-0.5?-1:0);
+
+  // 수퍼 판정
+  const sup = SUPER.every(tf=>st[tf]&&st[tf].s===2);
+  const supSell = SUPER.every(tf=>st[tf]&&st[tf].s===-2);
+  const SV=Object.values(st).filter(x=>!x.lack);
+  const nBuy=SV.filter(x=>x.s>0).length;
+  const nStrong=SV.filter(x=>x.s===2).length;
+  const nSell=SV.filter(x=>x.s<0).length;
+  const nStrongSell=SV.filter(x=>x.s===-2).length;
+  const total=SV.length;
+
+  let vcls='',vtxt,vsub;
+  if(sup){vcls='buy';vtxt='★ 수퍼매수 타이밍';vsub='5분·60분·240분봉이 동시에 적극매수입니다.';}
+  else if(supSell){vcls='sell';vtxt='★ 수퍼매도 타이밍';vsub='5분·60분·240분봉이 동시에 적극매도입니다.';}
+  else if(nStrong>=3){vcls='buy';vtxt='적극매수 우세';vsub=`${total}칸 중 ${nStrong}칸이 적극매수입니다.`;}
+  else if(nStrongSell>=3){vcls='sell';vtxt='적극매도 우세';vsub=`${total}칸 중 ${nStrongSell}칸이 적극매도입니다.`;}
+  else if(nBuy>nSell){vcls='buy';vtxt='매수 우위';vsub='적극매수 칸은 적습니다. 상승추세 위주입니다.';}
+  else if(nSell>nBuy){vcls='sell';vtxt='매도 우위';vsub='적극매도 칸은 적습니다. 하락추세 위주입니다.';}
+  else {vtxt='중립';vsub='어느 쪽으로도 기울지 않았습니다.';}
+
+  const px=data.rows[0].c[data.rows[0].c.length-1];
+  const upd=data.mn?data.mn.updated:'';
+
+  const line=(r,extra='')=>{
+    const s=st[r.tf];
+    const ma=maState(r.c);
+    const bc=baseCount(r.K.k5.k,60);
+    return `<tr class="${extra}">
+      <td>${r.label}</td>
+      <td class="state ${SCLS[s.s]}">${s.lack?'<span class="sub">데이터 부족</span>':SNAME[s.s]}</td>
+      <td class="k">${kcell(r.K.k5.k[r.K.k5.k.length-1],r.K.k5.d[r.K.k5.d.length-1])}</td>
+      <td class="k">${kcell(r.K.k10.k[r.K.k10.k.length-1],r.K.k10.d[r.K.k10.d.length-1])}</td>
+      <td class="k">${kcell(r.K.k20.k[r.K.k20.k.length-1],r.K.k20.d[r.K.k20.d.length-1])}</td>
+      <td>${ma.a===1?'<span class="lo">정배열</span>':ma.a===-1?'<span class="hi">역배열</span>':'<span class="sub">—</span>'}${ma.cv?'<span class="tag">수렴중</span>':''}</td>
+      <td class="k">${bc}</td>
+      <td class="sub" style="font-size:11px">${fmtT(r.t)}</td>
+    </tr>`;
+  };
+
+  const minHtml=mrows.map(r=>line(r)).join('');
+  const avgHtml=`<tr class="avg"><td>분봉 평균</td>
+    <td class="state ${SCLS[avgS]}">${SNAME[avgS]}</td>
+    <td colspan="6" class="sub" style="text-align:left">위 7개 분봉의 평균 (${mavg==null?'-':mavg.toFixed(2)})</td></tr>`;
+  const dayHtml=data.rows.filter(r=>['D','W','M'].includes(r.tf)).map((r,i)=>line(r,i===0?'sep':'')).join('');
+
+  out.innerHTML=`
+  <div class="verdict ${vcls}">
+    <div class="big">${vtxt}</div>
+    <div class="meta">${data.dl?data.dl.name:CODE} ${CODE} · ${px!=null?(+px).toLocaleString():'-'} ·
+      ${total}칸 중 <b>매수 ${nBuy}</b>(적극 ${nStrong}) / <b>매도 ${nSell}</b>(적극 ${nStrongSell}) · ${vsub}</div>
+  </div>
+  <table>
+    <thead><tr><th>봉</th><th style="text-align:center">상태</th><th>막내 %K/%D</th><th>둘째</th><th>큰형</th>
+      <th style="text-align:left">이평 20·60</th><th>바닥다지기</th><th style="text-align:left">최근봉</th></tr></thead>
+    <tbody>${minHtml}${avgHtml}${dayHtml}</tbody>
+  </table>`;
+
+  document.getElementById('foot').innerHTML=`
+    <b>적극매수</b> = 막내·둘째·큰형 %K가 모두 ${CUT} 이하 · <b>적극매도</b> = 모두 ${100-CUT} 이상.
+    <b>상승추세</b> = 셋 중 둘 이상의 %K가 ${TRN}봉 전보다 높음. 하락추세는 반대.
+    적극과 추세는 섞지 않고 개수도 따로 셉니다.<br>
+    <b>★ 수퍼매수</b> = 5분·60분·240분봉이 동시에 적극매수. 간격을 크게 벌린 셋이라 서로 다른 시간대를 확인합니다
+    (240분=며칠 단위 판 / 60분=당일 흐름 / 5분=진입).<br>
+    <b>바닥다지기</b> = 최근 60봉에서 막내 %K가 ${CUT} 아래로 새로 내려간 횟수. 많이 다질수록 상승 확률이 올라갑니다.
+    다만 그동안 가격이 저점을 낮추지 않았어야 응축이고, 계속 신저가면 그냥 하락입니다.<br>
+    <b>이평</b> — 정배열(종가&gt;20&gt;60)이면 신뢰도가 올라가고 역배열이면 내려갑니다. 수렴은 방향을 알 수 없으므로 표시만 합니다.<br>
+    ⚠ 야후 분봉은 <b>09:00~14:55</b>까지만 제공되어 장 마감 35분이 빠집니다.
+    1분봉은 8일치부터 시작해 매일 쌓입니다. 갱신 ${upd?upd.replace('T',' ').slice(0,16)+' UTC':'-'}.<br>
+    ⚠ 월봉 큰형(20,12)은 일봉 500봉(약 24개월)으로는 계산에 필요한 기간이 모자라 «데이터 부족»으로 나옵니다.<br>
+    ⚠ 아직 백테스트로 검증하지 않은 화면입니다. 컷·추세봉수는 위에서 바꿔가며 확인하십시오.`;
+}
+
+async function go(){
+  const out=document.getElementById('out');
+  out.innerHTML='<p class="sub">불러오는 중…</p>';
+  try{ render(await loadOne(CODE)); }
+  catch(e){ out.innerHTML=`<div class="err">오류: ${e.message}</div>`; }
+}
+
+(async function(){
+  try{
+    const idx=await fetch('../stoch/data/index.json').then(r=>r.json());
+    (idx.tickers||[]).forEach(t=>NAMES[t.code]=t.name);
+  }catch(e){}
+  try{ WL=await fetch('../stoch/watchlist.json').then(r=>r.json()); }catch(e){ WL=[]; }
+  const sel=document.getElementById('sel');
+  sel.innerHTML=WL.map(c=>`<option value="${c}">${NAMES[c]||c} (${c})</option>`).join('');
+  const q=new URLSearchParams(location.search).get('code');
+  CODE=(q&&WL.includes(q))?q:(WL[0]||'005930');
+  sel.value=CODE;
+  sel.onchange=()=>{CODE=sel.value;go();};
+  document.getElementById('cut').onchange=e=>{CUT=+e.target.value;go();};
+  document.getElementById('tr').onchange=e=>{TRN=+e.target.value;go();};
+  go();
+})();
+</script>
+</body>
+</html>
