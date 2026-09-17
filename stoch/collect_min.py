@@ -36,7 +36,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "min")
 RAW = os.path.join(OUT, "raw")
 SIG_BARS = 300          # 화면용으로 남길 봉 수 (백테스트는 raw에서 재계산)
-ACC = ("1m", "5m", "30m")   # 누적 대상. 60m은 야후가 3년을 주므로 매번 새로 받는다
+# 누적 대상. 60m도 저장한다 — 야후가 3년을 주긴 하지만, 검증(백테스트)이
+# 매번 야후를 다시 부르지 않고 저장소만 읽고 끝내도록 하기 위해서다.
+ACC = ("1m", "5m", "30m", "60m")
 
 # 야후에서 직접 받는 시간축: (라벨, interval, period)
 FETCH = [("1m", "1m", "8d"), ("5m", "5m", "60d"), ("30m", "30m", "60d"), ("60m", "60m", "730d")]
