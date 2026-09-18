@@ -736,6 +736,7 @@ function scell(a){
 function setAgg(r60,r240){
   const cy=setCycles(r60,r240),C=r60.c;
   const R={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],
+           combo:[],missCut:[],missHold:[],
            miss:0,n:cy.length,g:{lo:[],mid:[],hi:[],na:[]}};
   for(const c of cy){
     // ① 전체 사이클 — 무산 포함
@@ -747,18 +748,20 @@ function setAgg(r60,r240){
       R.cut.push(ct);
       const g=c.g;
       (g==null?R.g.na:(g<30?R.g.lo:(g>70?R.g.hi:R.g.mid))).push(ct);}
-    if(c.i80==null)R.miss++;
+    if(c.i80==null){R.miss++;const mc=pct(C,c.lim,c.ep);if(mc!=null)R.missCut.push(mc);if(hd!=null)R.missHold.push(hd);}
+    // 결론용 — 8.0에 닿으면 그 봉에서 팔고, 못 가면 다음 2.0↓에서 손절
     // ② 80에 닿은 사이클만 — 청산 규칙 비교용
     const d=pct(C,c.dead,c.ep); if(d!=null)R.dead.push(d);
     const o=pct(C,c.iout,c.ep); if(o!=null)R.out80.push(o);
     const b=pct(C,c.ibend,c.ep); if(b!=null)R.bend.push(b);
     const h=pct(C,c.i80,c.ep); if(h!=null)R.hit80.push(h);
+    const cb=pct(C,c.i80!=null?c.i80:c.lim,c.ep); if(cb!=null)R.combo.push(cb);
     if(c.peak>-Infinity&&c.dead!=null)R.peak.push((c.peak-c.ep)/c.ep*100);
     if(c.low<Infinity)R.dd.push((c.low-c.ep)/c.ep*100);}
   return {cy,R};}
 
 function setTables(list){   // list: [{code,r60,r240}]
-  const M={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[]},
+  const M={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],combo:[],missCut:[],missHold:[]},
         G={lo:[],mid:[],hi:[]}, per=[]; let miss=0,tot=0;
   for(const x of list){
     const {R}=setAgg(x.r60,x.r240);
@@ -769,7 +772,22 @@ function setTables(list){   // list: [{code,r60,r240}]
     if(st)per.push({code:x.code,st});}
   per.sort((a,b)=>b.st.avg-a.st.avg);
   const row=(nm,a,note)=>`<tr><td><b>${nm}</b></td>${scell(a)}<td class="num small">${a?((a.worst>0?'+':'')+a.worst.toFixed(1)+'%'):'-'}</td><td class="small">${note||''}</td></tr>`;
-  let html=`<h2>전체 사이클 — 무산 포함</h2>
+  // ── 결론 — 「2.0에서 사서 8.0에 갔을 때」 (2026-09-19 대표 「결국 알고 싶은 건 2에서 8로 갔을 때의 승률과 수익률」)
+  const H=stat(M.hit80),MC=stat(M.missCut),MH=stat(M.missHold),CB=stat(M.combo),HD=stat(M.hold),CU=stat(M.cut);
+  const pc=x=>x==null?'-':((x>0?'+':'')+x.toFixed(2)+'%');
+  let html=`<div class="verdict buy" style="margin-bottom:10px"><div class="big" style="font-size:18px">2.0에서 사서 8.0에 갔을 때</div>
+    <div class="meta" style="line-height:1.7">60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 올라선 봉에 산 것이 ${tot}번</b>입니다.<br>
+    그중 <b>큰형이 8.0에 닿은 것이 ${tot-miss}번(${tot?((tot-miss)/tot*100).toFixed(0):0}%)</b> — 8.0에 닿은 봉에서 바로 팔면 <b>${H?H.win.toFixed(0)+'% 이기고 평균 '+pc(H.avg):'-'}</b>(최악 ${H?pc(H.worst):'-'}).<br>
+    <b>8.0에 못 가고 다시 2.0 아래로 무너진 것이 ${miss}번(${tot?(miss/tot*100).toFixed(0):0}%)</b> — 그 자리(다음 2.0↓)에서 손절하면 평균 <b>${MC?pc(MC.avg):'-'}</b>, 안 팔고 다음 데드크로스까지 들고 있으면 평균 <b>${MH?pc(MH.avg):'-'}</b>(${MH?MH.n:0}건).<br>
+    <b>둘을 합치면</b> — 8.0에 닿으면 팔고 못 가면 손절하는 방식이 <b>${CB?CB.win.toFixed(0)+'% · 평균 '+pc(CB.avg):'-'}</b>, 8.0 위 데드크로스에서 팔고 못 가도 끝까지 드는 방식이 <b>${HD?HD.win.toFixed(0)+'% · 평균 '+pc(HD.avg):'-'}</b>.</div></div>
+    <table><thead><tr><th>파는 방식</th><th>건수</th><th>승률</th><th>평균</th><th>최악</th><th style="text-align:left">뜻</th></tr></thead><tbody>
+    <tr><td><b>8.0 닿으면 즉시 (닿은 것만)</b></td><td class="num">${H?H.n:'-'}</td><td class="num">${H?H.win.toFixed(0)+'%':'-'}</td><td class="num ${H&&H.avg>0?'pos':'neg'}">${H?pc(H.avg):'-'}</td><td class="num small">${H?pc(H.worst):'-'}</td><td class="small">2.0→8.0 그대로 간 사이클만</td></tr>
+    <tr><td><b>못 간 것을 손절 (무산만)</b></td><td class="num">${MC?MC.n:'-'}</td><td class="num">${MC?MC.win.toFixed(0)+'%':'-'}</td><td class="num ${MC&&MC.avg>0?'pos':'neg'}">${MC?pc(MC.avg):'-'}</td><td class="num small">${MC?pc(MC.worst):'-'}</td><td class="small">다음 2.0↓ 봉에서 정리</td></tr>
+    <tr class="avg"><td><b>합쳐서 — 닿으면 팔고 못 가면 손절</b></td><td class="num">${CB?CB.n:'-'}</td><td class="num">${CB?CB.win.toFixed(0)+'%':'-'}</td><td class="num ${CB&&CB.avg>0?'pos':'neg'}">${CB?pc(CB.avg):'-'}</td><td class="num small">${CB?pc(CB.worst):'-'}</td><td class="small">이 매매법을 기계적으로 했을 때</td></tr>
+    <tr class="avg"><td><b>합쳐서 — 데드크로스에 팔고 못 가도 끝까지 보유</b></td><td class="num">${HD?HD.n:'-'}</td><td class="num">${HD?HD.win.toFixed(0)+'%':'-'}</td><td class="num ${HD&&HD.avg>0?'pos':'neg'}">${HD?pc(HD.avg):'-'}</td><td class="num small">${HD?pc(HD.worst):'-'}</td><td class="small">8.0 위 %K가 %D를 꺾을 때 판다 · 지금 세팅 기본값</td></tr>
+    </tbody></table>
+    <h2 style="margin-top:22px">상세</h2>`
+   +`<h2>전체 사이클 — 무산 포함</h2>
     <table><thead><tr><th>무산 처리 방식</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">뜻</th></tr></thead><tbody>
     ${row('끝까지 보유',stat(M.hold),'8.0에 못 닿아도 데드크로스가 올 때까지 기다린다')}
     ${row('다음 2.0↓에서 손절',stat(M.cut),'무산되면 다음 사이클 진입 시점에 정리한다')}
