@@ -690,7 +690,19 @@ function g240At(r240,ts){
   while(lo<=hi){const m=(lo+hi)>>1;if(T[m]<=ts){idx=m;lo=m+1;}else hi=m-1;}
   return idx<0?null:K[idx];}
 
-function setCycles(r60,r240){
+// 5분 분할매수 평균가 — 60분 큰형 2.0↓ 구간(사이클 시작 봉 ~ 진입 봉 직전) 동안 5분봉의 막내·둘째·큰형이 각각
+// FLOOR 이하에서 바닥을 찍을 때마다 한 몫씩 산 것으로 보고, 바닥이 확인되는 다음 5분 봉 종가를 몫 가격으로 평균한다.
+// 2026-09-19 대표 「60분 큰형 2 이하 바닥일 때 5분봉을 보고 분할매수 — 그 평균가로 검증」. 5분 자료가 없는 옛 사이클은 몫 0.
+function splitAvg(r5,t0,t1){
+  if(!r5)return {n:0,avg:null};
+  const ts=r5.ts,c=r5.c,K=[r5.K.k5.k,r5.K.k10.k,r5.K.k20.k];
+  let lo=0,hi=ts.length-1,i0=-1;while(lo<=hi){const m=(lo+hi)>>1;if(ts[m]>=t0){i0=m;hi=m-1;}else lo=m+1;}
+  if(i0<0)return {n:0,avg:null};
+  const px=[];
+  for(let i=Math.max(1,i0);i<ts.length-1&&ts[i]<t1;i++){
+    for(const x of K){if(x[i]!=null&&x[i-1]!=null&&x[i+1]!=null&&x[i]<=x[i-1]&&x[i+1]>x[i]&&x[i]<=BUYP.FLOOR)px.push(c[i+1]);}}
+  return {n:px.length,avg:px.length?px.reduce((a,b)=>a+b,0)/px.length:null};}
+function setCycles(r60,r240,r5){
   const K=r60.K.k20.k,D=r60.K.k20.d,C=r60.c,N=K.length,out=[];
   let i=1;
   while(i<N){
@@ -718,7 +730,8 @@ function setCycles(r60,r240){
     for(let k=(i80==null?e:i80);k<N;k++){
       if(K[k]==null||D[k]==null||K[k-1]==null||D[k-1]==null)continue;
       if(K[k]<D[k]&&K[k-1]>=D[k-1]&&K[k-1]>=80){held=k;break;}}
-    out.push({s,e,i80,dead,iout,ibend,lim,held,ep:C[e],low,peak,g:g240At(r240,r60.ts[e])});
+    const sp=splitAvg(r5,r60.ts[s],r60.ts[e]);
+    out.push({s,e,i80,dead,iout,ibend,lim,held,ep:C[e],low,peak,g:g240At(r240,r60.ts[e]),spN:sp.n,spAvg:sp.avg});
     i=Math.max(e+1,lim);}
   return out;}
 
@@ -733,10 +746,11 @@ function scell(a){
         +`<td class="num ${a.avg>0?'pos':'neg'}">${a.avg>0?'+':''}${a.avg.toFixed(2)}%</td>`;}
 
 // 한 종목의 사이클을 규칙별·240분 수준별로 집계
-function setAgg(r60,r240){
-  const cy=setCycles(r60,r240),C=r60.c;
+function setAgg(r60,r240,r5){
+  const cy=setCycles(r60,r240,r5),C=r60.c;
   const R={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],
            combo:[],missCut:[],missHold:[],
+           sp:{n:0,cnt:[],hit80:[],combo:[],hold:[],missCut:[]},   // 5분 분할매수 평균가 기준(몫이 있는 사이클만)
            miss:0,n:cy.length,g:{lo:[],mid:[],hi:[],na:[]}};
   for(const c of cy){
     // ① 전체 사이클 — 무산 포함
@@ -756,16 +770,23 @@ function setAgg(r60,r240){
     const b=pct(C,c.ibend,c.ep); if(b!=null)R.bend.push(b);
     const h=pct(C,c.i80,c.ep); if(h!=null)R.hit80.push(h);
     const cb=pct(C,c.i80!=null?c.i80:c.lim,c.ep); if(cb!=null)R.combo.push(cb);
+    if(c.spN>0&&c.spAvg){const ap=c.spAvg;R.sp.n++;R.sp.cnt.push(c.spN);
+      const q=i=>i==null?null:(C[i]-ap)/ap*100;
+      const h2=q(c.i80);if(h2!=null)R.sp.hit80.push(h2);
+      const cb2=q(c.i80!=null?c.i80:c.lim);if(cb2!=null)R.sp.combo.push(cb2);
+      const hd2=q(c.held);if(hd2!=null)R.sp.hold.push(hd2);
+      if(c.i80==null){const m2=q(c.lim);if(m2!=null)R.sp.missCut.push(m2);}}
     if(c.peak>-Infinity&&c.dead!=null)R.peak.push((c.peak-c.ep)/c.ep*100);
     if(c.low<Infinity)R.dd.push((c.low-c.ep)/c.ep*100);}
   return {cy,R};}
 
 function setTables(list){   // list: [{code,r60,r240}]
-  const M={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],combo:[],missCut:[],missHold:[]},
+  const M={hold:[],cut:[],dead:[],out80:[],bend:[],hit80:[],peak:[],dd:[],combo:[],missCut:[],missHold:[]},SP={n:0,cnt:[],hit80:[],combo:[],hold:[],missCut:[]},
         G={lo:[],mid:[],hi:[]}, per=[]; let miss=0,tot=0;
   for(const x of list){
-    const {R}=setAgg(x.r60,x.r240);
+    const {R}=setAgg(x.r60,x.r240,x.r5);
     for(const k in M)M[k]=M[k].concat(R[k]);
+    SP.n+=R.sp.n;for(const k of ['cnt','hit80','combo','hold','missCut'])SP[k]=SP[k].concat(R.sp[k]);
     for(const k of ['lo','mid','hi'])G[k]=G[k].concat(R.g[k]);
     miss+=R.miss; tot+=R.n;
     const st=stat(R.hold);
@@ -786,6 +807,13 @@ function setTables(list){   // list: [{code,r60,r240}]
     <tr class="avg"><td><b>합쳐서 — 닿으면 팔고 못 가면 손절</b></td><td class="num">${CB?CB.n:'-'}</td><td class="num">${CB?CB.win.toFixed(0)+'%':'-'}</td><td class="num ${CB&&CB.avg>0?'pos':'neg'}">${CB?pc(CB.avg):'-'}</td><td class="num small">${CB?pc(CB.worst):'-'}</td><td class="small">이 매매법을 기계적으로 했을 때</td></tr>
     <tr class="avg"><td><b>합쳐서 — 데드크로스에 팔고 못 가도 끝까지 보유</b></td><td class="num">${HD?HD.n:'-'}</td><td class="num">${HD?HD.win.toFixed(0)+'%':'-'}</td><td class="num ${HD&&HD.avg>0?'pos':'neg'}">${HD?pc(HD.avg):'-'}</td><td class="num small">${HD?pc(HD.worst):'-'}</td><td class="small">8.0 위 %K가 %D를 꺾을 때 판다 · 지금 세팅 기본값</td></tr>
     </tbody></table>
+    ${(()=>{const SH=stat(SP.hit80),SC=stat(SP.combo),SD=stat(SP.hold),SM=stat(SP.missCut);const avgCnt=SP.cnt.length?(SP.cnt.reduce((a,b)=>a+b,0)/SP.cnt.length).toFixed(1):'-';
+      if(!SP.n)return `<p class="note" style="margin-top:8px">5분 분할매수 평균가 기준 — 5분봉 자료(약 60거래일)에 걸리는 사이클이 없어 계산할 수 없습니다.</p>`;
+      return `<div class="verdict" style="margin-top:10px"><div class="big" style="font-size:16px">같은 사이클을 5분 분할매수 평균가로 샀다면</div>
+      <div class="meta" style="line-height:1.7">60분 큰형이 2.0 아래에 있는 동안 5분봉의 막내·둘째·큰형이 각각 2.0 이하에서 바닥을 찍을 때마다 한 몫씩 산 것으로 보고, 그 몫들의 평균가를 진입가로 잡았습니다.
+      5분봉 자료가 있는 최근 약 60거래일의 사이클 <b>${SP.n}번</b>(한 사이클 평균 <b>${avgCnt}몫</b>)만 계산됩니다.<br>
+      8.0에 닿은 봉에서 바로 팔면 <b>${SH?SH.win.toFixed(0)+'% · 평균 '+pc(SH.avg):'-'}</b>${SH?' ('+SH.n+'건)':''} · 못 간 것을 손절하면 평균 <b>${SM?pc(SM.avg):'-'}</b>${SM?' ('+SM.n+'건)':''} ·
+      합쳐서 닿으면 팔고 못 가면 손절 <b>${SC?SC.win.toFixed(0)+'% · '+pc(SC.avg):'-'}</b> · 데드크로스에 팔고 끝까지 보유 <b>${SD?SD.win.toFixed(0)+'% · '+pc(SD.avg):'-'}</b>.</div></div>`;})()}
     <h2 style="margin-top:22px">상세</h2>`
    +`<h2>전체 사이클 — 무산 포함</h2>
     <table><thead><tr><th>무산 처리 방식</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">뜻</th></tr></thead><tbody>
@@ -818,8 +846,8 @@ function setTables(list){   // list: [{code,r60,r240}]
     html+='</tbody></table>';}
   return html;}
 
-function setCycleTable(r60,r240){
-  const {cy}=setAgg(r60,r240), C=r60.c;
+function setCycleTable(r60,r240,r5){
+  const {cy}=setAgg(r60,r240,r5), C=r60.c;
   const last=cy.slice(-14).reverse();
   let b='';
   for(const c of last){
@@ -828,13 +856,14 @@ function setCycleTable(r60,r240){
     const gt=g==null?'-':(g<30?`<span class="neg">${S10(g)}</span>`:(g>70?`<span class="small">${S10(g)}</span>`:`<span class="pos">${S10(g)}</span>`));
     b+=`<tr><td class="small">${fmtT(r60.ts[c.s])}</td><td class="small">${fmtT(r60.ts[c.e])}</td>
       <td class="num">${(+c.ep).toLocaleString()}</td>
+      <td class="num small">${c.spN?c.spN+'몫 · '+Math.round(c.spAvg).toLocaleString():'<span class="small">5분 없음</span>'}</td>
       <td class="num small">${((c.low-c.ep)/c.ep*100).toFixed(1)}%</td>
       <td class="num">${gt}</td>
       <td class="small">${c.dead==null?(c.i80==null?'<span class="neg">무산</span>':'8.0 도달·청산 전'):fmtT(r60.ts[c.dead])}</td>
       <td class="num ${d==null?'small':(d>0?'pos':'neg')}">${d==null?'-':((d>0?'+':'')+d.toFixed(2)+'%')}</td>
       <td class="num small">+${((c.peak-c.ep)/c.ep*100).toFixed(1)}%</td></tr>`;}
   return `<h2>최근 사이클 ${last.length}건</h2>
-    <table><thead><tr><th>2.0↓ 시작</th><th>진입(2.0↑)</th><th>진입가</th><th>진입전 최저</th>
+    <table><thead><tr><th>2.0↓ 시작</th><th>진입(2.0↑)</th><th>진입가</th><th>5분 분할·평균가</th><th>진입전 최저</th>
       <th>240분</th><th style="text-align:left">청산(데드크로스)</th><th>수익률</th><th>구간최고</th></tr></thead>
     <tbody>${b}</tbody></table>`;}
 
@@ -942,7 +971,7 @@ async function renderC(){
       el.innerHTML=bar+'<p class="sub">관심종목 누적 원본을 모으는 중… <span id="cp">0</span></p>';wire();
       const pe=document.getElementById('cp');
       VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
-    const LS=VALL.map(t=>({code:t.code,r60:t.rows.find(r=>r.tf==='60m'),r240:t.rows.find(r=>r.tf==='240m')})).filter(x=>x.r60);
+    const LS=VALL.map(t=>({code:t.code,r60:t.rows.find(r=>r.tf==='60m'),r240:t.rows.find(r=>r.tf==='240m'),r5:t.rows.find(r=>r.tf==='5m')})).filter(x=>x.r60);
     el.innerHTML=bar+`<h2 style="margin-top:6px">60분봉매매법 검증 · ${LS.length}종목 합산</h2>`+rule+setTables(LS);
     wire();return;}
   if(VROWS===null){
@@ -951,10 +980,10 @@ async function renderC(){
     const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
     const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
     VROWS={rows:mins.concat(dwm),raw:!!raw};}
-  const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m');
+  const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m'), r5=VROWS.rows.find(r=>r.tf==='5m');
   el.innerHTML=bar+(r60
     ? `<h2 style="margin-top:6px">60분봉매매법 검증 · ${NAMES[CODE]||CODE}</h2>`+rule.replace('수수료·세금 없음.',`60분봉 ${r60.c.length}봉 구간. 수수료·세금 없음.`)
-      +setTables([{code:CODE,r60,r240}])+setCycleTable(r60,r240)
+      +setTables([{code:CODE,r60,r240,r5}])+setCycleTable(r60,r240,r5)
     : '<div class="err">이 종목은 60분봉이 없어 검증을 할 수 없습니다.</div>');
   wire();}
 

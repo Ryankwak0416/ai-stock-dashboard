@@ -284,7 +284,27 @@ def g240_at(r240, ts):
     return r240["k20"][best]
 
 
-def cycles(r60, r240):
+def split_avg(r5, t0, t1, P=BUYP):
+    """5분 분할매수 평균가 — 페이지 splitAvg 와 같다. [t0,t1) 동안 5분 막내·둘째·큰형이 각각 FLOOR 이하 바닥을 찍을 때마다
+    다음 봉 종가를 한 몫으로 평균."""
+    if r5 is None:
+        return 0, None
+    ts, c = r5["t"], r5["c"]
+    K = (r5["k5"], r5["k10"], r5["k20"])
+    import bisect
+    i0 = bisect.bisect_left(ts, t0)
+    px = []
+    i = max(1, i0)
+    while i < len(ts) - 1 and ts[i] < t1:
+        for x in K:
+            if (x[i] is not None and x[i - 1] is not None and x[i + 1] is not None
+                    and x[i] <= x[i - 1] and x[i + 1] > x[i] and x[i] <= P["FLOOR"]):
+                px.append(c[i + 1])
+        i += 1
+    return len(px), (sum(px) / len(px) if px else None)
+
+
+def cycles(r60, r240, r5=None):
     K, D, C = r60["k20"], r60["d20"], r60["c"]
     N = len(K)
     out = []
@@ -336,9 +356,10 @@ def cycles(r60, r240):
         # 「사이클 최고가」는 데드크로스까지의 최고다 — 데드크로스 규칙의 상한선을 재는 것이므로
         # 사이클 끝까지의 최고(+21.5%)를 쓰면 도달 불가능한 값과 비교하게 된다.
         peak = max(C[e:(dead if dead is not None else lim) + 1])
+        sp_n, sp_avg = split_avg(r5, r60["t"][s], r60["t"][e])
         out.append(dict(s=s, e=e, i80=i80, dead=dead, iout=iout, ibend=ibend,
                         lim=lim, held=held, ep=C[e], low=low, peak=peak,
-                        g=g240_at(r240, r60["t"][e])))
+                        g=g240_at(r240, r60["t"][e]), sp_n=sp_n, sp_avg=sp_avg))
         i = max(e + 1, lim)
     return out
 
@@ -385,6 +406,8 @@ def main():
     per = {}
     n_cyc = n_miss = 0
     dd = Acc()
+    SP = {k: Acc() for k in ("hit80", "combo", "hold", "missCut")}   # 5분 분할매수 평균가 기준
+    sp_n = 0; sp_cnt = []
     used = []
     PT = {tf: [[], 0] for tf in TFS_ALL}     # 3형제 매수 규칙 — [짝 목록, 진행중 수]
     PR = [{tf: [[], 0] for tf in TFS_ALL} for _ in BUY_RULES]   # 규칙 하나씩
@@ -400,7 +423,8 @@ def main():
             continue
         r60 = series(raw["60m"])
         r240 = series(chunk_day(raw["60m"], 4))
-        cy = cycles(r60, r240)
+        r5 = series(raw["5m"]) if "5m" in raw and len(raw["5m"]["c"]) > 80 else None
+        cy = cycles(r60, r240, r5)
         if not cy:
             continue
         used.append(code)
@@ -440,6 +464,13 @@ def main():
             xc = pct(c["ep"], C[cut])
             R["cut"].add(xc)
 
+            # 5분 분할매수 평균가 기준 (몫이 있는 사이클만)
+            if c["sp_n"] and c["sp_avg"]:
+                ap = c["sp_avg"]; sp_n += 1; sp_cnt.append(c["sp_n"])
+                if c["i80"] is not None: SP["hit80"].add(pct(ap, C[c["i80"]]))
+                SP["combo"].add(pct(ap, C[c["i80"] if c["i80"] is not None else c["lim"]]))
+                if c["held"] is not None: SP["hold"].add(pct(ap, C[c["held"]]))
+                if c["i80"] is None: SP["missCut"].add(pct(ap, C[c["lim"]]))
             # 240분 수준별 (손절 방식)
             g = c["g"]
             key = "na" if g is None else ("lo" if g < 30 else ("hi" if g > 70 else "mid"))
@@ -487,6 +518,10 @@ def main():
     print("■ 240분 큰형 수준별 (손절 방식)")
     for k, nm in (("lo", "30 미만"), ("mid", "30~70"), ("hi", "70 초과"), ("na", "값 없음")):
         print(" ", G[k].row(nm))
+    print()
+    print(f"■ 5분 분할매수 평균가 기준 (5분 자료 있는 사이클 {sp_n}개 · 사이클당 평균 {sum(sp_cnt)/len(sp_cnt) if sp_cnt else 0:.1f}몫)")
+    for k, nm in (("hit80", "80 도달 즉시"), ("missCut", "무산→손절"), ("combo", "합쳐서(도달 즉시+손절)"), ("hold", "끝까지 보유")):
+        print(" ", SP[k].row(nm))
     print()
     print("■ 진입 전 최저 (20↓ 시작 → 진입까지)")
     print(" ", dd.row("구간최저"))
