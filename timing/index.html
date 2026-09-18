@@ -65,9 +65,10 @@ td.num{font-variant-numeric:tabular-nums}
 .tf{padding:6px 12px;border:1px solid #c9ced8;border-bottom:none;border-radius:9px 9px 0 0;
   background:#eef1f5;font-weight:700;font-size:12px;cursor:pointer;color:#475467;line-height:1.25;text-align:center}
 .tf.on{background:#fff;color:#1849a9;border-color:#1849a9}
+.cbox.drag{cursor:grabbing}
 .tf b{display:block;font-size:14px;margin-top:1px}
 #tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
-.cbox{position:relative;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
+.cbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
 .scrollrow input[type=range]{flex:1;accent-color:#1849a9}
 .info{font-size:12px;color:var(--sub);display:flex;justify-content:space-between;margin-top:4px}
@@ -119,6 +120,7 @@ td.num{font-variant-numeric:tabular-nums}
   <span><i style="background:#0ca678"></i>둘째 10·6·6</span>
   <span><i style="background:#7048e8;height:3px"></i>큰형 20·12·12</span>
   <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
+  <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
 
 <p class="note" id="foot"></p>
@@ -209,14 +211,15 @@ function fmtT(t){if(t==null)return '-';
 // 내놓고, 이 페이지는 그것을 «먼저» 찾아본다. 꺼져 있으면 저장소 파일로 그대로 돌아간다.
 // 공급기가 없다고 화면이 죽지 않는다 — 어제까지의 값으로 평소대로 보인다.
 const LIVE_URL='http://127.0.0.1:8787';
-let LIVE={on:false,last:null};
+const LIVE_VER_NEED=3;
+let LIVE={on:false,last:null,ver:0};
 async function loadMin(code){
   try{
     const r=await fetch(`${LIVE_URL}/min/${code}.json`,{signal:AbortSignal.timeout(8000)});
     if(r.ok){const j=await r.json();
-      if(j&&j.sig&&j.sig['60m']){LIVE={on:true,last:j.liveLast||null};return j;}}
+      if(j&&j.sig&&j.sig['60m']){LIVE={on:true,last:j.liveLast||null,ver:j.ver||1};return j;}}
   }catch(e){}
-  LIVE={on:false,last:null};
+  LIVE={on:false,last:null,ver:0};
   return fetch(`../stoch/min/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null);
 }
 
@@ -289,19 +292,38 @@ function render(){
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
    +'<span class="sub" id="spl" style="min-width:52px">'+(SPAN===0?'전체':SPAN+'봉')+'</span>'
+   +[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']]
+     .map(o=>`<button class="sm ${SPAN===o[0]?'on':''}" data-sp="${o[0]}">${o[1]}</button>`).join('')
    +'<span style="width:14px"></span><span class="sub">표시</span>'
    +[['px','가격','#111827'],['k5','막내 5·3·3','#e03131'],['k10','둘째 10·6·6','#2f9e44'],['k20','큰형 20·12·12','#1971c2']]
      .map(o=>`<button class="sm ${SHOW[o[0]]?'on':''}" data-sh="${o[0]}" style="border-color:${o[2]};${SHOW[o[0]]?'':'color:'+o[2]}">${o[1]}</button>`).join('');
   const spEl=document.getElementById('sp');
   spEl.oninput=e=>{SPAN=SPANOPT[+e.target.value];POS=1e9;render();};
-  document.querySelectorAll('[data-ctf]').forEach(b=>b.onclick=()=>{TF=b.dataset.ctf;POS=1e9;render();});
+  // 탭을 바꿔도 «보던 자리»를 유지한다. 봉 길이가 다르므로 위치를 비율로 옮긴다.
+  document.querySelectorAll('[data-ctf]').forEach(b=>b.onclick=()=>{
+    const rr=data.rows.find(x=>x.tf===TF),NN=rr.c.length;
+    const cur=(SPAN<=0||SPAN>=NN)?NN:SPAN;
+    const frac=(NN-cur)>0?POS/(NN-cur):1;
+    TF=b.dataset.ctf;
+    const r2=data.rows.find(x=>x.tf===TF),N2=r2.c.length;
+    const s2=(SPAN<=0||SPAN>=N2)?N2:SPAN;
+    POS=Math.max(0,Math.round((N2-s2)*frac));render();});
   document.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>{SHOW[b.dataset.sh]=!SHOW[b.dataset.sh];render();});
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{
+    const rr=data.rows.find(x=>x.tf===TF),NN=rr.c.length;
+    const cur=(SPAN<=0||SPAN>=NN)?NN:SPAN, ctr=POS+cur/2;
+    SPAN=+b.dataset.sp;
+    const ns=(SPAN<=0||SPAN>=NN)?NN:SPAN;
+    POS=Math.max(0,Math.min(NN-ns,Math.round(ctr-ns/2)));render();});
 
   const r=data.rows.find(x=>x.tf===TF),N=r.c.length;
   const span=(SPAN<=0||SPAN>=N)?N:SPAN;
   POS=Math.max(0,Math.min(POS,N-span));
   const a=POS,b=a+span-1;
   const sc=document.getElementById('sc');sc.max=Math.max(0,N-span);sc.value=POS;sc.disabled=(span>=N);
+  document.getElementById('d0').textContent=fmtT(r.ts[a]);
+  document.getElementById('d1').textContent=fmtT(r.ts[b]);
+  document.getElementById('mid').textContent=`${LBL[TF]} ${span}봉 / 전체 ${N}봉`;
 
   const BUY=[],SELL=[];
   for(let i=0;i<N;i++){const q=stateAt(r.K,i),p=i?stateAt(r.K,i-1):{s:0};
@@ -354,6 +376,38 @@ function render(){
       g.restore();});};
     mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'적극매수');
     mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1,'적극매도');}};
+
+  // 차트 위에서 휠 = 구간 폭 조정, Shift+휠 = 좌우 이동. 커서 자리를 기준으로 확대·축소한다.
+  const box=document.querySelector('.cbox');
+  if(!box.dataset.bound){
+    box.dataset.bound='1';
+    let dg=false,sx=0,sp=0;
+    box.addEventListener('pointerdown',e=>{dg=true;sx=e.clientX;sp=POS;box.classList.add('drag');
+      try{box.setPointerCapture(e.pointerId);}catch(_){}} );
+    box.addEventListener('pointermove',e=>{if(!dg)return;
+      const rr=DATA.rows.find(x=>x.tf===TF),NN=rr.c.length;
+      const cur=(SPAN<=0||SPAN>=NN)?NN:SPAN;
+      POS=Math.max(0,Math.min(NN-cur,sp-Math.round((e.clientX-sx)/(box.clientWidth||800)*cur)));
+      render();});
+    const up=()=>{dg=false;box.classList.remove('drag');};
+    box.addEventListener('pointerup',up); box.addEventListener('pointercancel',up);
+    box.addEventListener('wheel',(ev)=>{
+      ev.preventDefault();
+      const rr=DATA.rows.find(x=>x.tf===TF),NN=rr.c.length;
+      const cur=(SPAN<=0||SPAN>=NN)?NN:SPAN;
+      const rect=box.getBoundingClientRect();
+      const frac=Math.min(1,Math.max(0,(ev.clientX-rect.left)/rect.width));
+      if(ev.shiftKey){
+        POS=Math.max(0,Math.min(NN-cur,POS+Math.sign(ev.deltaY)*Math.max(1,Math.round(cur*0.12))));
+        render();return;}
+      // 스캐너와 같은 배율 — 넓힐 때 ×1.25, 좁힐 때 ×0.8, 최소 20봉
+      let ns=Math.round(ev.deltaY>0?cur*1.25:cur*0.8);
+      ns=Math.max(20,Math.min(ns,NN));
+      const anchor=POS+cur*frac;
+      SPAN=(ns>=NN)?0:ns;
+      POS=Math.max(0,Math.min(NN-ns,Math.round(anchor-ns*frac)));
+      render();},{passive:false});
+  }
 
   if(chart)chart.destroy();
   chart=new Chart(document.getElementById('cv'),{type:'line',data:{labels,datasets:ds},plugins:[tap],
@@ -950,8 +1004,10 @@ function liveBadge(){
   const el=document.getElementById('livebadge'); if(!el)return;
   const btn='padding:2px 8px;font-size:12px;margin-left:6px';
   if(LIVE.on){
+    const old=(LIVE.ver||0)<LIVE_VER_NEED
+      ?` <b style="color:#b42318">공급기 구버전(v${LIVE.ver||1}) — 파일을 덮어쓰고 [끄기]→[켜기]</b>`:'';
     el.innerHTML=`<b style="color:#2e7d32">● 실시간 ON</b>`
-      +` <span class="sub">오늘 ${LIVE.last||'-'} 봉까지</span>`
+      +` <span class="sub">오늘 ${LIVE.last||'-'} 봉까지</span>${old}`
       +`<button id="liveoff" style="${btn}">끄기</button>`;
     document.getElementById('liveoff').onclick=async()=>{
       try{await fetch(LIVE_URL+'/stop',{signal:AbortSignal.timeout(2000)});}catch(e){}
