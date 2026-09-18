@@ -42,7 +42,7 @@ tr.avg{border-top:2px solid #cbd2d9}
 .tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:#eef0f3;color:var(--sub);margin-left:3px}
 .tag.cv{background:#fef3c7;color:#92400e}
 .tag.hot{background:#eef0f3;color:#6b7280;font-size:12px;padding:1px 7px}
-.sbox{position:relative;height:210px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-bottom:4px}
+.sbox{position:relative;cursor:grab;touch-action:none;height:210px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-bottom:4px}
 .shead{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin:12px 0 3px}
 .shead b{font-size:14px}
 .gate{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
@@ -66,6 +66,7 @@ td.num{font-variant-numeric:tabular-nums}
   background:#eef1f5;font-weight:700;font-size:12px;cursor:pointer;color:#475467;line-height:1.25;text-align:center}
 .tf.on{background:#fff;color:#1849a9;border-color:#1849a9}
 .cbox.drag{cursor:grabbing}
+.sbox.drag{cursor:grabbing}
 .tf b{display:block;font-size:14px;margin-top:1px}
 #tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
 .cbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
@@ -809,6 +810,9 @@ const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 80 → 매도'],
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
 const SORD=[['60m','cvS6'],['5m','cvS5'],['240m','cvS4']];
 let SMUL=1;
+// 세팅 탭 차트도 스캐너처럼 끌어서 이동·휠로 확대축소한다 (260918 사장님 지시).
+// SBARS = 그 차트가 보여줄 봉수, SOFF = 오른쪽 끝에서 몇 봉 뒤로 물러났는지.
+let SBARS={}, SOFF={};
 
 function sSeries(tf){return SROWS?SROWS.find(r=>r.tf===tf):null;}
 
@@ -871,7 +875,12 @@ function gate240(r){
 }
 
 function drawSet(tf,cid,r,cy,sp5){
-  const N=r.c.length, span=Math.min(Math.round(SBASE[tf]*SMUL),N), a=N-span, b=N-1;
+  const N=r.c.length;
+  if(SBARS[tf]==null)SBARS[tf]=Math.round(SBASE[tf]*SMUL);
+  const span=Math.max(20,Math.min(SBARS[tf],N));
+  if(SOFF[tf]==null)SOFF[tf]=0;
+  SOFF[tf]=Math.max(0,Math.min(N-span,SOFF[tf]));
+  const b=N-1-SOFF[tf], a=b-span+1;
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
@@ -978,11 +987,34 @@ async function renderS(){
     ⚠ 5분 분할이 성적을 개선하는지는 아직 검증되지 않았습니다 — 5분봉 보유량이 60거래일뿐이어서
     검증 숫자는 전부 «60분 단일 진입» 기준입니다.
   </p>`;
-  el.querySelectorAll('[data-smul]').forEach(b=>b.onclick=()=>{SMUL=+b.dataset.smul;renderS();});
+  el.querySelectorAll('[data-smul]').forEach(b=>b.onclick=()=>{
+    SMUL=+b.dataset.smul; SBARS={}; SOFF={}; renderS();});
+  // 차트마다 끌어서 이동 · 휠로 확대축소 (스캐너와 같은 배율 ×1.25 / ×0.8, 최소 20봉)
+  el.querySelectorAll('.sbox[data-stf]').forEach(box=>{
+    const tf=box.dataset.stf;
+    let dg=false,sx=0,so=0;
+    const bars=()=>{const rr=sSeries(tf);return rr?rr.c.length:0;};
+    box.addEventListener('pointerdown',e=>{dg=true;sx=e.clientX;so=SOFF[tf]||0;box.classList.add('drag');
+      try{box.setPointerCapture(e.pointerId);}catch(_){}});
+    box.addEventListener('pointermove',e=>{if(!dg)return;
+      const N=bars(),span=Math.max(20,Math.min(SBARS[tf]||SBASE[tf],N));
+      SOFF[tf]=Math.max(0,Math.min(N-span,so-Math.round((e.clientX-sx)/(box.clientWidth||600)*span)*-1));
+      if(SREDRAW)SREDRAW(tf); else renderS();});
+    const up=()=>{dg=false;box.classList.remove('drag');};
+    box.addEventListener('pointerup',up); box.addEventListener('pointercancel',up);
+    box.addEventListener('wheel',e=>{e.preventDefault();
+      const N=bars(),cur=Math.max(20,Math.min(SBARS[tf]||SBASE[tf],N));
+      let ns=Math.round(e.deltaY>0?cur*1.25:cur*0.8);
+      ns=Math.max(20,Math.min(ns,N));
+      SBARS[tf]=ns; SOFF[tf]=Math.max(0,Math.min(N-ns,SOFF[tf]||0));
+      if(SREDRAW)SREDRAW(tf); else renderS();},{passive:false});});
   for(const [tf,cid] of SORD){
     const rr=sSeries(tf); if(!rr)continue;
     drawSet(tf,cid,rr,cy,sp5);}
+  SREDRAW=(tf)=>{const e=SORD.find(x=>x[0]===tf); if(!e)return;
+    const rr=sSeries(tf); if(!rr)return; drawSet(tf,e[1],rr,cy,sp5);};
 }
+let SREDRAW=null;
 function SSET_HTML(){
   return SORD.map(([tf,cid])=>{
     const rr=sSeries(tf);
@@ -993,7 +1025,7 @@ function SSET_HTML(){
     return `<div class="shead"><span><b>${LBL[tf]}봉</b> <span class="role">${role}</span> <span class="sub">${desc}</span></span>
       <span class="sub">막내 ${fk(rr.K.k5.k[rr.K.k5.k.length-1])} · 둘째 ${fk(rr.K.k10.k[rr.K.k10.k.length-1])} · 큰형 ${fk(rr.K.k20.k[rr.K.k20.k.length-1])}
       · ${st.lack?'-':SN[st.s]}</span></div>
-      <div class="sbox"><canvas id="${cid}"></canvas></div>`;}).join('');
+      <div class="sbox" data-stf="${tf}"><canvas id="${cid}"></canvas></div>`;}).join('');
 }
 
 // ───────── 실시간 공급기 스위치 ─────────
