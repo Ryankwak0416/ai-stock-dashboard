@@ -198,8 +198,26 @@ def sell_rule2(r, P=BUYP):
     return out
 
 
-BUY_RULES = [("①", buy_rule1), ("②", buy_rule2)]
-SELL_RULES = [("①", sell_rule1), ("②", sell_rule2)]
+def buy_rule3(r, P=BUYP):
+    """③ 막내·둘째가 WIN1봉 안에 FLOOR 이하였고, 큰형이 FLOOR 이하에서 내려가다 처음 위로 꺾이는 봉."""
+    a, b, g = r["k5"], r["k10"], r["k20"]
+    def rec(x, i):
+        return any(x[j] is not None and x[j] <= P["FLOOR"] for j in range(max(1, i - P["WIN1"]), i + 1))
+    return [i for i in range(2, len(a)) if None not in (g[i], g[i - 1], g[i - 2])
+            and g[i - 1] <= P["FLOOR"] and g[i - 1] <= g[i - 2] and g[i] > g[i - 1] and rec(a, i) and rec(b, i)]
+
+
+def sell_rule3(r, P=BUYP):
+    a, b, g = r["k5"], r["k10"], r["k20"]
+    TOP = 100 - P["FLOOR"]
+    def rec(x, i):
+        return any(x[j] is not None and x[j] >= TOP for j in range(max(1, i - P["WIN1"]), i + 1))
+    return [i for i in range(2, len(a)) if None not in (g[i], g[i - 1], g[i - 2])
+            and g[i - 1] >= TOP and g[i - 1] >= g[i - 2] and g[i] < g[i - 1] and rec(a, i) and rec(b, i)]
+
+
+BUY_RULES = [("①", buy_rule1), ("②", buy_rule2), ("③", buy_rule3)]
+SELL_RULES = [("①", sell_rule1), ("②", sell_rule2), ("③", sell_rule3)]
 
 
 def sig_union(rules, r):
@@ -439,8 +457,8 @@ def main():
                     R["peak"].add(pct(c["ep"], c["peak"]))
         per[code] = pa
 
-    sell_nm = "매도 규칙 ①+②" if args.sell == "rule" else "큰형 80 위 데드크로스"
-    print(f"■ 매수 신호 → 매도 신호 · 매수 규칙 전부(①+②) (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
+    sell_nm = "매도 규칙 ①+②+③" if args.sell == "rule" else "큰형 80 위 데드크로스"
+    print(f"■ 매수 신호 → 매도 신호 · 매수 규칙 전부(①+②+③) (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
     tot, topn = [], 0
     for tf in TFS_ALL:
         print(pair_row(tf, PT[tf][0], PT[tf][1])); tot += PT[tf][0]; topn += PT[tf][1]

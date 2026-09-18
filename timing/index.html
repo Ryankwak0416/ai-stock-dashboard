@@ -126,7 +126,7 @@ td.num{font-variant-numeric:tabular-nums}
   <span><i style="background:#e8590c"></i>막내</span>
   <span><i style="background:#0b1220;height:2px"></i>둘째</span>
   <span><i style="background:#7048e8;height:4px"></i>큰형 (가장 두껍게)</span>
-  <span>▲ 매수 ①3형제 동시 2.0↓ ②막내·둘째 바닥 → 2.0 이상 회복 → 큰형 2.0 아래서 반등 · ▼ 매도는 그 반대 ①동시 8.0↑ ②꼭대기 뒤 큰형 8.0 위에서 꺾임</span>
+  <span>▲ 매수 ①3형제 동시 2.0↓ ②막내·둘째 바닥 → 2.0 이상 회복 → 큰형 2.0 아래서 반등 ③막내·둘째 2.0↓ 즈음 큰형이 2.0 아래서 꺾여 오름 · ▼ 매도는 그 반대 ①②③</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
 
@@ -217,8 +217,22 @@ function sellRule2(K,P){const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[],TOP
        &&a[t1]-a[i]>=P.RISE&&b[t2]-b[i]>=P.RISE
        &&g[i-1]>=TOP&&g[i]<g[i-1]){out.push(i);used=true;}}
   return out;}
-const BUY_RULES=[{no:'①',name:'3형제 동시 2.0↓',fn:buyRule1},{no:'②',name:'막내·둘째 바닥 뒤 큰형 2.0↓ 반등',fn:buyRule2}];
-const SELL_RULES=[{no:'①',name:'3형제 동시 8.0↑',fn:sellRule1},{no:'②',name:'막내·둘째 꼭대기 뒤 큰형 8.0↑ 꺾임',fn:sellRule2}];
+// ③ 막내·둘째가 그 즈음(WIN1봉 안)에 FLOOR 이하였고, 큰형이 FLOOR 이하에서 내려가다 처음 위로 꺾이는 봉
+//    (2026-09-19 03:0x 대표 「막내 둘째가 2포인트 이하에 있으면서 그즈음에 큰형도 2포인트 이하에서 내려가다가 위로 꺾인 포인트」 — 네이버 60분 9/4 09:00)
+function buyRule3(K,P){const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[];
+  const rec=(x,i)=>{for(let j=Math.max(1,i-P.WIN1);j<=i;j++)if(x[j]!=null&&x[j]<=P.FLOOR)return true;return false;};
+  for(let i=2;i<N;i++){
+    if(g[i]==null||g[i-1]==null||g[i-2]==null)continue;
+    if(g[i-1]<=P.FLOOR&&g[i-1]<=g[i-2]&&g[i]>g[i-1]&&rec(a,i)&&rec(b,i))out.push(i);}
+  return out;}
+function sellRule3(K,P){const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[],TOP=100-P.FLOOR;
+  const rec=(x,i)=>{for(let j=Math.max(1,i-P.WIN1);j<=i;j++)if(x[j]!=null&&x[j]>=TOP)return true;return false;};
+  for(let i=2;i<N;i++){
+    if(g[i]==null||g[i-1]==null||g[i-2]==null)continue;
+    if(g[i-1]>=TOP&&g[i-1]>=g[i-2]&&g[i]<g[i-1]&&rec(a,i)&&rec(b,i))out.push(i);}
+  return out;}
+const BUY_RULES=[{no:'①',name:'3형제 동시 2.0↓',fn:buyRule1},{no:'②',name:'막내·둘째 바닥 뒤 큰형 2.0↓ 반등',fn:buyRule2},{no:'③',name:'막내·둘째 2.0↓ 즈음 큰형 2.0↓에서 꺾여 오름',fn:buyRule3}];
+const SELL_RULES=[{no:'①',name:'3형제 동시 8.0↑',fn:sellRule1},{no:'②',name:'막내·둘째 꼭대기 뒤 큰형 8.0↑ 꺾임',fn:sellRule2},{no:'③',name:'막내·둘째 8.0↑ 즈음 큰형 8.0↑에서 꺾여 내림',fn:sellRule3}];
 // 규칙 목록을 합친다 → [{i,no}] 시각순. 같은 봉에 둘이 걸리면 번호를 이어 붙인다(①②).
 function sigUnion(rules,K,P){P=P||BUYP;const m=new Map();
   for(const r of rules)for(const i of r.fn(K,P))m.set(i,(m.get(i)||'')+r.no);
@@ -827,7 +841,7 @@ function pairSection(list,who){
   return `<h2 style="margin-top:6px">매수 신호 → 매도 신호 · ${who}</h2>`
     +`<p class="note" style="margin:0 0 6px">매수 = <b>매수 규칙 목록 중 하나라도 성립한 봉</b> — ${BUY_RULES.map(x=>x.no+' '+x.name).join(' / ')}. `
     +`매도 = <b>${sellNm}</b>. 매수 봉 종가에 사서 다음 매도 신호 봉 종가에 판 수익률이며, 매도 전에 나온 매수는 세지 않고 수수료·세금은 없습니다.</p>`
-    +pairRowsHtml(pairByTf(list,'new'),'매수 규칙 전부(①+②)')
+    +pairRowsHtml(pairByTf(list,'new'),'매수 규칙 전부(①+②+③)')
     +BUY_RULES.map((x,k)=>pairRowsHtml(pairByTf(list,'r'+k),'규칙 '+x.no+'만 — '+x.name)).join('');}
 function pairDetail(row){
   const p=pairUp(row,buysOf(row,'new'),sellSig(row.K,VSELL)),last=p.pairs.slice(-20).reverse();let b='';
@@ -842,7 +856,7 @@ async function renderV(){
   const mb=`<button class="sm ${VMODE==='one'?'on':''}" data-vm="one">이 종목</button>`
           +`<button class="sm ${VMODE==='all'?'on':''}" data-vm="all">관심 ${WL.length}종목 합산</button>`;
   const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
-  const sb=`<button class="sm ${VSELL==='dead'?'on':''}" data-vs="dead">8.0 위 데드크로스</button><button class="sm ${VSELL==='rule'?'on':''}" data-vs="rule">매도 규칙(①②)</button>`;
+  const sb=`<button class="sm ${VSELL==='dead'?'on':''}" data-vs="dead">8.0 위 데드크로스</button><button class="sm ${VSELL==='rule'?'on':''}" data-vs="rule">매도 규칙(①②③)</button>`;
   const bar=`<div class="bar">${mb}<span class="sub" style="margin-left:10px">매도 신호</span>${sb}<span class="sub" style="margin-left:10px">보유 기간</span>${hb}</div>`;
   const wire=()=>{
     el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});
