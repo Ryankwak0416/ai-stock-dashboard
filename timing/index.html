@@ -1133,11 +1133,14 @@ function SSET_HTML(){
 }
 
 // ═══════════ 테스트파동 탭 (2026-09-19 대표 지시 · 계획서 _계획_260919_테스트파동탭.md) ═══════════
-// 시간축마다 3형제 %K의 평균 (k5+k10+k20)/3 을 한 선으로, 일곱 시간축을 가격과 함께 한 차트에.
+// 시간축마다 3형제 %K의 평균 (k5+k10+k20)/3 을 한 선으로, 다섯 시간축(1·5·30·60·240분)을 가격과 함께 한 차트에.
 // 기준 봉(x축)보다 굵은 봉의 값은 그 봉 시각부터 다음 봉 시각 전까지 같은 값으로 잇는다(«연장»).
-const WTFS=['1m','5m','10m','30m','60m','120m','240m'];
-const WCOL={'1m':'#e03131','5m':'#f76707','10m':'#e6a700','30m':'#2f9e44','60m':'#1c7ed6','120m':'#3b3fc4','240m':'#7048e8'};
-let WBASE='1m', WSPAN=250, WPOS=1e9, WROWS=null, WCH=null;
+const WTFS=['1m','5m','30m','60m','240m'];   // 2026-09-19 대표 「1분 5분 30분 60분 240분 5개로」
+const WCOL={'1m':'#e03131','5m':'#f76707','30m':'#e6a700','60m':'#2f9e44','240m':'#1c7ed6'};   // 작은 것부터 빨·주·노·초·파
+let WSPAN=250, WPOS=1e9, WROWS=null, WCH=null;
+const WSHOW={'1m':true,'5m':true,'30m':true,'60m':true,'240m':true};   // 복합N분봉 켜고 끄기
+// 가로축은 켜져 있는 선 중 가장 잘은 봉을 따른다(기준 봉 단추 없음 — 2026-09-19 대표).
+function wBase(){for(const tf of WTFS)if(WSHOW[tf]&&WROWS.some(r=>r.tf===tf))return tf;return WROWS[0].tf;}
 function waveOf(r){const a=r.K.k5.k,b=r.K.k10.k,c=r.K.k20.k;
   return a.map((v,i)=>(v==null||b[i]==null||c[i]==null)?null:(v+b[i]+c[i])/3);}
 function wAt(ts,vals,t){let lo=0,hi=ts.length-1,idx=-1;
@@ -1151,33 +1154,32 @@ async function renderW(){
     const raw=SROWS||await loadRawRows(CODE);
     WROWS=(raw||[]).filter(r=>WTFS.includes(r.tf)).map(r=>({tf:r.tf,ts:r.ts,c:r.c,w:waveOf(r)}));}
   if(!WROWS.length){el.innerHTML='<div class="err">이 종목은 분봉 누적 원본이 없어 테스트파동을 그릴 수 없습니다.</div>';return;}
-  if(!WROWS.some(r=>r.tf===WBASE))WBASE=WROWS[0].tf;
-  const baseb=['1m','5m','10m','30m','60m'].filter(tf=>WROWS.some(r=>r.tf===tf))
-    .map(tf=>`<button class="sm ${tf===WBASE?'on':''}" data-wb="${tf}">${LBL[tf]}</button>`).join('');
+  const togb=WTFS.filter(tf=>WROWS.some(r=>r.tf===tf))
+    .map(tf=>`<button class="sm ${WSHOW[tf]?'on':''}" data-wt="${tf}" style="border-color:${WCOL[tf]};${WSHOW[tf]?'':'color:'+WCOL[tf]}">복합${LBL[tf]}봉</button>`).join('');
   const spanb=[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']].map(o=>`<button class="sm ${WSPAN===o[0]?'on':''}" data-ws="${o[0]}">${o[1]}</button>`).join('');
-  const leg=WTFS.map(tf=>`<span><i style="background:${WCOL[tf]};height:3px"></i>${LBL[tf]}</span>`).join('');
-  el.innerHTML=`<div class="bar"><span class="sub">기준 봉</span>${baseb}<span style="width:14px"></span><span class="sub">구간 폭</span>${spanb}</div>`
+  const leg=WTFS.map(tf=>`<span><i style="background:${WCOL[tf]};height:3px"></i>복합${LBL[tf]}봉</span>`).join('');
+  el.innerHTML=`<div class="bar"><span class="sub">표시</span>${togb}<span style="width:14px"></span><span class="sub">구간 폭</span>${spanb}</div>`
     +`<div class="wbox"><canvas id="cvW"></canvas></div>`
     +`<div class="info"><span id="wd0">-</span><span id="wmid">-</span><span id="wd1">-</span></div>`
     +`<div class="lg"><span><i style="background:#0ca678;height:4px"></i>가격</span>${leg}<span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동 · 끌기 = 이동</span></div>`
     +`<p class="note">각 선은 그 시간축 <b>3형제 %K(막내 5·3·3 / 둘째 10·6·6 / 큰형 20·12·12)의 평균</b>, 즉 합계의 1/3입니다. 화면은 0~10.`
-    +` 기준 봉보다 굵은 봉의 값은 <b>그 봉 시각부터 다음 봉까지 같은 값으로 이어</b> 그렸고, 기준 봉보다 잘은 시간축은 그리지 않습니다.`
-    +` 1분봉 원본은 8~9거래일뿐이라 더 긴 구간은 기준 봉을 5분·10분으로 바꿔 보십시오. 붉은 점선 ${S10(CUT)} · 푸른 점선 ${S10(100-CUT)}.</p>`;
-  el.querySelectorAll('[data-wb]').forEach(b=>b.onclick=()=>{WBASE=b.dataset.wb;WPOS=1e9;renderW();});
+    +` 가로축은 켜져 있는 선 중 가장 잘은 봉을 따르고, 굵은 봉의 값은 <b>그 봉 시각부터 다음 봉까지 같은 값으로 이어</b> 그립니다.`
+    +` 1분봉 원본은 8~9거래일뿐이라 더 긴 구간을 보려면 복합1분봉을 끄십시오. 붉은 점선 ${S10(CUT)} · 푸른 점선 ${S10(100-CUT)}.</p>`;
+  el.querySelectorAll('[data-wt]').forEach(b=>b.onclick=()=>{WSHOW[b.dataset.wt]=!WSHOW[b.dataset.wt];WPOS=1e9;renderW();});
   el.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>{
-    const N=WROWS.find(r=>r.tf===WBASE).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN,ctr=WPOS+cur/2;
+    const N=WROWS.find(r=>r.tf===wBase()).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN,ctr=WPOS+cur/2;
     WSPAN=+b.dataset.ws;const ns=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
     WPOS=Math.max(0,Math.min(N-ns,Math.round(ctr-ns/2)));renderW();});
   const box=el.querySelector('.wbox');
   let dg=false,sx=0,sp=0;
   box.addEventListener('pointerdown',e=>{dg=true;sx=e.clientX;sp=WPOS;box.classList.add('drag');try{box.setPointerCapture(e.pointerId);}catch(_){}});
   box.addEventListener('pointermove',e=>{if(!dg)return;
-    const N=WROWS.find(r=>r.tf===WBASE).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
+    const N=WROWS.find(r=>r.tf===wBase()).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
     WPOS=Math.max(0,Math.min(N-cur,sp-Math.round((e.clientX-sx)/(box.clientWidth||800)*cur)));drawW();});
   const up=()=>{dg=false;box.classList.remove('drag');};
   box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);
   box.addEventListener('wheel',ev=>{ev.preventDefault();
-    const N=WROWS.find(r=>r.tf===WBASE).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
+    const N=WROWS.find(r=>r.tf===wBase()).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
     const rect=box.getBoundingClientRect(),frac=Math.min(1,Math.max(0,(ev.clientX-rect.left)/rect.width));
     if(ev.shiftKey){WPOS=Math.max(0,Math.min(N-cur,WPOS+Math.sign(ev.deltaY)*Math.max(1,Math.round(cur*0.12))));drawW();return;}
     let ns=Math.round(ev.deltaY>0?cur*1.25:cur*0.8);ns=Math.max(20,Math.min(ns,N));
@@ -1185,23 +1187,23 @@ async function renderW(){
     WPOS=Math.max(0,Math.min(N-ns,Math.round(anchor-ns*frac)));drawW();},{passive:false});
   drawW();}
 function drawW(){
-  const base=WROWS.find(r=>r.tf===WBASE);if(!base)return;
+  const WBASE=wBase(),base=WROWS.find(r=>r.tf===WBASE);if(!base)return;
   const N=base.ts.length,span=(WSPAN<=0||WSPAN>=N)?N:WSPAN;
   WPOS=Math.max(0,Math.min(WPOS,N-span));
   const a=WPOS,b=a+span-1;
   const labels=[],px=[];for(let i=a;i<=b;i++){labels.push(fmtT(base.ts[i]));px.push(base.c[i]);}
   const line=(d,col,w,ax,o,dash)=>({data:d,borderColor:col,borderWidth:w,borderDash:dash||[],pointRadius:0,tension:.2,yAxisID:ax,order:o,spanGaps:false});
   const ds=[line(px,'rgba(255,255,255,.95)',7,'y',2),line(px,'#0ca678',3.4,'y',1)],NM=[null,'가격'];
-  const show=WTFS.filter(tf=>WMIN[tf]>=WMIN[WBASE]&&WROWS.some(r=>r.tf===tf));
+  const show=WTFS.filter(tf=>WSHOW[tf]&&WMIN[tf]>=WMIN[WBASE]&&WROWS.some(r=>r.tf===tf));
   for(const tf of show){const r=WROWS.find(x=>x.tf===tf);
     const d=(tf===WBASE)?r.w.slice(a,b+1):base.ts.slice(a,b+1).map(t=>wAt(r.ts,r.w,t));
     ds.push(line(d,WCOL[tf],1.5,'y2',3));NM.push(LBL[tf]);}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   document.getElementById('wd0').textContent=fmtT(base.ts[a]);document.getElementById('wd1').textContent=fmtT(base.ts[b]);
-  document.getElementById('wmid').textContent=`기준 ${LBL[WBASE]} · 폭 ${span}봉 / 전체 ${N}봉 · 선 ${show.length}개`;
+  document.getElementById('wmid').textContent=`가로축 ${LBL[WBASE]} · 폭 ${span}봉 / 전체 ${N}봉 · 선 ${show.length}개`;
   const plug={id:'wave',beforeDatasetsDraw(ch){const ca=ch.chartArea;if(!ca)return;const g=ch.ctx;
-    const items=show.map(tf=>{const r=WROWS.find(x=>x.tf===tf);const v=(tf===WBASE)?r.w[b]:wAt(r.ts,r.w,base.ts[b]);return [LBL[tf]+' '+S10(v),WCOL[tf]];});
+    const items=show.map(tf=>{const r=WROWS.find(x=>x.tf===tf);const v=(tf===WBASE)?r.w[b]:wAt(r.ts,r.w,base.ts[b]);return ['복합'+LBL[tf]+' '+S10(v),WCOL[tf]];});
     g.save();g.font='bold 12px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
     const w=items.reduce((s2,it)=>s2+g.measureText(it[0]).width+16,0)+6;
     g.fillStyle='rgba(255,255,255,.88)';g.fillRect(ca.left+2,ca.top+2,w,18);
