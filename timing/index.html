@@ -121,9 +121,9 @@ td.num{font-variant-numeric:tabular-nums}
 <div class="info"><span id="d0">-</span><span id="mid">-</span><span id="d1">-</span></div>
 <div class="lg">
   <span><i style="background:#0ca678;height:4px"></i>가격</span>
-  <span><i style="background:#e8590c"></i>막내 (점선)</span>
+  <span><i style="background:#e8590c"></i>막내</span>
   <span><i style="background:#0b1220;height:2px"></i>둘째</span>
-  <span><i style="background:#7048e8;height:4px"></i>큰형 (점선)</span>
+  <span><i style="background:#7048e8;height:4px"></i>큰형 (가장 두껍게)</span>
   <span>▲ 매수(3형제 매수 규칙 — 막내 바닥 → 둘째 바닥 → 둘 다 2.0 이상 상승 중 + 큰형 상방 반전) · ▼ 적극매도 성립(동시 과매수)</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
@@ -375,10 +375,10 @@ function render(){
   // 가격선은 굵게 맨 위에, 흰 테두리를 깔아 스토캐스틱 선과 확실히 떨어뜨린다
   if(SHOW.px){ds.push(line(px,'rgba(255,255,255,.95)',7,'y',2));NM.push(null);
               ds.push(line(px,'#0ca678',3.4,'y',1));NM.push('종가');}
-  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2',3,[4,3]));NM.push('막내');}
+  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2'));NM.push('막내');}
   if(SHOW.k10){ds.push(line(k10,'#0b1220',1.3,'y2'));NM.push('둘째');}
-  // 큰형은 점선 — 다른 선보다 두껍게(1.1배). 2026-09-18 사장님 지시.
-  if(SHOW.k20){ds.push(line(k20,'#7048e8',1.8,'y2',3,[7,4]));NM.push('큰형');}
+  // 큰형은 가장 두껍게, 전부 실선. 2026-09-19 대표 「파동선 전부 실선, 큰형 가장 두껍게」(점선은 그 전날 지시).
+  if(SHOW.k20){ds.push(line(k20,'#7048e8',2.4,'y2'));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
 
@@ -974,8 +974,8 @@ function drawSet(tf,cid,r,cy,sp5){
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
   const ln=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:o});
   const ds=[ln(px,'rgba(255,255,255,.95)',7,'y',2), ln(px,'#0ca678',3.4,'y',1),
-            Object.assign(ln(k5,'#e8590c',1.3,'y2',3),{borderDash:[4,3]}), ln(k10,'#0b1220',1.3,'y2',3),
-            Object.assign(ln(k20,'#7048e8',1.8,'y2',3),{borderDash:[7,4]}),
+            ln(k5,'#e8590c',1.3,'y2',3), ln(k10,'#0b1220',1.3,'y2',3),
+            ln(k20,'#7048e8',2.4,'y2',3),
             {data:labels.map(()=>20),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4},
             {data:labels.map(()=>80),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4}];
   const NM=[null,'가격','막내','둘째','큰형'];
