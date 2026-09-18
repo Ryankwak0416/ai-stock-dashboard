@@ -1011,7 +1011,7 @@ function showTab(n){
 let SROWS=null, SSPAN=3, SCH={};
 const SSPANS=[[0.7,'좁게'],[1,'기본'],[1.6,'넓게'],[2.6,'아주 넓게']];
 const SBASE={'240m':60,'60m':120,'5m':140};
-const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 8.0 → 매도'],
+const SROLE={'60m':['메인','주황 ▼ 적극매수①(3형제 모두 2.0 이하) · 큰형 2.0 부근은 5분봉 보며 분할매수 · 회색 = 2.0 복귀(반등 확인) · 파란 ▲ = 8.0 위 데드크로스 매도'],
              '5m':['분할','주황 띠 = 60분 큰형 2.0 이하 구간 — 그 안에서 나눠 담는다'],
              '240m':['흐름','큰형 기울기(+상승/−하락)로 큰 흐름을 본다 · 붉은 띠 = 3형제 바닥(매수 가능 구간)']};
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
@@ -1139,11 +1139,13 @@ function drawSet(tf,cid,r,cy,sp5){
         const ty=(dir>0)?ca.bottom-26:ca.top+33, w=g.measureText(tx).width+8;
         g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ty-11,w,14);
         g.fillStyle=col;g.fillText(tx,x,ty);g.restore();});
-      mark(cy.BUY,'#d92d20',1,'매수');
+      // 큰형 2.0 복귀 자리는 분할매수가 «끝난» 시점이라 「매수」로 그리지 않는다(2026-09-19 대표). 회색 「반등 확인」.
+      mark(cy.BUY,'#8a94a6',1,'반등 확인');
       mark(cy.SELL,'#1849a9',-1,'매도');
-      // 3형제 매수 규칙(buySig) 표식 — 세팅 사이클과 별개로 얹는다(계획서 §2-4). 주황 ▼「3형제 매수」, 사이클 ▲보다 위 칸.
-      buySig(r.K).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);const tx='매수'+o.no;
-        const heavy=o.no.includes('①')&&I240.inZone(r.ts[i]);   // 240분 3형제 바닥 구간 안의 60분 3형제 바닥 = 가중
+      // 60분의 점(포인트) 매수는 적극매수 ①(3형제 모두 2.0 이하)뿐 — 2026-09-19 대표. ②③은 큰형 2.0 부근 분할매수 흐름 안의 자리라 60분 차트에선 그리지 않는다.
+      // 240분도 3형제 바닥이면 세모 하나 더(가중).
+      buySig(r.K).filter(o=>o.no.includes('①')).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);const tx='적극매수①';
+        const heavy=I240.inZone(r.ts[i]);
         g.save();g.fillStyle='#e8590c';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
         g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();
         g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
@@ -1222,7 +1224,7 @@ async function renderS(){
     <b>이 매매의 목적은 하나입니다 — 60분 큰형이 바닥일 때 사서, 60분 큰형이 8.0에 올 때 판다.</b>
     그래서 기준봉은 60분봉 하나이고, 화면도 위에서부터 <b>60분(메인) → 5분(분할) → 240분(흐름)</b> 순으로 놓았습니다.<br>
     <b>60분 — 메인.</b> 큰형 2.0 이하가 «바닥 구간»이고,
-    큰형이 2.0 위로 올라서는 자리가 ▲<b>매수</b>(반등 확인)입니다.
+    큰형이 2.0 위로 올라서는 자리는 <b>분할매수가 끝난 시점</b>이라 회색 「반등 확인」으로만 표시하고, 점으로 찍는 매수는 <b>3형제가 모두 2.0 이하인 적극매수①</b>뿐입니다.
     큰형 8.0 이상은 목표 지점에 왔다는 뜻이지만 여기서 바로 팔지 않습니다.
     8.0 위에서 %K가 %D를 꺾고 내려오는 자리가 ▼<b>매도</b>입니다.
     실측에서 데드크로스가 사이클 최고가의 78%를 가져갔습니다(+9.63% vs 상한 +12.27%).<br>
