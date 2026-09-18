@@ -101,7 +101,8 @@ td.num{font-variant-numeric:tabular-nums}
 
 <div class="bar">
   <button id="tabT" class="on">타이밍</button>
-  <button id="tabS">60분봉 매매세팅</button>
+  <button id="tabS">60분봉매매법</button>
+  <button id="tabC">60분봉매매법검증</button>
   <button id="tabV">검증 (매수·매도 결과)</button>
   <button id="tabW">테스트파동</button>
   <span class="sub" id="nomin"></span>
@@ -109,6 +110,7 @@ td.num{font-variant-numeric:tabular-nums}
 </div>
 
 <div id="paneS" class="pane"></div>
+<div id="paneC" class="pane"></div>
 <div id="paneV" class="pane"></div>
 <div id="paneW" class="pane"></div>
 
@@ -870,15 +872,8 @@ async function renderV(){
       wire();
       const pe=document.getElementById('vp');
       VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
-    const LS=VALL.map(t=>({code:t.code,
-      r60:t.rows.find(r=>r.tf==='60m'), r240:t.rows.find(r=>r.tf==='240m')}))
-      .filter(x=>x.r60);
     el.innerHTML=bar
       +pairSection(VALL,`${VALL.length}종목 합산`)
-      +`<h2 style="margin-top:26px">60분봉 매매세팅 검증 · ${LS.length}종목 합산</h2>`
-      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
-         청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 2.0↓ 진입 전까지입니다.</p>`
-      +setTables(LS)
       +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
         <p class="note" style="margin:0 0 6px">3형제가 동시에 2.0 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.
         세팅 규칙이 아니라 기준① 하나만 떼어 본 것입니다.</p>`
@@ -896,16 +891,9 @@ async function renderV(){
     const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
     const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
     VROWS={rows:mins.concat(dwm),raw:!!raw};}
-  const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m');
-  const setHtml = r60
-    ? `<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${NAMES[CODE]||CODE}</h2>`
-      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
-         청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 60분봉 ${r60.c.length}봉 구간입니다.</p>`
-      +setTables([{code:CODE,r60,r240}])
-      +setCycleTable(r60,r240)
-    : '<div class="err">이 종목은 60분봉이 없어 세팅 검증을 할 수 없습니다.</div>';
+  const r60=VROWS.rows.find(r=>r.tf==='60m');
   const curRow=VROWS.rows.find(r=>r.tf===TF)||r60;
-  el.innerHTML=bar+pairSection([{rows:VROWS.rows}],NAMES[CODE]||CODE)+(curRow?pairDetail(curRow):'')+'<div style="height:14px"></div>'+setHtml
+  el.innerHTML=bar+pairSection([{rows:VROWS.rows}],NAMES[CODE]||CODE)+(curRow?pairDetail(curRow):'')
     +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
       <p class="note" style="margin:0 0 6px">3형제가 동시에 2.0 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.</p>`
     +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
@@ -921,13 +909,45 @@ async function renderV(){
        조건을 고칠지 말지는 위의 <b>«관심 ${WL.length}종목 합산»</b>을 보고 정하십시오.</p>`;
   wire();}
 
+// ═══════════ 60분봉매매법검증 탭 (2026-09-19 대표 「검수를 따로 분리」) — 종전 검증 탭의 60분 사이클 검증을 옮겨 왔다 ═══════════
+let CMODE='one';
+async function renderC(){
+  const el=document.getElementById('paneC');
+  const mb=`<button class="sm ${CMODE==='one'?'on':''}" data-cm="one">이 종목</button>`
+          +`<button class="sm ${CMODE==='all'?'on':''}" data-cm="all">관심 ${WL.length}종목 합산</button>`;
+  const bar=`<div class="bar">${mb}</div>`;
+  const wire=()=>el.querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{CMODE=b.dataset.cm;renderC();});
+  const rule=`<p class="note" style="margin:0 0 6px">60분봉매매법 — 진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
+         청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 2.0↓ 진입 전까지입니다. 수수료·세금 없음.</p>`;
+  if(CMODE==='all'){
+    if(VALL===null){
+      el.innerHTML=bar+'<p class="sub">관심종목 누적 원본을 모으는 중… <span id="cp">0</span></p>';wire();
+      const pe=document.getElementById('cp');
+      VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
+    const LS=VALL.map(t=>({code:t.code,r60:t.rows.find(r=>r.tf==='60m'),r240:t.rows.find(r=>r.tf==='240m')})).filter(x=>x.r60);
+    el.innerHTML=bar+`<h2 style="margin-top:6px">60분봉매매법 검증 · ${LS.length}종목 합산</h2>`+rule+setTables(LS);
+    wire();return;}
+  if(VROWS===null){
+    el.innerHTML=bar+'<p class="sub">누적 원본을 불러와 다시 계산하는 중…</p>';
+    const raw=await loadRawRows(CODE);
+    const mins=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);
+    const dwm=DATA?DATA.rows.filter(r=>['D','W','M'].includes(r.tf)):[];
+    VROWS={rows:mins.concat(dwm),raw:!!raw};}
+  const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m');
+  el.innerHTML=bar+(r60
+    ? `<h2 style="margin-top:6px">60분봉매매법 검증 · ${NAMES[CODE]||CODE}</h2>`+rule.replace('수수료·세금 없음.',`60분봉 ${r60.c.length}봉 구간. 수수료·세금 없음.`)
+      +setTables([{code:CODE,r60,r240}])+setCycleTable(r60,r240)
+    : '<div class="err">이 종목은 60분봉이 없어 검증을 할 수 없습니다.</div>');
+  wire();}
+
 let TAB='T';
 function showTab(n){
   TAB=n; VTAB=(n==='V');
-  for(const k of ['S','T','V','W']){
+  for(const k of ['S','C','T','V','W']){
     document.getElementById('pane'+k).className='pane'+(k===n?' on':'');
     document.getElementById('tab'+k).className=(k===n?'on':'');}
   if(n==='V')renderV();
+  if(n==='C')renderC();
   if(n==='S')renderS();
   if(n==='W')renderW();}
 
@@ -1374,6 +1394,7 @@ async function go(){
     render(); liveBadge();
     SROWS=null; WROWS=null; WPOS=1e9;
     if(TAB==='W')renderW();
+    if(TAB==='C')renderC();
     if(TAB==='V')renderV();
     if(TAB==='S')renderS();
   }catch(e){document.getElementById('vd').innerHTML='<div class="err">오류: '+e.message+'</div>';}
@@ -1409,6 +1430,7 @@ async function go(){
   document.getElementById('tabT').onclick=()=>showTab('T');
   document.getElementById('tabV').onclick=()=>showTab('V');
   document.getElementById('tabW').onclick=()=>showTab('W');
+  document.getElementById('tabC').onclick=()=>showTab('C');
   document.getElementById('cut').onchange=e=>{CUT=+e.target.value;render();if(TAB==='W')drawW();};
   document.getElementById('sc').oninput=e=>{POS=+e.target.value;render();};
   document.getElementById('prev').onclick=()=>{POS=Math.max(0,POS-Math.round(SPAN/3||20));render();};
