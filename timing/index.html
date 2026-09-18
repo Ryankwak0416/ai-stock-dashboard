@@ -438,10 +438,19 @@ function chunkDay(o,k){
 // 누적 원본(gz)을 받아 훨씬 긴 이력으로 다시 계산한다. 화면용 300봉으로는 표본이 모자란다.
 async function loadRawRows(code){
   try{
-    const r=await fetch(`../stoch/min/raw/${code}.json.gz?t=${Date.now()}`);
-    if(!r.ok)return null;
-    const txt=await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
-    const d=JSON.parse(txt);
+    // 세팅·검증 탭은 DATA 를 쓰지 않고 누적 원본을 직접 받아 자체 계산한다.
+    // 그래서 여기서도 공급기를 «먼저» 본다 — 안 그러면 세팅 탭만 어제 값으로 남는다.
+    let d=null;
+    try{
+      const lr=await fetch(`${LIVE_URL}/raw/${code}.json`,{signal:AbortSignal.timeout(12000)});
+      if(lr.ok){const j=await lr.json(); if(j&&j['60m']&&j['60m'].t)d=j;}
+    }catch(e){}
+    if(!d){
+      const r=await fetch(`../stoch/min/raw/${code}.json.gz?t=${Date.now()}`);
+      if(!r.ok)return null;
+      const txt=await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      d=JSON.parse(txt);
+    }
     const o={};
     for(const tf of ['1m','5m','30m','60m'])if(d[tf]&&d[tf].t&&d[tf].t.length>80)
       o[tf]={ts:d[tf].t,h:d[tf].h,l:d[tf].l,c:d[tf].c};
