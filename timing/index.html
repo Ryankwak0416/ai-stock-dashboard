@@ -944,7 +944,7 @@ let SROWS=null, SSPAN=3, SCH={};
 const SSPANS=[[0.7,'좁게'],[1,'기본'],[1.6,'넓게'],[2.6,'아주 넓게']];
 const SBASE={'240m':60,'60m':120,'5m':140};
 const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 8.0 → 매도'],
-             '5m':['분할','단기 고·저점으로 담는 자리를 정한다'],
+             '5m':['분할','주황 띠 = 60분 큰형 2.0 이하 구간 — 그 안에서 나눠 담는다'],
              '240m':['흐름','큰 흐름만 본다']};
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
 const SORD=[['60m','cvS6'],['5m','cvS5'],['240m','cvS4']];
@@ -1067,14 +1067,16 @@ function drawSet(tf,cid,r,cy,sp5){
         const w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
         g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);g.restore();});
     }
-    if(tf==='5m'&&sp5){
-      const COL={'막내':'#e8590c','둘째':'#0b1220','큰형':'#7048e8'};
-      sp5.forEach(m=>{if(m.i<a||m.i>b)return;const x=X(m.i);
-        g.save();g.fillStyle=COL[m.nm];
-        g.beginPath();g.moveTo(x,ca.bottom-6);g.lineTo(x-5,ca.bottom-16);g.lineTo(x+5,ca.bottom-16);
-        g.closePath();g.fill();
-        g.font='10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
-        g.fillText(m.nm[0],x,ca.bottom-19);g.restore();});
+    if(tf==='5m'&&cy&&cy.ts){
+      // 2026-09-19 대표 「분할매수 구간을 매수 포인트로 찍지 말고, 60분 큰형 2.0 이하 구간을 5분 차트 바탕색으로」
+      // 60분 큰형 2.0↓ 구간(cy.ZL, 60분 봉 번호)을 시각 범위로 바꿔 5분 봉이 그 안에 들면 옅은 주황 띠.
+      const zones=cy.ZL.map(z=>[cy.ts[z[0]],cy.ts[z[1]]+3600]);
+      const inZ=t=>zones.some(z=>t>=z[0]&&t<z[1]);
+      let s0=null;g.save();g.fillStyle='rgba(245,158,11,.20)';
+      for(let i=a;i<=b+1;i++){const on=i<=b&&inZ(r.ts[i]);
+        if(on&&s0==null)s0=i;
+        if(!on&&s0!=null){const x1=X(s0),x2=X(i-1);g.fillRect(x1-2,ca.top,Math.max(3,x2-x1+4),ca.bottom-ca.top);s0=null;}}
+      g.restore();
     }
   }};
   if(SCH[cid])SCH[cid].destroy();
@@ -1097,7 +1099,7 @@ async function renderS(){
     SROWS=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);}
   const r60=sSeries('60m'), r240=sSeries('240m'), r5=sSeries('5m');
   if(!r60){el.innerHTML='<div class="err">이 종목은 60분봉이 없습니다. 관심 25종목만 분봉을 모읍니다.</div>';return;}
-  const cy=cyc60(r60), gt=gate240(r240), sp5=r5?split5(r5):null;
+  const cy=cyc60(r60), gt=gate240(r240), sp5=null; cy.ts=r60.ts;   // 5분 분할 삼각형(split5)은 2026-09-19 대표 지시로 안 그린다
   const st5=r5?rowState(r5.K):null, st6=rowState(r60.K);
   const agg = st6.s===2 ? '<span class="tag hot" style="background:#fef3f2;color:#b42318">적극매수 (60분 3형제 동시 2.0↓)</span>' : '';
   const SP=['분할매수','보유','매도 준비','청산 완료'];
@@ -1131,7 +1133,7 @@ async function renderS(){
     8.0 위에서 %K가 %D를 꺾고 내려오는 자리가 ▼<b>매도</b>입니다.
     실측에서 데드크로스가 사이클 최고가의 78%를 가져갔습니다(+9.63% vs 상한 +12.27%).<br>
     <b>5분 — 분할.</b> 단기 고·저점을 보고 «어디서 얼마나 담을지»만 정합니다. 매수·매도 판정은 하지 않습니다.
-    차트 아래 작은 삼각형이 <b>막·둘·큰</b> 각각의 분할 트리거입니다.<br>
+    <b>옅은 주황 세로 띠</b>가 60분 큰형이 2.0 이하인 구간 — 그 안에서 5분봉을 보며 나눠 담습니다.<br>
     <b>240분 — 흐름.</b> 큰 흐름만 봅니다. 재검증(24종목·무산 포함 1,464 사이클) 결과
     3.0 미만 38% / 3.0~7.0 39% / 7.0 초과 27%로, <b>낮은 쪽은 차이가 없고 7.0 초과만 나쁩니다.</b>
     이전에 «3.0 미만이면 위험»이라고 경고했던 것은 11건짜리 단일 종목 관찰이어서 내렸습니다.<br>
