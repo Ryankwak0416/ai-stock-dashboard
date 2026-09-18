@@ -100,10 +100,10 @@ td.num{font-variant-numeric:tabular-nums}
 </div>
 
 <div class="bar">
-  <button id="tabT" class="on">타이밍</button>
+  <button id="tabT" class="on">스토캐스틱10개방향성</button>
+  <button id="tabV">방향성검증결과</button>
   <button id="tabS">60분봉매매법</button>
   <button id="tabC">60분봉매매법검증</button>
-  <button id="tabV">검증 (매수·매도 결과)</button>
   <button id="tabW">테스트파동</button>
   <span class="sub" id="nomin"></span>
   <span id="livebadge" style="margin-left:auto;font-size:12px"></span>
@@ -539,7 +539,7 @@ function render(){
             :' · <b>실시간 OFF</b> — 저장소 파일(평일 15:10 수집분)입니다');
 }
 
-// ───────── 검증 (매수·매도 결과) ─────────
+// ───────── 방향성검증결과 (구 «검증 (매수·매도 결과)») — 시간축별 매수→매도 규칙 표·규칙별 표·기준① 단독 표. 60분 사이클 검증은 60분봉매매법검증 탭 ─────────
 let VHOLD=20, VROWS=null, VTAB=false, VMODE='one', VALL=null;
 const HOLDS=[5,10,20,40];
 
