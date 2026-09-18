@@ -1140,7 +1140,9 @@ function drawSet(tf,cid,r,cy,sp5){
         g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ty-11,w,14);
         g.fillStyle=col;g.fillText(tx,x,ty);g.restore();});
       // 큰형 2.0 복귀 자리는 분할매수가 «끝난» 시점이라 「매수」로 그리지 않는다(2026-09-19 대표). 회색 「반등 확인」.
-      mark(cy.BUY,'#8a94a6',1,'반등 확인');
+      // 반등 확인 — 세로선·세모 없이 아래쪽 작은 회색 점과 작은 글자만(매수 포인트로 읽히지 않게, 2026-09-19 대표).
+      cy.BUY.forEach(i=>{if(i<a||i>b)return;const x=X(i);g.save();g.fillStyle='#8a94a6';g.beginPath();g.arc(x,ca.bottom-8,3,0,Math.PI*2);g.fill();
+        g.font='10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';g.fillStyle='#8a94a6';g.fillText('반등 확인',x,ca.bottom-14);g.restore();});
       mark(cy.SELL,'#1849a9',-1,'매도');
       // 60분의 점(포인트) 매수는 적극매수 ①(3형제 모두 2.0 이하)뿐 — 2026-09-19 대표. ②③은 큰형 2.0 부근 분할매수 흐름 안의 자리라 60분 차트에선 그리지 않는다.
       // 240분도 3형제 바닥이면 세모 하나 더(가중).
