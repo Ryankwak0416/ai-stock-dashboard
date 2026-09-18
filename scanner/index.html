@@ -63,7 +63,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 </div>
 
 <div class="tabs" id="tabs">
-  <div class="tab on" data-t="score">종합 스코어 (106지표)</div>
+  <div class="tab on" data-t="score">보조지표 106개 방향성</div>
   <div class="tab" data-t="stoch">스토캐스틱 3형제</div>
   <div class="tab" data-t="boll">볼린저밴드</div>
   <div class="tab" data-t="macd">MACD</div>
@@ -282,15 +282,15 @@ function render(){
       const g6a=AG6.slice(a,b+1), useAg=hasAg();
       const main=useAg?g6a:S6.slice(a,b+1);
       ds=[{label:'종가',data:c,yAxisID:'y',borderColor:'#1849a9',backgroundColor:'rgba(24,73,169,.06)',borderWidth:2,pointRadius:0,tension:.1,fill:true,order:10},
-          {label:useAg?'합의도':'106지표 종합',data:main,yAxisID:'y2',borderColor:'#7a5af8',backgroundColor:'rgba(122,90,248,.10)',borderWidth:2,pointRadius:0,tension:.15,spanGaps:true,fill:true,order:20},
+          {label:'보조지표 106개 방향성',data:main,yAxisID:'y2',borderColor:'#7a5af8',backgroundColor:'rgba(122,90,248,.10)',borderWidth:2,pointRadius:0,tension:.15,spanGaps:true,fill:true,order:20},
           {label:'매수선',data:main.map(()=>useAg?TH6.buy:65),yAxisID:'y2',borderColor:'rgba(6,118,71,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
           {label:'매도선',data:main.map(()=>useAg?TH6.sell:35),yAxisID:'y2',borderColor:'rgba(180,35,24,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,order:25},
           {label:'0선',data:main.map(()=>useAg?0:50),yAxisID:'y2',borderColor:'rgba(148,163,184,.45)',borderWidth:1,pointRadius:0,order:24},
           pts(BUY,i=>SER[i][F.C],a,b,n,'#067647',0), pts(SELL,i=>SER[i][F.C],a,b,n,'#d92d20',180)];
       sc.y={position:'left',ticks:{font:FONT,color:'#1849a9',callback:v=>v>=1000?(v/1000)+'천':v}};
-      sc.y2=useAg?{position:'right',min:-100,max:100,ticks:{font:FONT,stepSize:50},grid:{drawOnChartArea:false},title:{display:true,text:'합의도(−100~+100)',font:FONT}}
-                 :{position:'right',min:0,max:100,ticks:{font:FONT,stepSize:20},grid:{drawOnChartArea:false},title:{display:true,text:'106지표 종합(0~100)',font:FONT}};
-      leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#7a5af8;height:4px"></i>'+(useAg?'합의도(우축)':'106지표 종합(우축)')+'</span><span><i class="sw" style="background:#067647"></i>▲매수 타점</span><span><i class="sw" style="background:#d92d20"></i>▼매도 타점</span>';
+      sc.y2=useAg?{position:'right',min:-100,max:100,ticks:{font:FONT,stepSize:50},grid:{drawOnChartArea:false},title:{display:true,text:'보조지표 106개 방향성(−100~+100)',font:FONT}}
+                 :{position:'right',min:0,max:100,ticks:{font:FONT,stepSize:20},grid:{drawOnChartArea:false},title:{display:true,text:'보조지표 106개 방향성(0~100)',font:FONT}};
+      leg='<span><i class="sw" style="background:#1849a9;height:4px"></i>종가</span><span><i class="sw" style="background:#7a5af8;height:4px"></i>보조지표 106개 방향성(우축)</span><span><i class="sw" style="background:#067647"></i>▲매수 타점</span><span><i class="sw" style="background:#d92d20"></i>▼매도 타점</span>';
       panel=cat6()+ind6()+tapTable();
       note=useAg
         ? '<b>합의도</b> = (관행상 매수라고 말하는 지표 수 − 매도라고 말하는 지표 수) ÷ 방향을 말하는 지표 수 × 100. 각 지표는 교과서 규칙대로 판정합니다 — RSI 30 이하 매수·70 이상 매도, MACD가 시그널 위면 매수, 종가가 이동평균 위면 매수 같은 식입니다. 합의도가 <b>+'+TH6.buy+'를 위로 통과</b>하면 ▲, <b>'+TH6.sell+'을 아래로 통과</b>하면 ▼ — 여러 지표의 매수(매도)가 겹치기 시작한 지점입니다. 규칙 발화 지점일 뿐 검증된 신호가 아닙니다.'
@@ -523,7 +523,8 @@ function verdict(){
       return `<span class="chip ${c6(v)}">${k} ${v==null?'-':v}</span>`;}).join('');
     const b=cnt.buy?cnt.buy[i]:'-',h=cnt.hold?cnt.hold[i]:'-',se=cnt.sell?cnt.sell[i]:'-';
     const agc=ag==null?'neu':(ag>=25?'buy':(ag<=-25?'sell':'neu'));
-    const agt=ag==null?'-':(ag>=50?'강한 매수 합의':ag>=25?'매수 우위':ag<=-50?'강한 매도 합의':ag<=-25?'매도 우위':'지표 합의 없음');
+    // 2026-09-19 대표 「지표합의 없음을 빼고 이름을 바꾸자 — 보조지표 106개 방향성」
+    const agt='보조지표 106개 방향성'+(ag==null?'':(ag>=50?' · 강한 매수':ag>=25?' · 매수 우위':ag<=-50?' · 강한 매도':ag<=-25?' · 매도 우위':''));
     const pa=(()=>{for(let k=i-1;k>=Math.max(0,i-5);k--)if(AG[k]!=null)return AG[k];return null;})();
     const da=(pa!=null&&ag!=null)?(ag-pa):null;
     const arrow=da==null?'':(da>0?` <span class="buy">▲${da}</span>`:(da<0?` <span class="sell">▼${Math.abs(da)}</span>`:' →'));
