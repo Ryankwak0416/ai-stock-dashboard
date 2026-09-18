@@ -945,7 +945,7 @@ const SSPANS=[[0.7,'좁게'],[1,'기본'],[1.6,'넓게'],[2.6,'아주 넓게']];
 const SBASE={'240m':60,'60m':120,'5m':140};
 const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 8.0 → 매도'],
              '5m':['분할','주황 띠 = 60분 큰형 2.0 이하 구간 — 그 안에서 나눠 담는다'],
-             '240m':['흐름','큰 흐름만 본다']};
+             '240m':['흐름','큰형 기울기(+상승/−하락)로 큰 흐름을 본다 · 붉은 띠 = 3형제 바닥(매수 가능 구간)']};
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
 const SORD=[['60m','cvS6'],['5m','cvS5'],['240m','cvS4']];
 let SMUL=1;
@@ -1013,6 +1013,18 @@ function gate240(r){
   return {cls:'ok',txt:`240분 큰형 ${S10(v)} — 큰 흐름 무리 없음`,v};
 }
 
+// 240분 — 큰형 «기울기»(마지막 봉 − 직전 봉, +상승/−하락)와 3형제 바닥(동시 2.0↓) 구간. 2026-09-19 대표 제안.
+//   그 구간 안에서 60분봉이 3형제 바닥(매수①)이면 60분 차트 표식에 세모를 하나 더 얹어 가중한다.
+function info240(r240){
+  if(!r240)return {slope:null,zones:[],inZone:()=>false};
+  const K=r240.K.k20.k,n=K.length-1;
+  const slope=(K[n]!=null&&K[n-1]!=null)?K[n]-K[n-1]:null;
+  const zones=[];let s0=null;
+  for(let i=0;i<=n+1;i++){const on=i<=n&&!stateAt(r240.K,i).lack&&stateAt(r240.K,i).s===2;
+    if(on&&s0==null)s0=i; if(!on&&s0!=null){zones.push([s0,i-1]);s0=null;}}
+  const tz=zones.map(z=>[r240.ts[z[0]],(z[1]+1<r240.ts.length?r240.ts[z[1]+1]:r240.ts[z[1]]+14400)]);
+  return {slope,zones,inZone:t=>tz.some(z=>t>=z[0]&&t<z[1])};}
+let I240={slope:null,zones:[],inZone:()=>false};
 function drawSet(tf,cid,r,cy,sp5){
   const N=r.c.length;
   if(SBARS[tf]==null)SBARS[tf]=Math.round(SBASE[tf]*SMUL);
@@ -1061,11 +1073,22 @@ function drawSet(tf,cid,r,cy,sp5){
       mark(cy.SELL,'#1849a9',-1,'매도');
       // 3형제 매수 규칙(buySig) 표식 — 세팅 사이클과 별개로 얹는다(계획서 §2-4). 주황 ▼「3형제 매수」, 사이클 ▲보다 위 칸.
       buySig(r.K).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);const tx='매수'+o.no;
+        const heavy=o.no.includes('①')&&I240.inZone(r.ts[i]);   // 240분 3형제 바닥 구간 안의 60분 3형제 바닥 = 가중
         g.save();g.fillStyle='#e8590c';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
         g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();
         g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
         const w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
-        g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);g.restore();});
+        g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);
+        if(heavy){g.fillStyle='#d92d20';g.beginPath();g.moveTo(x,ca.bottom-60);g.lineTo(x-6,ca.bottom-72);g.lineTo(x+6,ca.bottom-72);g.closePath();g.fill();
+          g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();const t2='가중(240 바닥)',w2=g.measureText(t2).width+8;
+          g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w2/2,ca.bottom-86,w2,13);g.fillStyle='#d92d20';g.fillText(t2,x,ca.bottom-76);}
+        g.restore();});
+    }
+    if(tf==='240m'){
+      // 3형제 동시 2.0↓ 구간 = 매수 가능 구간 — 옅은 붉은 세로 띠
+      g.save();g.fillStyle='rgba(217,45,32,.14)';
+      I240.zones.forEach(z=>{const s0=Math.max(z[0],a),e0=Math.min(z[1],b);if(e0<a||s0>b)return;const x1=X(s0),x2=X(e0);g.fillRect(x1-2,ca.top,Math.max(3,x2-x1+4),ca.bottom-ca.top);});
+      g.restore();
     }
     if(tf==='5m'&&cy&&cy.ts){
       // 2026-09-19 대표 「분할매수 구간을 매수 포인트로 찍지 말고, 60분 큰형 2.0 이하 구간을 5분 차트 바탕색으로」
@@ -1099,7 +1122,8 @@ async function renderS(){
     SROWS=raw||(DATA?DATA.rows.filter(r=>MIN.includes(r.tf)):[]);}
   const r60=sSeries('60m'), r240=sSeries('240m'), r5=sSeries('5m');
   if(!r60){el.innerHTML='<div class="err">이 종목은 60분봉이 없습니다. 관심 25종목만 분봉을 모읍니다.</div>';return;}
-  const cy=cyc60(r60), gt=gate240(r240), sp5=null; cy.ts=r60.ts;   // 5분 분할 삼각형(split5)은 2026-09-19 대표 지시로 안 그린다
+  const cy=cyc60(r60), gt=gate240(r240), sp5=null; cy.ts=r60.ts; I240=info240(r240);
+  const sl=I240.slope; const slTxt=sl==null?'':` · 240분 큰형 기울기 <b style="color:${sl>=0?'#d92d20':'#1849a9'}">${sl>=0?'+':''}${(sl/10).toFixed(1)} ${sl>=0?'상승':'하락'}</b>`;   // 5분 분할 삼각형(split5)은 2026-09-19 대표 지시로 안 그린다
   const st5=r5?rowState(r5.K):null, st6=rowState(r60.K);
   const agg = st6.s===2 ? '<span class="tag hot" style="background:#fef3f2;color:#b42318">적극매수 (60분 3형제 동시 2.0↓)</span>' : '';
   const SP=['분할매수','보유','매도 준비','청산 완료'];
@@ -1119,7 +1143,7 @@ async function renderS(){
     <div class="big">${cy.stage}</div>
     <div class="meta">${NAMES[CODE]||CODE} ${CODE} · ${pxNow!=null?(+pxNow).toLocaleString():'-'} ·
       60분 큰형 ${S10(cy.k)} / %D ${S10(cy.d)} ${agg}
-      <br><span class="gate ${gt.cls}">${gt.txt}</span></div>
+      <br><span class="gate ${gt.cls}">${gt.txt}</span>${slTxt}</div>
   </div>
   <div class="steps">${steps}</div>
   <div class="bar"><span class="sub">구간</span>${spanb}</div>
@@ -1134,7 +1158,8 @@ async function renderS(){
     실측에서 데드크로스가 사이클 최고가의 78%를 가져갔습니다(+9.63% vs 상한 +12.27%).<br>
     <b>5분 — 분할.</b> 단기 고·저점을 보고 «어디서 얼마나 담을지»만 정합니다. 매수·매도 판정은 하지 않습니다.
     <b>옅은 주황 세로 띠</b>가 60분 큰형이 2.0 이하인 구간 — 그 안에서 5분봉을 보며 나눠 담습니다.<br>
-    <b>240분 — 흐름.</b> 큰 흐름만 봅니다. 재검증(24종목·무산 포함 1,464 사이클) 결과
+    <b>240분 — 흐름.</b> 큰형의 <b>기울기</b>(마지막 봉 − 직전 봉)가 +면 상승, −면 하락으로 큰 흐름을 봅니다. 붉은 세로 띠는 3형제 동시 2.0 이하 = 매수 가능 구간이고,
+    그 구간 안에서 60분봉이 3형제 바닥(매수①)이면 60분 차트에 <b>붉은 세모를 하나 더 얹어 가중</b>합니다. 재검증(24종목·무산 포함 1,464 사이클) 결과
     3.0 미만 38% / 3.0~7.0 39% / 7.0 초과 27%로, <b>낮은 쪽은 차이가 없고 7.0 초과만 나쁩니다.</b>
     이전에 «3.0 미만이면 위험»이라고 경고했던 것은 11건짜리 단일 종목 관찰이어서 내렸습니다.<br>
     <b>계산식은 HTS 정식</b>입니다 — Σ(종가−최저)/Σ(최고−최저), %D는 지수이동평균.
@@ -1179,9 +1204,10 @@ function SSET_HTML(){
     if(!rr)return `<div class="shead"><span><b>${LBL[tf]}</b> <span class="role">${role}</span></span></div>
       <div class="sbox" style="height:60px;display:flex;align-items:center;justify-content:center;color:#9aa0a6;font-size:12px">데이터 없음</div>`;
     const st=rowState(rr.K);
+    const slp=(tf==='240m'&&I240.slope!=null)?` · 큰형 기울기 <b style="color:${I240.slope>=0?'#d92d20':'#1849a9'}">${I240.slope>=0?'+':''}${(I240.slope/10).toFixed(1)} ${I240.slope>=0?'상승':'하락'}</b>`:'';
     return `<div class="shead"><span><b>${LBL[tf]}봉</b> <span class="role">${role}</span> <span class="sub">${desc}</span></span>
       <span class="sub">막내 ${fk(rr.K.k5.k[rr.K.k5.k.length-1])} · 둘째 ${fk(rr.K.k10.k[rr.K.k10.k.length-1])} · 큰형 ${fk(rr.K.k20.k[rr.K.k20.k.length-1])}
-      · ${st.lack?'-':SN[st.s]}</span></div>
+      · ${st.lack?'-':SN[st.s]}${slp}</span></div>
       <div class="sbox" data-stf="${tf}"><canvas id="${cid}"></canvas></div>`;}).join('');
 }
 
