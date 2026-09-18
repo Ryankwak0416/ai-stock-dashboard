@@ -90,7 +90,7 @@ td.num{font-variant-numeric:tabular-nums}
   <datalist id="tk"></datalist>
   <select id="sel"></select>
   <span class="sub">컷</span>
-  <select id="cut"><option value="20">20 / 80</option><option value="15">15 / 85</option><option value="25">25 / 75</option><option value="30">30 / 70</option></select>
+  <select id="cut"><option value="20">2.0 / 8.0</option><option value="15">1.5 / 8.5</option><option value="25">2.5 / 7.5</option><option value="30">3.0 / 7.0</option></select>
   <span class="sub">추세</span>
   <select id="tr"><option value="3">3봉 전 대비</option><option value="1">1봉 전</option><option value="5">5봉 전</option></select>
 </div>
@@ -116,10 +116,10 @@ td.num{font-variant-numeric:tabular-nums}
 <div class="scrollrow"><button class="sm" id="prev">◀</button><input type="range" id="sc" min="0" max="0" value="0"><button class="sm" id="next">▶</button></div>
 <div class="info"><span id="d0">-</span><span id="mid">-</span><span id="d1">-</span></div>
 <div class="lg">
-  <span><i style="background:#0b1220;height:4px"></i>종가</span>
-  <span><i style="background:#e8590c"></i>막내 5·3·3</span>
-  <span><i style="background:#0ca678"></i>둘째 10·6·6</span>
-  <span><i style="background:#7048e8;height:3px"></i>큰형 20·12·12</span>
+  <span><i style="background:#0b1220;height:4px"></i>가격</span>
+  <span><i style="background:#e8590c"></i>막내</span>
+  <span><i style="background:#0ca678;height:3px"></i>둘째</span>
+  <span><i style="background:#7048e8;height:4px"></i>큰형 (점선)</span>
   <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
@@ -239,8 +239,11 @@ async function loadOne(code){
 
 const SN={2:'적극매수',1:'상승추세',0:'중립','-1':'하락추세','-2':'적극매도'};
 const SC={2:'c2',1:'c1',0:'c0','-1':'cm1','-2':'cm2'};
-const fk=x=>x==null?'-':Math.round(x);
-const kc=x=>x==null?'<span class="c0">-</span>':(x<=CUT?`<span class="lo">${Math.round(x)}</span>`:(x>=100-CUT?`<span class="hi">${Math.round(x)}</span>`:Math.round(x)));
+// 스토캐스틱은 화면에 0~100이 아니라 0~10으로 적는다. 2026-09-18 사장님 지시.
+// 내부 판정(CUT=20 등)은 그대로 0~100이고, 사람 눈에 보이는 숫자만 10으로 나눈다.
+const S10=v=>v==null?'-':(v/10).toFixed(1);
+const fk=x=>x==null?'-':S10(x);
+const kc=x=>x==null?'<span class="c0">-</span>':(x<=CUT?`<span class="lo">${S10(x)}</span>`:(x>=100-CUT?`<span class="hi">${S10(x)}</span>`:S10(x)));
 
 // 2026-09-17 검증 반영 —
 // 적극매도는 24종목 1,000여 건에서 전 구간 음수였고(60분 944건 승률 44%),
@@ -288,7 +291,7 @@ function render(){
     data.rows.map(r=>{const v=lastVal(r.K.k20.k);
       const col=v==null?'#9aa0a6':(v<=CUT?'#1849a9':(v>=100-CUT?'#d92d20':'#344054'));
       return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12">`
-        +`${r.label}<b style="color:${col}">${v==null?'-':Math.round(v)}</b></button>`;}).join('');
+        +`${r.label}<b style="color:${col}">${S10(v)}</b></button>`;}).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
@@ -296,7 +299,7 @@ function render(){
    +[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']]
      .map(o=>`<button class="sm ${SPAN===o[0]?'on':''}" data-sp="${o[0]}">${o[1]}</button>`).join('')
    +'<span style="width:14px"></span><span class="sub">표시</span>'
-   +[['px','가격','#111827'],['k5','막내 5·3·3','#e03131'],['k10','둘째 10·6·6','#2f9e44'],['k20','큰형 20·12·12','#1971c2']]
+   +[['px','가격','#111827'],['k5','막내','#e8590c'],['k10','둘째','#0ca678'],['k20','큰형','#7048e8']]
      .map(o=>`<button class="sm ${SHOW[o[0]]?'on':''}" data-sh="${o[0]}" style="border-color:${o[2]};${SHOW[o[0]]?'':'color:'+o[2]}">${o[1]}</button>`).join('');
   const spEl=document.getElementById('sp');
   spEl.oninput=e=>{SPAN=SPANOPT[+e.target.value];POS=1e9;render();};
@@ -334,14 +337,15 @@ function render(){
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
-  const line=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:(o==null?3:o)});
+  const line=(d,col,w,ax,o,dash)=>({data:d,borderColor:col,borderWidth:w,borderDash:dash||[],pointRadius:0,tension:.25,yAxisID:ax,order:(o==null?3:o)});
   const ds=[];const NM=[];
   // 가격선은 굵게 맨 위에, 흰 테두리를 깔아 스토캐스틱 선과 확실히 떨어뜨린다
   if(SHOW.px){ds.push(line(px,'rgba(255,255,255,.95)',7,'y',2));NM.push(null);
               ds.push(line(px,'#0b1220',3.4,'y',1));NM.push('종가');}
   if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2'));NM.push('막내');}
-  if(SHOW.k10){ds.push(line(k10,'#0ca678',1.3,'y2'));NM.push('둘째');}
-  if(SHOW.k20){ds.push(line(k20,'#7048e8',1.7,'y2'));NM.push('큰형');}
+  if(SHOW.k10){ds.push(line(k10,'#0ca678',1.6,'y2'));NM.push('둘째');}
+  // 큰형은 점선 — 다른 선보다 두껍게(1.1배). 2026-09-18 사장님 지시.
+  if(SHOW.k20){ds.push(line(k20,'#7048e8',1.8,'y2',3,[7,4]));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
 
@@ -351,8 +355,8 @@ function render(){
     const by0=ca.bottom;
     // 지금 보는 시간축의 3형제 %K·%D를 차트 왼쪽 위에 얹는다.
     (function(){
-      const q=(o)=>{const v=o.k[b],d=o.d[b];return (v==null?'-':Math.round(v))+' / '+(d==null?'-':Math.round(d));};
-      const items=[['막내 5·3·3','#e8590c',r.K.k5],['둘째 10·6·6','#0ca678',r.K.k10],['큰형 20·12·12','#7048e8',r.K.k20]];
+      const q=(o)=>{const v=o.k[b],d=o.d[b];return S10(v)+' / '+S10(d);};
+      const items=[['막내','#e8590c',r.K.k5],['둘째','#0ca678',r.K.k10],['큰형','#7048e8',r.K.k20]];
       g.save();g.font='bold 12px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
       let x=ca.left+6;const y=ca.top+14;
       const txts=items.map(it=>it[0]+' '+q(it[2]));
@@ -414,34 +418,32 @@ function render(){
   chart=new Chart(document.getElementById('cv'),{type:'line',data:{labels,datasets:ds},plugins:[tap],
     options:{responsive:true,maintainAspectRatio:false,animation:false,
       interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>NM[c.datasetIndex]?
-        NM[c.datasetIndex]+' '+(c.parsed.y==null?'-':Math.round(c.parsed.y*10)/10):null}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const nm=NM[c.datasetIndex];if(!nm)return null;
+        const y=c.parsed.y;return nm+' '+(y==null?'-':(c.dataset.yAxisID==='y2'?S10(y):Math.round(y*10)/10));}}}},
       scales:{x:{ticks:{color:'#6b7280',maxTicksLimit:8,font:{size:10}},grid:{color:'#eceef1'}},
         y:{position:'left',ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#eceef1'}},
-        y2:{position:'right',min:0,max:100,ticks:{color:'#6b7280',stepSize:20,font:{size:10}},grid:{display:false}}}}});
+        y2:{position:'right',min:0,max:100,ticks:{color:'#6b7280',stepSize:20,font:{size:10},callback:v=>v/10},grid:{display:false}}}}});
 
   document.getElementById('d0').textContent=fmtT(r.ts[a]);
   document.getElementById('d1').textContent=fmtT(r.ts[b]);
   document.getElementById('mid').textContent=`${LBL[TF]} · 폭 ${span}봉 / 전체 ${N}봉 · 이 구간 ▲${BUY.filter(i=>i>=a&&i<=b).length} ▼${SELL.filter(i=>i>=a&&i<=b).length}`;
 
   document.getElementById('foot').innerHTML=
-    `<b>적극매수</b> = 3형제 %K가 모두 ${CUT} 이하 · <b>적극매도</b> = 모두 ${100-CUT} 이상 · `
+    `<b>적극매수</b> = 3형제 %K가 모두 ${S10(CUT)} 이하 · <b>적극매도</b> = 모두 ${S10(100-CUT)} 이상 · `
    +`<b>상승추세</b> = 셋 중 둘 이상이 ${TRN}봉 전보다 높음. 적극과 추세는 섞지 않고 개수도 따로 셉니다.<br>`
-   +'차트의 <b>▲▼가 조건이 새로 성립한 자리</b>이고, <b>세로 색 띠는 조건이 유지되는 구간 전체</b>입니다. '
-   +'3형제 동시 과매도면 붉은 띠, 동시 과매수면 푸른 띠입니다. '
-   +'차트 맨 아래 가로 띠는 봉마다의 <b>이평 20·60 배열</b>이라, 신호가 정배열 구간에서 났는지 역배열 구간에서 났는지 바로 보입니다.<br>'
+   +'차트의 <b>▲▼가 조건이 새로 성립한 자리</b>입니다 — 붉은 ▲가 적극매수, 푸른 ▼가 적극매도.<br>'
    +'<b>봉 주기별 쓰임</b> — <b>5분봉 = 단타</b>, <b>60분봉 = 스윙</b>(사흘~2주), <b>240분봉 = 추세</b>(며칠~몇 주). '
    +'스윙이면 60분봉에서 타점을 잡되 일봉이 어느 쪽인지 반드시 같이 보십시오.<br>'
    +'<b>★ 수퍼매수</b> = 5분·60분·240분봉 동시 적극매수. 간격을 크게 벌린 셋이라 서로 다른 시간대를 확인합니다.<br>'
-   +`<b>다지기</b> = 최근 60봉에서 막내 %K가 ${CUT} 아래로 새로 내려간 횟수. 많이 다질수록 확률이 올라가되, `
-   +'그동안 가격이 저점을 낮추지 않았어야 응축입니다. <b>이평</b> 정배열이면 신뢰도가 올라가고 역배열이면 내려갑니다.<br>'
+   +`<b>다지기</b> = 최근 60봉에서 막내 %K가 ${S10(CUT)} 아래로 새로 내려간 횟수. 많이 다질수록 확률이 올라가되, `
+   +'그동안 가격이 저점을 낮추지 않았어야 응축입니다.<br>'
    +'· 야후 분봉이 14:55까지만 주는 구간은 <b>네이버 1분봉으로 15:30까지 메웁니다</b>(그 구간 고·저가는 1분 종가의 최대·최소). '
    +'1분봉은 8일치부터 시작해 매일 쌓입니다.<br>'
    +'⚠ 월봉 큰형(20,12)은 일봉 500봉으로는 기간이 모자라 «데이터 부족»입니다.<br>'
    +'<b>계산식 교정(2026-09-17)</b> — %K·%D를 HTS 정식으로 바꿨습니다. '
    +'Σ(종가−n기간최저)/Σ(n기간최고−n기간최저), %D는 지수이동평균입니다. '
    +'사장님 HTS가 내보낸 60분봉 900봉과 오차 0으로 맞췄습니다. '
-   +'이전 식(Fast %K의 단순평균)은 최대 22포인트까지 벌어져 840봉 중 18봉에서 20/80 판정이 달랐습니다.<br>'
+   +'이전 식(Fast %K의 단순평균)은 최대 2.2포인트까지 벌어져 840봉 중 18봉에서 2.0/8.0 판정이 달랐습니다.<br>'
    +'⚠ <b>이 교정 전에 돌린 검증 수치는 모두 무효</b>입니다. 그 숫자를 근거로 넣었던 «정배열 적극매도 격하»도 되돌렸습니다. '
    +'바른 식으로 다시 검증한 뒤 조건을 다시 정합니다.<br>'
    +'⚠ 수수료·세금은 계산에 넣지 않았습니다. 갱신 '
@@ -668,25 +670,25 @@ function setTables(list){   // list: [{code,r60,r240}]
   const row=(nm,a,note)=>`<tr><td><b>${nm}</b></td>${scell(a)}<td class="num small">${a?((a.worst>0?'+':'')+a.worst.toFixed(1)+'%'):'-'}</td><td class="small">${note||''}</td></tr>`;
   let html=`<h2>전체 사이클 — 무산 포함</h2>
     <table><thead><tr><th>무산 처리 방식</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">뜻</th></tr></thead><tbody>
-    ${row('끝까지 보유',stat(M.hold),'80에 못 닿아도 데드크로스가 올 때까지 기다린다')}
-    ${row('다음 20↓에서 손절',stat(M.cut),'무산되면 다음 사이클 진입 시점에 정리한다')}
+    ${row('끝까지 보유',stat(M.hold),'8.0에 못 닿아도 데드크로스가 올 때까지 기다린다')}
+    ${row('다음 2.0↓에서 손절',stat(M.cut),'무산되면 다음 사이클 진입 시점에 정리한다')}
     </tbody></table>
-    <p class="note" style="margin:0 0 4px">사이클 ${tot}개 중 <b>${miss}개(${(miss/tot*100).toFixed(0)}%)가 80에 못 닿고 무산</b>됐습니다.
-    아래 «청산 규칙 비교»는 <b>80에 닿은 ${tot-miss}개만</b>으로 낸 것이라 승률이 높게 나옵니다 — 규칙끼리 견줄 때만 보십시오.</p>
-    <h2>청산 규칙 비교 · 80에 닿은 사이클만</h2>
+    <p class="note" style="margin:0 0 4px">사이클 ${tot}개 중 <b>${miss}개(${(miss/tot*100).toFixed(0)}%)가 8.0에 못 닿고 무산</b>됐습니다.
+    아래 «청산 규칙 비교»는 <b>8.0에 닿은 ${tot-miss}개만</b>으로 낸 것이라 승률이 높게 나옵니다 — 규칙끼리 견줄 때만 보십시오.</p>
+    <h2>청산 규칙 비교 · 8.0에 닿은 사이클만</h2>
     <table><thead><tr><th>청산 규칙</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th>최악</th><th style="text-align:left">비고</th></tr></thead><tbody>
-    ${row('데드크로스',stat(M.dead),'80 위에서 %K가 %D 하향돌파 — 세팅 기본값')}
-    ${row('80 이탈',stat(M.out80),'큰형이 80 아래로')}
+    ${row('데드크로스',stat(M.dead),'8.0 위에서 %K가 %D 하향돌파 — 세팅 기본값')}
+    ${row('8.0 이탈',stat(M.out80),'큰형이 8.0 아래로')}
     ${row('큰형 3봉 꺾임',stat(M.bend),'')}
-    ${row('80 도달 즉시',stat(M.hit80),'가장 이르다')}
+    ${row('8.0 도달 즉시',stat(M.hit80),'가장 이르다')}
     ${row('사이클 최고가',stat(M.peak),'도달 불가능한 상한 — 비교용')}
     </tbody></table>`;
   const dq=stat(M.dd);
   html+=`<h2>240분 수준별 · 무산 포함(손절 방식)</h2>
     <table><thead><tr><th>진입 시 240분 큰형</th><th colspan="2" style="text-align:left">승률·건수 / 평균</th><th style="text-align:left">읽는 법</th></tr></thead><tbody>
-    <tr><td><b>30 미만</b></td>${scell(stat(G.lo))}<td class="small">상위도 같이 무너진 자리</td></tr>
-    <tr><td><b>30 ~ 70</b></td>${scell(stat(G.mid))}<td class="small">상위에 여력 있는 자리</td></tr>
-    <tr><td><b>70 초과</b></td>${scell(stat(G.hi))}<td class="small">상위가 이미 과열</td></tr>
+    <tr><td><b>3.0 미만</b></td>${scell(stat(G.lo))}<td class="small">상위도 같이 무너진 자리</td></tr>
+    <tr><td><b>3.0 ~ 7.0</b></td>${scell(stat(G.mid))}<td class="small">상위에 여력 있는 자리</td></tr>
+    <tr><td><b>7.0 초과</b></td>${scell(stat(G.hi))}<td class="small">상위가 이미 과열</td></tr>
     </tbody></table>
     <p class="note" style="margin-top:0">진입 후 반등까지 감수한 폭은 평균 ${dq?dq.avg.toFixed(1):'-'}%, 최악 ${dq?dq.worst.toFixed(1):'-'}%입니다 — 손절선의 근거입니다.</p>`;
   if(per.length>1){
@@ -704,16 +706,16 @@ function setCycleTable(r60,r240){
   for(const c of last){
     const d=pct(C,c.dead,c.ep);
     const g=c.g;
-    const gt=g==null?'-':(g<30?`<span class="neg">${g.toFixed(0)}</span>`:(g>70?`<span class="small">${g.toFixed(0)}</span>`:`<span class="pos">${g.toFixed(0)}</span>`));
+    const gt=g==null?'-':(g<30?`<span class="neg">${S10(g)}</span>`:(g>70?`<span class="small">${S10(g)}</span>`:`<span class="pos">${S10(g)}</span>`));
     b+=`<tr><td class="small">${fmtT(r60.ts[c.s])}</td><td class="small">${fmtT(r60.ts[c.e])}</td>
       <td class="num">${(+c.ep).toLocaleString()}</td>
       <td class="num small">${((c.low-c.ep)/c.ep*100).toFixed(1)}%</td>
       <td class="num">${gt}</td>
-      <td class="small">${c.dead==null?(c.i80==null?'<span class="neg">무산</span>':'80 도달·청산 전'):fmtT(r60.ts[c.dead])}</td>
+      <td class="small">${c.dead==null?(c.i80==null?'<span class="neg">무산</span>':'8.0 도달·청산 전'):fmtT(r60.ts[c.dead])}</td>
       <td class="num ${d==null?'small':(d>0?'pos':'neg')}">${d==null?'-':((d>0?'+':'')+d.toFixed(2)+'%')}</td>
       <td class="num small">+${((c.peak-c.ep)/c.ep*100).toFixed(1)}%</td></tr>`;}
   return `<h2>최근 사이클 ${last.length}건</h2>
-    <table><thead><tr><th>20↓ 시작</th><th>진입(20↑)</th><th>진입가</th><th>진입전 최저</th>
+    <table><thead><tr><th>2.0↓ 시작</th><th>진입(2.0↑)</th><th>진입가</th><th>진입전 최저</th>
       <th>240분</th><th style="text-align:left">청산(데드크로스)</th><th>수익률</th><th>구간최고</th></tr></thead>
     <tbody>${b}</tbody></table>`;}
 
@@ -738,11 +740,11 @@ async function renderV(){
       .filter(x=>x.r60);
     el.innerHTML=bar
       +`<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${LS.length}종목 합산</h2>`
-      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 20 아래로 갔다가 <b>20 위로 복귀하는 봉</b>(반등 확인).
-         청산 = <b>80 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 20↓ 진입 전까지입니다.</p>`
+      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
+         청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 2.0↓ 진입 전까지입니다.</p>`
       +setTables(LS)
       +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
-        <p class="note" style="margin:0 0 6px">3형제가 동시에 20 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.
+        <p class="note" style="margin:0 0 6px">3형제가 동시에 2.0 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.
         세팅 규칙이 아니라 기준① 하나만 떼어 본 것입니다.</p>`
       +vTableAll(VALL,2,VHOLD)+vTableAll(VALL,-2,VHOLD)
       +`<p class="note">관심종목 ${VALL.length}개의 분봉 신호를 한 통에 모은 것입니다. 한 종목 수십 건으로는
@@ -761,14 +763,14 @@ async function renderV(){
   const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m');
   const setHtml = r60
     ? `<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${NAMES[CODE]||CODE}</h2>`
-      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 20 아래로 갔다가 <b>20 위로 복귀하는 봉</b>(반등 확인).
-         청산 = <b>80 위에서 %K가 %D를 하향돌파</b>. 60분봉 ${r60.c.length}봉 구간입니다.</p>`
+      +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
+         청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 60분봉 ${r60.c.length}봉 구간입니다.</p>`
       +setTables([{code:CODE,r60,r240}])
       +setCycleTable(r60,r240)
     : '<div class="err">이 종목은 60분봉이 없어 세팅 검증을 할 수 없습니다.</div>';
   el.innerHTML=bar+setHtml
     +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
-      <p class="note" style="margin:0 0 6px">3형제가 동시에 20 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.</p>`
+      <p class="note" style="margin:0 0 6px">3형제가 동시에 2.0 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.</p>`
     +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
     +`<p class="note">신호는 <b>조건이 새로 성립한 봉</b>만 셉니다(유지되는 동안은 한 번). 그 봉의 종가에 들어가
        ${VHOLD}봉 뒤 종가에 나온다고 보고 잰 값이며, <b>수수료·세금·미끄러짐은 넣지 않았습니다.</b>
@@ -803,12 +805,13 @@ function showTab(n){
 //   상위 제약      = 240분 큰형이 20 근처로 무너져 있으면 60분 반등은 무산됐다(7월 폭락기 5연속)
 let SROWS=null, SSPAN=3, SCH={};
 const SSPANS=[[0.7,'좁게'],[1,'기본'],[1.6,'넓게'],[2.6,'아주 넓게']];
-const SBASE={'240m':60,'60m':120,'5m':140};
-const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 80 → 매도'],
+const SBASE={'240m':60,'60m':120,'5m':140,'3m':200};
+const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 8.0 → 매도'],
              '5m':['분할','단기 고·저점으로 담는 자리를 정한다'],
+             '3m':['분할 세밀','5분보다 잘게 — 담는 자리를 좁힌다'],
              '240m':['흐름','큰 흐름만 본다']};
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
-const SORD=[['60m','cvS6'],['5m','cvS5'],['240m','cvS4']];
+const SORD=[['60m','cvS6'],['5m','cvS5'],['3m','cvS3'],['240m','cvS4']];
 let SMUL=1;
 // 세팅 탭 차트도 스캐너처럼 끌어서 이동·휠로 확대축소한다 (260918 사장님 지시).
 // SBARS = 그 차트가 보여줄 봉수, SOFF = 오른쪽 끝에서 몇 봉 뒤로 물러났는지.
@@ -869,9 +872,9 @@ function gate240(r){
   // 2026-09-17 재검증 — 24종목·무산 포함 1,464 사이클에서
   // 30미만 756건 38% / 30~70 607건 39% / 70초과 89건 27%.
   // «30 미만이 위험»은 11건짜리 단일 종목 관찰이어서 근거가 없었다. 70 초과만 경고한다.
-  if(v>70)return {cls:'no',txt:`240분 큰형 ${v.toFixed(0)} — 큰 흐름이 이미 과열. 실측 89건 승률 27%로 가장 나빴다`,v};
-  if(v<30)return {cls:'ok',txt:`240분 큰형 ${v.toFixed(0)} — 큰 흐름도 낮다. 실측상 30~70과 차이 없다(38 vs 39%)`,v};
-  return {cls:'ok',txt:`240분 큰형 ${v.toFixed(0)} — 큰 흐름 무리 없음`,v};
+  if(v>70)return {cls:'no',txt:`240분 큰형 ${S10(v)} — 큰 흐름이 이미 과열. 실측 89건 승률 27%로 가장 나빴다`,v};
+  if(v<30)return {cls:'ok',txt:`240분 큰형 ${S10(v)} — 큰 흐름도 낮다. 실측상 3.0~7.0과 차이 없다(38 vs 39%)`,v};
+  return {cls:'ok',txt:`240분 큰형 ${S10(v)} — 큰 흐름 무리 없음`,v};
 }
 
 function drawSet(tf,cid,r,cy,sp5){
@@ -885,14 +888,26 @@ function drawSet(tf,cid,r,cy,sp5){
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
   const ln=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:o});
-  const ds=[ln(px,'rgba(255,255,255,.95)',6,'y',2), ln(px,'#0b1220',3,'y',1),
-            ln(k5,'#e8590c',1.1,'y2',3), ln(k10,'#0ca678',1.1,'y2',3), ln(k20,'#7048e8',1.9,'y2',3),
-            {data:labels.map(()=>20),borderColor:'rgba(217,45,32,.45)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4},
-            {data:labels.map(()=>80),borderColor:'rgba(24,73,169,.45)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4}];
-  const NM=[null,'종가','막내','둘째','큰형'];
+  const ds=[ln(px,'rgba(255,255,255,.95)',7,'y',2), ln(px,'#0b1220',3.4,'y',1),
+            ln(k5,'#e8590c',1.3,'y2',3), ln(k10,'#0ca678',1.6,'y2',3),
+            Object.assign(ln(k20,'#7048e8',1.8,'y2',3),{borderDash:[7,4]}),
+            {data:labels.map(()=>20),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4},
+            {data:labels.map(()=>80),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4}];
+  const NM=[null,'가격','막내','둘째','큰형'];
   const plug={id:'s'+tf,beforeDatasetsDraw(ch){
     const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
     const X=i=>xs.getPixelForValue(i-a);
+    // 타이밍 탭과 같은 자리에 3형제 %K/%D
+    (function(){
+      const q=o=>{const v=o.k[b],d=o.d[b];return S10(v)+' / '+S10(d);};
+      const items=[['막내','#e8590c',r.K.k5],['둘째','#0ca678',r.K.k10],['큰형','#7048e8',r.K.k20]];
+      g.save();g.font='bold 11px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
+      const txts=items.map(it=>it[0]+' '+q(it[2]));
+      const w=txts.reduce((s2,t)=>s2+g.measureText(t).width+14,0)+6;
+      g.fillStyle='rgba(255,255,255,.88)';g.fillRect(ca.left+2,ca.top+2,w,16);
+      let x=ca.left+6;const y=ca.top+13;
+      items.forEach((it,i)=>{g.fillStyle=it[1];g.fillText(txts[i],x,y);x+=g.measureText(txts[i]).width+14;});
+      g.restore();})();
     if(tf==='60m'){
       const zone=(list,fill)=>list.forEach(z=>{const s0=Math.max(z[0],a),e0=Math.min(z[1],b);
         if(e0<a||s0>b)return;const x1=X(s0),x2=X(e0);
@@ -902,11 +917,11 @@ function drawSet(tf,cid,r,cy,sp5){
         g.save();g.strokeStyle=col;g.lineWidth=1.3;g.setLineDash([5,4]);
         g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
         g.fillStyle=col;g.beginPath();
-        if(dir>0){g.moveTo(x,ca.bottom-8);g.lineTo(x-7,ca.bottom-22);g.lineTo(x+7,ca.bottom-22);}
-        else{g.moveTo(x,ca.top+4);g.lineTo(x-7,ca.top+18);g.lineTo(x+7,ca.top+18);}
-        g.closePath();g.fill();g.strokeStyle='#fff';g.lineWidth=1.4;g.stroke();
+        if(dir>0){g.moveTo(x,ca.bottom-6);g.lineTo(x-8,ca.bottom-22);g.lineTo(x+8,ca.bottom-22);}
+        else{g.moveTo(x,ca.top+4);g.lineTo(x-8,ca.top+20);g.lineTo(x+8,ca.top+20);}
+        g.closePath();g.fill();g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();
         g.font='bold 11px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
-        const ty=(dir>0)?ca.bottom-26:ca.top+31, w=g.measureText(tx).width+8;
+        const ty=(dir>0)?ca.bottom-26:ca.top+33, w=g.measureText(tx).width+8;
         g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ty-11,w,14);
         g.fillStyle=col;g.fillText(tx,x,ty);g.restore();});
       mark(cy.BUY,'#d92d20',1,'매수');
@@ -926,11 +941,11 @@ function drawSet(tf,cid,r,cy,sp5){
   SCH[cid]=new Chart(document.getElementById(cid),{type:'line',data:{labels,datasets:ds},plugins:[plug],
     options:{responsive:true,maintainAspectRatio:false,animation:false,
       interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>NM[c.datasetIndex]?
-        NM[c.datasetIndex]+' '+(c.parsed.y==null?'-':Math.round(c.parsed.y*10)/10):null}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const nm=NM[c.datasetIndex];if(!nm)return null;
+        const y=c.parsed.y;return nm+' '+(y==null?'-':(c.dataset.yAxisID==='y2'?S10(y):Math.round(y*10)/10));}}}},
       scales:{x:{ticks:{color:'#6b7280',maxTicksLimit:7,font:{size:9}},grid:{display:false}},
         y:{position:'left',ticks:{color:'#6b7280',font:{size:9}},grid:{color:'#eceef1'}},
-        y2:{position:'right',min:0,max:100,ticks:{color:'#6b7280',stepSize:20,font:{size:9}},grid:{display:false}}}}});
+        y2:{position:'right',min:0,max:100,ticks:{color:'#6b7280',stepSize:20,font:{size:9},callback:v=>v/10},grid:{display:false}}}}});
   return {span,a,b};
 }
 
@@ -944,15 +959,15 @@ async function renderS(){
   if(!r60){el.innerHTML='<div class="err">이 종목은 60분봉이 없습니다. 관심 25종목만 분봉을 모읍니다.</div>';return;}
   const cy=cyc60(r60), gt=gate240(r240), sp5=r5?split5(r5):null;
   const st5=r5?rowState(r5.K):null, st6=rowState(r60.K);
-  const agg = st6.s===2 ? '<span class="tag hot" style="background:#fef3f2;color:#b42318">적극매수 (60분 3형제 동시 20↓)</span>' : '';
+  const agg = st6.s===2 ? '<span class="tag hot" style="background:#fef3f2;color:#b42318">적극매수 (60분 3형제 동시 2.0↓)</span>' : '';
   const SP=['분할매수','보유','매도 준비','청산 완료'];
   const steps=SP.map(x=>{
     const done=SP.indexOf(x)<SP.indexOf(cy.stage);
     const on=(x===cy.stage);
-    const desc={'분할매수':'60분 큰형 20 이하 — 5분봉 보며 나눠 담기',
-                '보유':'60분 큰형 20 위 복귀 — 반등 확인됨',
-                '매도 준비':'60분 큰형 80 이상 — 아직 팔지 않는다',
-                '청산 완료':'80 위에서 데드크로스 — 매도 시점'}[x];
+    const desc={'분할매수':'60분 큰형 2.0 이하 — 5분봉 보며 나눠 담기',
+                '보유':'60분 큰형 2.0 위 복귀 — 반등 확인됨',
+                '매도 준비':'60분 큰형 8.0 이상 — 아직 팔지 않는다',
+                '청산 완료':'8.0 위에서 데드크로스 — 매도 시점'}[x];
     return `<div class="step ${on?'on':(done?'done':'')}"><b>${x}</b>${desc}</div>`;}).join('');
   const spanb=SSPANS.map(([m,t])=>`<button class="sm ${m===SMUL?'on':''}" data-smul="${m}">${t}</button>`).join('');
   const pxNow=r60.c[r60.c.length-1];
@@ -961,25 +976,25 @@ async function renderS(){
   <div class="verdict ${cy.stage==='분할매수'||cy.stage==='보유'?'buy':(cy.stage==='매도 준비'?'sell':'')}">
     <div class="big">${cy.stage}</div>
     <div class="meta">${NAMES[CODE]||CODE} ${CODE} · ${pxNow!=null?(+pxNow).toLocaleString():'-'} ·
-      60분 큰형 ${cy.k==null?'-':cy.k.toFixed(0)} / %D ${cy.d==null?'-':cy.d.toFixed(0)} ${agg}
+      60분 큰형 ${S10(cy.k)} / %D ${S10(cy.d)} ${agg}
       <br><span class="gate ${gt.cls}">${gt.txt}</span></div>
   </div>
   <div class="steps">${steps}</div>
   <div class="bar"><span class="sub">구간</span>${spanb}</div>
   ${SSET_HTML()}
   <p class="note">
-    <b>이 매매의 목적은 하나입니다 — 60분 큰형이 바닥일 때 사서, 60분 큰형이 80에 올 때 판다.</b>
+    <b>이 매매의 목적은 하나입니다 — 60분 큰형이 바닥일 때 사서, 60분 큰형이 8.0에 올 때 판다.</b>
     그래서 기준봉은 60분봉 하나이고, 화면도 위에서부터 <b>60분(메인) → 5분(분할) → 240분(흐름)</b> 순으로 놓았습니다.<br>
-    <b>60분 — 메인.</b> 붉은 세로 띠가 큰형 20 이하입니다. 이 구간이 «바닥 구간»이고,
-    띠가 끝나며 큰형이 20 위로 올라서는 자리가 ▲<b>매수</b>(반등 확인)입니다.
-    푸른 띠는 큰형 80 이상 — 목표 지점에 왔다는 뜻이지만 여기서 바로 팔지 않습니다.
-    80 위에서 %K가 %D를 꺾고 내려오는 ▼<b>청산</b>이 매도 시점입니다.
+    <b>60분 — 메인.</b> 붉은 세로 띠가 큰형 2.0 이하입니다. 이 구간이 «바닥 구간»이고,
+    띠가 끝나며 큰형이 2.0 위로 올라서는 자리가 ▲<b>매수</b>(반등 확인)입니다.
+    푸른 띠는 큰형 8.0 이상 — 목표 지점에 왔다는 뜻이지만 여기서 바로 팔지 않습니다.
+    8.0 위에서 %K가 %D를 꺾고 내려오는 ▼<b>청산</b>이 매도 시점입니다.
     실측에서 데드크로스가 사이클 최고가의 78%를 가져갔습니다(+9.63% vs 상한 +12.27%).<br>
     <b>5분 — 분할.</b> 단기 고·저점을 보고 «어디서 얼마나 담을지»만 정합니다. 매수·매도 판정은 하지 않습니다.
     차트 아래 작은 삼각형이 <b>막·둘·큰</b> 각각의 분할 트리거입니다.<br>
     <b>240분 — 흐름.</b> 큰 흐름만 봅니다. 재검증(24종목·무산 포함 1,464 사이클) 결과
-    30 미만 38% / 30~70 39% / 70 초과 27%로, <b>낮은 쪽은 차이가 없고 70 초과만 나쁩니다.</b>
-    이전에 «30 미만이면 위험»이라고 경고했던 것은 11건짜리 단일 종목 관찰이어서 내렸습니다.<br>
+    3.0 미만 38% / 3.0~7.0 39% / 7.0 초과 27%로, <b>낮은 쪽은 차이가 없고 7.0 초과만 나쁩니다.</b>
+    이전에 «3.0 미만이면 위험»이라고 경고했던 것은 11건짜리 단일 종목 관찰이어서 내렸습니다.<br>
     <b>계산식은 HTS 정식</b>입니다 — Σ(종가−최저)/Σ(최고−최저), %D는 지수이동평균.
     사장님 HTS 내보내기 900봉과 오차 0으로 맞췄습니다.<br>
     ⚠ 분할 회차·비중과 손절선은 아직 정하지 않았습니다. 진입 전 최저는 24종목 평균 −3.2%,
