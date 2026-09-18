@@ -1133,12 +1133,12 @@ function SSET_HTML(){
 }
 
 // ═══════════ 테스트파동 탭 (2026-09-19 대표 지시 · 계획서 _계획_260919_테스트파동탭.md) ═══════════
-// 시간축마다 막내(5·3·3) %K 한 선으로(처음엔 3형제 평균이었다), 다섯 시간축(1·5·30·60·240분)을 가격과 함께 한 차트에.
+// 시간축마다 막내(5·3·3) %K 한 선으로(처음엔 3형제 평균이었다), 세 시간축(5·60·240분)을 가격과 함께 한 차트에.
 // 기준 봉(x축)보다 굵은 봉의 값은 그 봉 시각부터 다음 봉 시각 전까지 같은 값으로 잇는다(«연장»).
-const WTFS=['1m','5m','30m','60m','240m'];   // 2026-09-19 대표 「1분 5분 30분 60분 240분 5개로」
-const WCOL={'1m':'#e03131','5m':'#f76707','30m':'#e6a700','60m':'#2f9e44','240m':'#1c7ed6'};   // 작은 것부터 빨·주·노·초·파
+const WTFS=['5m','60m','240m'];   // 2026-09-19 01:5x 대표 「5분 60분 240분으로 구성해보자」 (앞서 1·5·30·60·240 다섯)
+const WCOL={'5m':'#e03131','60m':'#f76707','240m':'#e6a700'};   // 작은 것부터 빨·주·노
 let WSPAN=250, WPOS=1e9, WROWS=null, WCH=null;
-const WSHOW={'1m':true,'5m':true,'30m':true,'60m':true,'240m':true};   // 복합N분봉 켜고 끄기
+const WSHOW={'5m':true,'60m':true,'240m':true};   // 막내N분봉 켜고 끄기
 // 가로축은 켜져 있는 선 중 가장 잘은 봉을 따른다(기준 봉 단추 없음 — 2026-09-19 대표).
 function wBase(){for(const tf of WTFS)if(WSHOW[tf]&&WROWS.some(r=>r.tf===tf))return tf;return WROWS[0].tf;}
 // 2026-09-19 01:4x 대표 「복합분봉이 아니고 각각의 5 3 3값만 넣어서」 — 선 = 그 시간축 막내(5·3·3) %K.
@@ -1165,7 +1165,7 @@ async function renderW(){
     +`<div class="lg"><span><i style="background:#0ca678;height:4px"></i>가격</span>${leg}<span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동 · 끌기 = 이동</span></div>`
     +`<p class="note">각 선은 그 시간축 <b>막내(5·3·3) %K</b> 하나입니다. 화면은 0~10.`
     +` 가로축은 켜져 있는 선 중 가장 잘은 봉을 따르고, 굵은 봉의 값은 <b>그 봉 시각부터 다음 봉까지 같은 값으로 이어</b> 그립니다.`
-    +` 1분봉 원본은 8~9거래일뿐이라 더 긴 구간을 보려면 막내1분봉을 끄십시오. 붉은 점선 ${S10(CUT)} · 푸른 점선 ${S10(100-CUT)}.</p>`;
+    +` 5분봉 원본은 60거래일이라 더 긴 구간을 보려면 막내5분봉을 끄십시오(60분 축 3년). 붉은 점선 ${S10(CUT)} · 푸른 점선 ${S10(100-CUT)}.</p>`;
   el.querySelectorAll('[data-wt]').forEach(b=>b.onclick=()=>{WSHOW[b.dataset.wt]=!WSHOW[b.dataset.wt];WPOS=1e9;renderW();});
   el.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>{
     const N=WROWS.find(r=>r.tf===wBase()).ts.length,cur=(WSPAN<=0||WSPAN>=N)?N:WSPAN,ctr=WPOS+cur/2;
