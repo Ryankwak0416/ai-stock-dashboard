@@ -95,8 +95,6 @@ td.num{font-variant-numeric:tabular-nums}
   <select id="sel"></select>
   <span class="sub">컷</span>
   <select id="cut"><option value="20">2.0 / 8.0</option><option value="15">1.5 / 8.5</option><option value="25">2.5 / 7.5</option><option value="30">3.0 / 7.0</option></select>
-  <span class="sub">추세</span>
-  <select id="tr"><option value="3">3봉 전 대비</option><option value="1">1봉 전</option><option value="5">5봉 전</option></select>
 </div>
 
 <div class="bar">
@@ -140,7 +138,8 @@ const SUPER=['5m','60m','240m'];
 const ROLE={'5m':'단타','60m':'스윙','240m':'추세'};
 const RTAG=tf=>ROLE[tf]?`<span class="role">${ROLE[tf]}</span>`:'';
 const SPANS=[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']];
-let CUT=20,TRN=3,CODE=null,TF='60m',SPAN=120,POS=1e9,NAMES={},WL=[],DATA=null,chart=null;
+// TRN=1 고정 — 추세는 «현재 기준 기울기»(마지막 봉 − 직전 봉 > 0 이면 상승). 2026-09-19 대표 「파동 해석은 현재 기준, 추세 드롭다운은 없앤다」.
+let CUT=20,TRN=1,CODE=null,TF='60m',SPAN=120,POS=1e9,NAMES={},WL=[],DATA=null,chart=null;
 let SHOW={px:true,k5:true,k10:true,k20:true};
 const SPANOPT=[30,40,60,80,100,120,160,200,250,300,0];
 
@@ -514,7 +513,7 @@ function render(){
 
   document.getElementById('foot').innerHTML=
     `<b>적극매수</b> = 3형제 %K가 모두 ${S10(CUT)} 이하 · <b>적극매도</b> = 모두 ${S10(100-CUT)} 이상 · `
-   +`<b>상승추세</b> = 셋 중 둘 이상이 ${TRN}봉 전보다 높음. 적극과 추세는 섞지 않고 개수도 따로 셉니다.<br>`
+   +`<b>상승추세</b> = 현재 기준 기울기 — 셋 중 둘 이상이 직전 봉보다 높음(기울기 +). 3형제 동시 ${S10(CUT)} 이하는 기울기와 무관하게 적극매수입니다.<br>`
    +`차트의 <b>▲▼가 규칙이 새로 성립한 자리</b>이고 글자의 번호가 어느 규칙인지입니다 — 매수 ${BUY_RULES.map(x=>x.no+' '+x.name).join(' / ')} · 매도 ${SELL_RULES.map(x=>x.no+' '+x.name).join(' / ')}. 규칙은 앞으로 목록에 더해집니다.<br>`
    +'<b>봉 주기별 쓰임</b> — <b>5분봉 = 단타</b>, <b>60분봉 = 스윙</b>(사흘~2주), <b>240분봉 = 추세</b>(며칠~몇 주). '
    +'스윙이면 60분봉에서 타점을 잡되 일봉이 어느 쪽인지 반드시 같이 보십시오.<br>'
@@ -1382,7 +1381,6 @@ async function go(){
   document.getElementById('tabV').onclick=()=>showTab('V');
   document.getElementById('tabW').onclick=()=>showTab('W');
   document.getElementById('cut').onchange=e=>{CUT=+e.target.value;render();if(TAB==='W')drawW();};
-  document.getElementById('tr').onchange=e=>{TRN=+e.target.value;render();};
   document.getElementById('sc').oninput=e=>{POS=+e.target.value;render();};
   document.getElementById('prev').onclick=()=>{POS=Math.max(0,POS-Math.round(SPAN/3||20));render();};
   document.getElementById('next').onclick=()=>{POS=POS+Math.round(SPAN/3||20);render();};
