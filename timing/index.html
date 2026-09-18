@@ -70,6 +70,8 @@ td.num{font-variant-numeric:tabular-nums}
 .wbox.drag{cursor:grabbing}
 .sbox.drag{cursor:grabbing}
 .tf b{display:block;font-size:14px;margin-top:1px}
+.tf em{display:block;font-style:normal;font-size:10px;font-weight:700;margin-top:1px;line-height:1.1}
+.tf em.buy{color:#d92d20}.tf em.sell{color:#1849a9}.tf em.none{color:#c9ced8}
 #tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
 .cbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
@@ -320,11 +322,17 @@ function render(){
   if(!data.rows.some(r=>r.tf===TF))TF=data.rows[0].tf;
   head();
   // 시간축 탭 — 라벨 아래에 그 봉의 «큰형 %K»를 박아 전 시간축 요약표를 대신한다.
+  // 탭마다 마지막 신호를 적는다 — ▲매수(3형제 매수 규칙)가 ▼적극매도보다 뒤면 「▲매수 N봉전」, 반대면 「▼매도 N봉전」. 2026-09-19 대표 지시.
+  const lastSig=r=>{const n=r.c.length-1;const bs=buySig(r.K).map(o=>o.i);let sl=-1;
+    for(let i=n;i>=1;i--){const q=stateAt(r.K,i),p=stateAt(r.K,i-1);if(!q.lack&&q.s===-2&&p.s!==-2){sl=i;break;}}
+    const bl=bs.length?bs[bs.length-1]:-1;
+    if(bl<0&&sl<0)return '<em class="none">-</em>';
+    return bl>sl?`<em class="buy">▲매수 ${n-bl}봉전</em>`:`<em class="sell">▼매도 ${n-sl}봉전</em>`;};
   document.getElementById('tfbar').innerHTML=
     data.rows.map(r=>{const v=lastVal(r.K.k20.k);
       const col=v==null?'#9aa0a6':(v<=CUT?'#1849a9':(v>=100-CUT?'#d92d20':'#344054'));
-      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12">`
-        +`${r.label}<b style="color:${col}">${S10(v)}</b></button>`;}).join('');
+      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12 · 아래는 마지막 신호">`
+        +`${r.label}<b style="color:${col}">${S10(v)}</b>${lastSig(r)}</button>`;}).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
