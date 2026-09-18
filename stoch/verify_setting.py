@@ -107,6 +107,115 @@ def series(bars):
             "k5": k5, "k10": k10, "k20": k20, "d20": d20}
 
 
+def clock_chunk(bars, mins):
+    """1분봉을 09:00(KST) 기점 mins분 단위로 묶는다 — collect_min.clock_chunk·페이지 chunkClock과 같은 규칙."""
+    t, h, l, c = bars["t"], bars["h"], bars["l"], bars["c"]
+    out = {"t": [], "h": [], "l": [], "c": []}
+    key = None
+    step = mins * 60
+    for i in range(len(t)):
+        since9 = ((t[i] + 32400) % 86400) - 32400
+        if since9 < 0:
+            continue
+        k = t[i] - since9 + (since9 // step) * step
+        if k != key:
+            key = k
+            out["t"].append(k); out["h"].append(h[i]); out["l"].append(l[i]); out["c"].append(c[i])
+        else:
+            if h[i] > out["h"][-1]: out["h"][-1] = h[i]
+            if l[i] < out["l"][-1]: out["l"][-1] = l[i]
+            out["c"][-1] = c[i]
+    return out
+
+
+# ─────────────── 3형제 매수 규칙 (2026-09-18 대표 지시 · 페이지 buySig/sellSig/pairUp 과 동일) ───────────────
+BUYP = dict(FLOOR=20, RISE=20, TURN=3, WIN1=12, WIN2=12)
+TFS_ALL = ["1m", "3m", "5m", "10m", "30m", "60m", "120m", "240m"]
+
+
+def buy_sig(r, P=BUYP):
+    a, b, g, gd = r["k5"], r["k10"], r["k20"], r["d20"]
+    N = len(a)
+    def tr(x, i):
+        return (x[i] is not None and x[i - 1] is not None and x[i + 1] is not None
+                and x[i] <= x[i - 1] and x[i + 1] > x[i] and x[i] <= P["FLOOR"])
+    out = []
+    t1 = t2 = None
+    used = False
+    for i in range(1, N - 1):
+        if tr(a, i):
+            t1, t2, used = i, None, False
+        if t1 is not None and t2 is None and i >= t1 and i - t1 <= P["WIN1"] and tr(b, i):
+            t2, used = i, False
+        if (t2 is not None and not used and i > t2 and i - t2 <= P["WIN2"]
+                and None not in (a[i], b[i], a[i - 1], b[i - 1], g[i], gd[i], g[i - 1], gd[i - 1])
+                and a[i] - a[t1] >= P["RISE"] and b[i] - b[t2] >= P["RISE"]
+                and a[i] > a[i - 1] and b[i] > b[i - 1]
+                and g[i] > gd[i] and g[i - 1] <= gd[i - 1] and g[i] - g[i - 1] >= P["TURN"]):
+            out.append(i)
+            used = True
+    return out
+
+
+def state_at(r, i):
+    v = (r["k5"][i], r["k10"][i], r["k20"][i])
+    if None in v:
+        return None
+    if all(x <= 20 for x in v):
+        return 2
+    if all(x >= 80 for x in v):
+        return -2
+    return 0
+
+
+def old_buy_sig(r):
+    """종전 적극매수(3형제 동시 20 이하)가 새로 성립한 봉 — 비교용."""
+    return [i for i in range(1, len(r["c"])) if state_at(r, i) == 2 and state_at(r, i - 1) != 2]
+
+
+def sell_sig(r, mode="dead"):
+    g, gd = r["k20"], r["d20"]
+    out = []
+    for i in range(1, len(g)):
+        if mode == "aggr":
+            if state_at(r, i) == -2 and state_at(r, i - 1) != -2:
+                out.append(i)
+        elif (None not in (g[i], gd[i], g[i - 1], gd[i - 1])
+              and g[i] < gd[i] and g[i - 1] >= gd[i - 1] and g[i - 1] >= 80):
+            out.append(i)
+    return out
+
+
+def pair_up(r, buys, sells):
+    c = r["c"]
+    out, si, hold, dup, opn = [], 0, -1, 0, None
+    for i in buys:
+        if i <= hold:
+            dup += 1
+            continue
+        while si < len(sells) and sells[si] <= i:
+            si += 1
+        if si >= len(sells):
+            opn = i
+            break
+        j = sells[si]
+        out.append(((c[j] - c[i]) / c[i] * 100.0, j - i))
+        hold = j
+    return out, dup, opn
+
+
+def pair_row(name, pairs, opn):
+    if not pairs:
+        return f"  {name:<6} {'-':>6}"
+    n = len(pairs)
+    rets = [x[0] for x in pairs]
+    win = sum(1 for x in rets if x > 0) / n * 100
+    bars = sum(x[1] for x in pairs) / n
+    return (f"  {name:<6} {n:>5}건  승률 {win:>4.0f}%  평균 {sum(rets)/n:>+7.2f}%  "
+            f"최악 {min(rets):>+7.1f}%  최고 {max(rets):>+7.1f}%  보유 {bars:>5.0f}봉  진행중 {opn}")
+
+
+
 # ─────────────────────── 사이클 추출 ───────────────────────
 def g240_at(r240, ts):
     """진입 시각 이하의 마지막 240분봉 큰형 %K."""
@@ -211,6 +320,7 @@ def main():
     ap.add_argument("--exclude-inverse", action="store_true")
     ap.add_argument("--exclude-leverage", action="store_true")
     ap.add_argument("--only", default=None)
+    ap.add_argument("--sell", default="dead", choices=["dead", "aggr"], help="매수→매도 표의 매도 신호")
     args = ap.parse_args()
 
     files = sorted(glob.glob(os.path.join(RAW, "*.json.gz")))
@@ -226,6 +336,8 @@ def main():
     n_cyc = n_miss = 0
     dd = Acc()
     used = []
+    PT = {tf: [[], 0] for tf in TFS_ALL}     # 3형제 매수 규칙 — [짝 목록, 진행중 수]
+    PO = {tf: [[], 0] for tf in TFS_ALL}     # 종전 적극매수 — 비교
 
     for f in files:
         code = os.path.basename(f)[:-8]
@@ -242,6 +354,24 @@ def main():
         if not cy:
             continue
         used.append(code)
+        # 매수 신호 → 매도 신호 (페이지 검증 탭 맨 위 표와 같은 계산)
+        allt = {tf: raw[tf] for tf in ("1m", "5m", "30m", "60m") if tf in raw and len(raw[tf]["c"]) > 80}
+        if "1m" in allt:
+            allt["3m"] = clock_chunk(allt["1m"], 3)
+        if "5m" in allt:
+            allt["10m"] = chunk_day(allt["5m"], 2)
+        if "60m" in allt:
+            allt["120m"] = chunk_day(allt["60m"], 2)
+            allt["240m"] = chunk_day(allt["60m"], 4)
+        for tf in TFS_ALL:
+            if tf not in allt or len(allt[tf]["c"]) <= 80:
+                continue
+            rr = series(allt[tf])
+            sells = sell_sig(rr, args.sell)
+            pr, _d, op = pair_up(rr, buy_sig(rr), sells)
+            PT[tf][0].extend(pr); PT[tf][1] += (1 if op is not None else 0)
+            pr, _d, op = pair_up(rr, old_buy_sig(rr), sells)
+            PO[tf][0].extend(pr); PO[tf][1] += (1 if op is not None else 0)
         C = r60["c"]
         pa = Acc()
         for c in cy:
@@ -276,6 +406,18 @@ def main():
                     R["peak"].add(pct(c["ep"], c["peak"]))
         per[code] = pa
 
+    sell_nm = "적극매도(3형제 동시 80↑) 새 성립" if args.sell == "aggr" else "큰형 80 위 데드크로스"
+    print(f"■ 매수 신호 → 매도 신호 · 3형제 매수 규칙 (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} TURN {BUYP['TURN']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
+    tot, topn = [], 0
+    for tf in TFS_ALL:
+        print(pair_row(tf, PT[tf][0], PT[tf][1])); tot += PT[tf][0]; topn += PT[tf][1]
+    print(pair_row("합계", tot, topn))
+    print("■ 비교 — 종전 적극매수(3형제 동시 20↓) 새 성립")
+    tot, topn = [], 0
+    for tf in TFS_ALL:
+        print(pair_row(tf, PO[tf][0], PO[tf][1])); tot += PO[tf][0]; topn += PO[tf][1]
+    print(pair_row("합계", tot, topn))
+    print()
     print(f"종목 {len(used)}개 · 사이클 {n_cyc}개 · 그중 80 미도달(무산) "
           f"{n_miss}개 ({n_miss/max(n_cyc,1)*100:.0f}%)")
     if skip:

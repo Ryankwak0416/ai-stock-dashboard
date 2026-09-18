@@ -117,8 +117,8 @@ td.num{font-variant-numeric:tabular-nums}
 <div class="info"><span id="d0">-</span><span id="mid">-</span><span id="d1">-</span></div>
 <div class="lg">
   <span><i style="background:#0ca678;height:4px"></i>가격</span>
-  <span><i style="background:#e8590c"></i>막내</span>
-  <span><i style="background:#0b1220;height:3px"></i>둘째</span>
+  <span><i style="background:#e8590c"></i>막내 (점선)</span>
+  <span><i style="background:#0b1220;height:2px"></i>둘째</span>
   <span><i style="background:#7048e8;height:4px"></i>큰형 (점선)</span>
   <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
@@ -181,6 +181,35 @@ function stateAt(K,i){
   const up=d.filter(x=>x>0).length,dn=d.filter(x=>x<0).length;
   return {s:up>=2?1:(dn>=2?-1:0),v};}
 function rowState(K){return stateAt(K,K.k5.k.length-1);}
+// ── 3형제 매수 규칙 (2026-09-18 대표 지시, 계획서 _계획_260918_매수규칙_막내점선_결과표.md §2) ──
+// 막내가 바닥(FLOOR 이하 저점)을 찍고, 그 뒤 둘째가 바닥을 찍고, 둘 다 저점보다 RISE 이상 올라 아직 오르는 중일 때
+// 큰형이 어느 높이에 있든 %D를 위로 뚫으며(골든크로스) 한 봉에 TURN 이상 솟으면 그 봉이 매수다. 값은 내부 0~100.
+const BUYP={FLOOR:20,RISE:20,TURN:3,WIN1:12,WIN2:12};
+function buySig(K,P){P=P||BUYP;const a=K.k5.k,b=K.k10.k,g=K.k20.k,gd=K.k20.d,N=a.length,out=[];
+  const tr=(x,i)=>x[i]!=null&&x[i-1]!=null&&x[i+1]!=null&&x[i]<=x[i-1]&&x[i+1]>x[i]&&x[i]<=P.FLOOR;
+  let t1=null,t2=null,used=false;
+  for(let i=1;i<N-1;i++){
+    if(tr(a,i)){t1=i;t2=null;used=false;}
+    if(t1!=null&&t2==null&&i>=t1&&i-t1<=P.WIN1&&tr(b,i)){t2=i;used=false;}
+    if(t2!=null&&!used&&i>t2&&i-t2<=P.WIN2&&a[i]!=null&&b[i]!=null&&a[i-1]!=null&&b[i-1]!=null&&g[i]!=null&&gd[i]!=null&&g[i-1]!=null&&gd[i-1]!=null
+       &&a[i]-a[t1]>=P.RISE&&b[i]-b[t2]>=P.RISE&&a[i]>a[i-1]&&b[i]>b[i-1]
+       &&g[i]>gd[i]&&g[i-1]<=gd[i-1]&&g[i]-g[i-1]>=P.TURN){out.push({i,t1,t2});used=true;}}
+  return out;}
+// 매도 신호 — 'dead' = 큰형 8.0 이상에서 %K가 %D 하향돌파(세팅 탭 ▼매도와 같다) / 'aggr' = 3형제 동시 8.0 이상이 새로 성립한 봉
+function sellSig(K,mode){const g=K.k20.k,gd=K.k20.d,N=g.length,out=[];
+  for(let i=1;i<N;i++){
+    if(mode==='aggr'){const q=stateAt(K,i),p=stateAt(K,i-1);if(!q.lack&&q.s===-2&&p.s!==-2)out.push(i);}
+    else if(g[i]!=null&&gd[i]!=null&&g[i-1]!=null&&gd[i-1]!=null&&g[i]<gd[i]&&g[i-1]>=gd[i-1]&&g[i-1]>=80)out.push(i);}
+  return out;}
+// 매수 → 다음 매도 신호 짝. 포지션은 하나 — 매도 전에 나온 매수는 dup 로 센다. 마지막이 매도 없이 끝나면 open(그 매수 봉).
+function pairUp(row,buys,sells){const c=row.c,out=[];let si=0,hold=-1,dup=0,open=null;
+  for(const i of buys){if(i<=hold){dup++;continue;}
+    while(si<sells.length&&sells[si]<=i)si++;
+    if(si>=sells.length){open=i;break;}
+    const j=sells[si];out.push({i,j,ret:(c[j]-c[i])/c[i]*100,bars:j-i});hold=j;}
+  return {pairs:out,dup,open};}
+function pstat(v){if(!v.length)return null;const r=v.map(x=>x.ret);
+  return {n:v.length,win:r.filter(x=>x>0).length/v.length*100,avg:r.reduce((a,b)=>a+b,0)/v.length,worst:Math.min(...r),best:Math.max(...r),bars:v.reduce((a,x)=>a+x.bars,0)/v.length};}
 function baseCount(a,w){const n=a.length,st=Math.max(1,n-w);let c=0;
   for(let i=st;i<n;i++)if(a[i]!=null&&a[i-1]!=null&&a[i]<=CUT&&a[i-1]>CUT)c++;return c;}
 // 이평 5·10·20·60 상태. a: 1 정배열 / -1 역배열 / 0 중립, cv: 수렴중
@@ -329,9 +358,9 @@ function render(){
   document.getElementById('d1').textContent=fmtT(r.ts[b]);
   document.getElementById('mid').textContent=`${LBL[TF]} ${span}봉 / 전체 ${N}봉`;
 
-  const BUY=[],SELL=[];
-  for(let i=0;i<N;i++){const q=stateAt(r.K,i),p=i?stateAt(r.K,i-1):{s:0};
-    if(!q.lack&&q.s===2&&p.s!==2)BUY.push(i);
+  // ▲매수 = 3형제 매수 규칙(buySig). 종전 «3형제 동시 2.0↓» 적극매수 표시는 2026-09-18 대표 지시로 교체(검증 탭에 비교 줄로 남긴다).
+  const BUY=buySig(r.K).map(o=>o.i),SELL=[];
+  for(let i=1;i<N;i++){const q=stateAt(r.K,i),p=stateAt(r.K,i-1);
     if(!q.lack&&q.s===-2&&p.s!==-2)SELL.push(i);}
 
   const labels=[],px=[],k5=[],k10=[],k20=[];
@@ -342,8 +371,8 @@ function render(){
   // 가격선은 굵게 맨 위에, 흰 테두리를 깔아 스토캐스틱 선과 확실히 떨어뜨린다
   if(SHOW.px){ds.push(line(px,'rgba(255,255,255,.95)',7,'y',2));NM.push(null);
               ds.push(line(px,'#0ca678',3.4,'y',1));NM.push('종가');}
-  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2'));NM.push('막내');}
-  if(SHOW.k10){ds.push(line(k10,'#0b1220',1.6,'y2'));NM.push('둘째');}
+  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2',3,[4,3]));NM.push('막내');}
+  if(SHOW.k10){ds.push(line(k10,'#0b1220',1.3,'y2'));NM.push('둘째');}
   // 큰형은 점선 — 다른 선보다 두껍게(1.1배). 2026-09-18 사장님 지시.
   if(SHOW.k20){ds.push(line(k20,'#7048e8',1.8,'y2',3,[7,4]));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
@@ -379,7 +408,7 @@ function render(){
       g.fillStyle='rgba(255,255,255,.85)';g.fillRect(x-w/2,ty-11,w,14);
       g.fillStyle=fl;g.fillText(tx,x,ty);
       g.restore();});};
-    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'적극매수');
+    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'매수');
     mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1,'적극매도');}};
 
   // 차트 위에서 휠 = 구간 폭 조정, Shift+휠 = 좌우 이동. 커서 자리를 기준으로 확대·축소한다.
@@ -733,15 +762,51 @@ function setCycleTable(r60,r240){
       <th>240분</th><th style="text-align:left">청산(데드크로스)</th><th>수익률</th><th>구간최고</th></tr></thead>
     <tbody>${b}</tbody></table>`;}
 
+// ── 검증 탭 맨 위 표 — 매수 신호 → 매도 신호 (계획서 §4) ──
+let VSELL='dead';
+function buysOf(row,kind){
+  if(kind==='old'){const o=[];for(let i=1;i<row.c.length;i++){const q=stateAt(row.K,i),p=stateAt(row.K,i-1);if(!q.lack&&q.s===2&&p.s!==2)o.push(i);}return o;}
+  return buySig(row.K).map(x=>x.i);}
+function pairByTf(list,kind){const byTf={};
+  for(const t of list)for(const r of t.rows){const p=pairUp(r,buysOf(r,kind),sellSig(r.K,VSELL));
+    const e=(byTf[r.tf]=byTf[r.tf]||{pairs:[],dup:0,open:0});e.pairs.push(...p.pairs);e.dup+=p.dup;e.open+=(p.open!=null?1:0);}
+  return byTf;}
+function pcell(a){if(!a)return '<td class="num small">-</td>'.repeat(6);
+  return `<td class="num">${a.n}</td><td class="num"><span class="${a.win>=50?'pos':'neg'}">${a.win.toFixed(0)}%</span></td>`
+    +`<td class="num ${a.avg>0?'pos':'neg'}">${(a.avg>0?'+':'')+a.avg.toFixed(2)}%</td><td class="num small">${a.worst.toFixed(1)}%</td>`
+    +`<td class="num small">+${a.best.toFixed(1)}%</td><td class="num small">${a.bars.toFixed(0)}</td>`;}
+function pairRowsHtml(byTf,label){let body='',tot=[],openT=0,dupT=0;
+  for(const tf of MIN.concat(['D','W','M'])){const x=byTf[tf];if(!x)continue;tot=tot.concat(x.pairs);openT+=x.open;dupT+=x.dup;
+    body+=`<tr><td><b>${LBL[tf]}</b></td>${pcell(pstat(x.pairs))}<td class="num small">${x.open||''}</td></tr>`;}
+  body+=`<tr class="avg"><td><b>합계</b></td>${pcell(pstat(tot))}<td class="num small">${openT||''}</td></tr>`;
+  return `<h2>${label}${dupT?` <span class="small">(매도 전 매수 ${dupT}건 제외)</span>`:''}</h2>`
+    +`<table><thead><tr><th>봉</th><th>건수</th><th>승률</th><th>평균</th><th>최악</th><th>최고</th><th>평균 보유(봉)</th><th>진행 중</th></tr></thead><tbody>${body}</tbody></table>`;}
+function pairSection(list,who){
+  const sellNm=VSELL==='aggr'?'적극매도(3형제 동시 8.0↑)가 새로 성립한 봉':'큰형 8.0 이상에서 %K가 %D 하향돌파(데드크로스)';
+  return `<h2 style="margin-top:6px">매수 신호 → 매도 신호 · ${who}</h2>`
+    +`<p class="note" style="margin:0 0 6px">매수 = <b>3형제 매수 규칙</b> — 막내가 ${S10(BUYP.FLOOR)} 이하 바닥을 찍고, 그 뒤 둘째가 바닥을 찍고, 둘 다 저점보다 ${S10(BUYP.RISE)} 이상 올라 아직 오르는 중일 때 큰형이 (어느 높이에서든) %D를 위로 뚫으며 한 봉에 ${S10(BUYP.TURN)} 이상 솟는 봉. `
+    +`매도 = <b>${sellNm}</b>. 매수 봉 종가에 사서 다음 매도 신호 봉 종가에 판 수익률이며, 매도 전에 나온 매수는 세지 않고 수수료·세금은 없습니다.</p>`
+    +pairRowsHtml(pairByTf(list,'new'),'3형제 매수 규칙')
+    +pairRowsHtml(pairByTf(list,'old'),'비교 — 종전 적극매수(3형제 동시 2.0↓)');}
+function pairDetail(row){
+  const p=pairUp(row,buysOf(row,'new'),sellSig(row.K,VSELL)),last=p.pairs.slice(-20).reverse();let b='';
+  for(const x of last)b+=`<tr><td class="small">${fmtT(row.ts[x.i])}</td><td class="num">${(+row.c[x.i]).toLocaleString()}</td><td class="small">${fmtT(row.ts[x.j])}</td>`
+    +`<td class="num">${(+row.c[x.j]).toLocaleString()}</td><td class="num ${x.ret>0?'pos':'neg'}">${(x.ret>0?'+':'')+x.ret.toFixed(2)}%</td><td class="num small">${x.bars}</td></tr>`;
+  if(p.open!=null)b+=`<tr><td class="small">${fmtT(row.ts[p.open])}</td><td class="num">${(+row.c[p.open]).toLocaleString()}</td><td class="small" colspan="4">진행 중 — 아직 매도 신호 없음</td></tr>`;
+  return `<h2>최근 짝 ${last.length}건 · ${LBL[row.tf]}${p.dup?` <span class="small">(매도 전 매수 ${p.dup}건 제외)</span>`:''}</h2>`
+    +`<table><thead><tr><th>매수 시각</th><th>매수가</th><th>매도 시각</th><th>매도가</th><th>수익률</th><th>보유(봉)</th></tr></thead><tbody>${b||'<tr><td colspan="6" class="small">짝이 없습니다</td></tr>'}</tbody></table>`;}
+
 async function renderV(){
   const el=document.getElementById('paneV');
   const mb=`<button class="sm ${VMODE==='one'?'on':''}" data-vm="one">이 종목</button>`
           +`<button class="sm ${VMODE==='all'?'on':''}" data-vm="all">관심 ${WL.length}종목 합산</button>`;
   const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
-  const bar=`<div class="bar">${mb}<span class="sub" style="margin-left:10px">보유 기간</span>${hb}</div>`;
+  const sb=`<button class="sm ${VSELL==='dead'?'on':''}" data-vs="dead">8.0 위 데드크로스</button><button class="sm ${VSELL==='aggr'?'on':''}" data-vs="aggr">적극매도</button>`;
+  const bar=`<div class="bar">${mb}<span class="sub" style="margin-left:10px">매도 신호</span>${sb}<span class="sub" style="margin-left:10px">보유 기간</span>${hb}</div>`;
   const wire=()=>{
     el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});
-    el.querySelectorAll('[data-vm]').forEach(b=>b.onclick=()=>{VMODE=b.dataset.vm;renderV();});};
+    el.querySelectorAll('[data-vm]').forEach(b=>b.onclick=()=>{VMODE=b.dataset.vm;renderV();});
+    el.querySelectorAll('[data-vs]').forEach(b=>b.onclick=()=>{VSELL=b.dataset.vs;renderV();});};
 
   if(VMODE==='all'){
     if(VALL===null){
@@ -753,7 +818,8 @@ async function renderV(){
       r60:t.rows.find(r=>r.tf==='60m'), r240:t.rows.find(r=>r.tf==='240m')}))
       .filter(x=>x.r60);
     el.innerHTML=bar
-      +`<h2 style="margin-top:6px">60분봉 매매세팅 검증 · ${LS.length}종목 합산</h2>`
+      +pairSection(VALL,`${VALL.length}종목 합산`)
+      +`<h2 style="margin-top:26px">60분봉 매매세팅 검증 · ${LS.length}종목 합산</h2>`
       +`<p class="note" style="margin:0 0 6px">진입 = 60분 큰형이 2.0 아래로 갔다가 <b>2.0 위로 복귀하는 봉</b>(반등 확인).
          청산 = <b>8.0 위에서 %K가 %D를 하향돌파</b>. 한 사이클은 다음 2.0↓ 진입 전까지입니다.</p>`
       +setTables(LS)
@@ -782,7 +848,8 @@ async function renderV(){
       +setTables([{code:CODE,r60,r240}])
       +setCycleTable(r60,r240)
     : '<div class="err">이 종목은 60분봉이 없어 세팅 검증을 할 수 없습니다.</div>';
-  el.innerHTML=bar+setHtml
+  const curRow=VROWS.rows.find(r=>r.tf===TF)||r60;
+  el.innerHTML=bar+pairSection([{rows:VROWS.rows}],NAMES[CODE]||CODE)+(curRow?pairDetail(curRow):'')+'<div style="height:14px"></div>'+setHtml
     +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
       <p class="note" style="margin:0 0 6px">3형제가 동시에 2.0 이하인 <b>첫 봉</b>에 들어가 <b>${VHOLD}봉 뒤</b> 기계적으로 파는 경우입니다.</p>`
     +vTable(VROWS.rows,2,VHOLD)+vTable(VROWS.rows,-2,VHOLD)
@@ -902,7 +969,7 @@ function drawSet(tf,cid,r,cy,sp5){
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
   const ln=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:o});
   const ds=[ln(px,'rgba(255,255,255,.95)',7,'y',2), ln(px,'#0ca678',3.4,'y',1),
-            ln(k5,'#e8590c',1.3,'y2',3), ln(k10,'#0b1220',1.6,'y2',3),
+            Object.assign(ln(k5,'#e8590c',1.3,'y2',3),{borderDash:[4,3]}), ln(k10,'#0b1220',1.3,'y2',3),
             Object.assign(ln(k20,'#7048e8',1.8,'y2',3),{borderDash:[7,4]}),
             {data:labels.map(()=>20),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4},
             {data:labels.map(()=>80),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4}];
@@ -936,6 +1003,13 @@ function drawSet(tf,cid,r,cy,sp5){
         g.fillStyle=col;g.fillText(tx,x,ty);g.restore();});
       mark(cy.BUY,'#d92d20',1,'매수');
       mark(cy.SELL,'#1849a9',-1,'매도');
+      // 3형제 매수 규칙(buySig) 표식 — 세팅 사이클과 별개로 얹는다(계획서 §2-4). 주황 ▼「3형제 매수」, 사이클 ▲보다 위 칸.
+      buySig(r.K).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);
+        g.save();g.fillStyle='#e8590c';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
+        g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();
+        g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
+        const tx='3형제 매수',w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
+        g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);g.restore();});
     }
     if(tf==='5m'&&sp5){
       const COL={'막내':'#e8590c','둘째':'#0b1220','큰형':'#7048e8'};
