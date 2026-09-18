@@ -124,10 +124,10 @@ td.num{font-variant-numeric:tabular-nums}
 <div class="scrollrow"><button class="sm" id="prev">◀</button><input type="range" id="sc" min="0" max="0" value="0"><button class="sm" id="next">▶</button></div>
 <div class="info"><span id="d0">-</span><span id="mid">-</span><span id="d1">-</span></div>
 <div class="lg">
-  <span><i style="background:#0ca678;height:4px"></i>가격</span>
-  <span><i style="background:#e8590c"></i>막내</span>
-  <span><i style="background:#0b1220;height:2px"></i>둘째</span>
-  <span><i style="background:#7048e8;height:4px"></i>큰형 (가장 두껍게)</span>
+  <span><i style="background:#1849a9;height:4px"></i>가격 (스토캐스틱의 3배 굵기)</span>
+  <span><i style="background:#12b76a"></i>막내</span>
+  <span><i style="background:#f79009"></i>둘째</span>
+  <span><i style="background:#d92d20;height:3px"></i>큰형 (가장 두껍게)</span>
   <span>▲ 매수 ①3형제 동시 2.0↓ ②막내·둘째 바닥 → 2.0 이상 회복 → 큰형 2.0 아래서 반등 ③막내·둘째 2.0↓ 즈음 큰형이 2.0 아래서 꺾여 오름 · ▼ 매도는 그 반대 ①②③</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
@@ -386,7 +386,7 @@ function render(){
    +[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']]
      .map(o=>`<button class="sm ${SPAN===o[0]?'on':''}" data-sp="${o[0]}">${o[1]}</button>`).join('')
    +'<span style="width:14px"></span><span class="sub">표시</span>'
-   +[['px','가격','#0ca678'],['k5','막내','#e8590c'],['k10','둘째','#111827'],['k20','큰형','#7048e8']]
+   +[['px','가격','#1849a9'],['k5','막내','#12b76a'],['k10','둘째','#f79009'],['k20','큰형','#d92d20']]
      .map(o=>`<button class="sm ${SHOW[o[0]]?'on':''}" data-sh="${o[0]}" style="border-color:${o[2]};${SHOW[o[0]]?'':'color:'+o[2]}">${o[1]}</button>`).join('');
   const spEl=document.getElementById('sp');
   spEl.oninput=e=>{SPAN=SPANOPT[+e.target.value];POS=1e9;render();};
@@ -427,12 +427,12 @@ function render(){
   const line=(d,col,w,ax,o,dash)=>({data:d,borderColor:col,borderWidth:w,borderDash:dash||[],pointRadius:0,tension:.25,yAxisID:ax,order:(o==null?3:o)});
   const ds=[];const NM=[];
   // 가격선은 굵게 맨 위에, 흰 테두리를 깔아 스토캐스틱 선과 확실히 떨어뜨린다
-  if(SHOW.px){ds.push(line(px,'rgba(255,255,255,.95)',7,'y',2));NM.push(null);
-              ds.push(line(px,'#0ca678',3.4,'y',1));NM.push('종가');}
-  if(SHOW.k5){ds.push(line(k5,'#e8590c',1.3,'y2'));NM.push('막내');}
-  if(SHOW.k10){ds.push(line(k10,'#0b1220',1.3,'y2'));NM.push('둘째');}
+  // 색은 스캐너와 같게(가격 #1849a9 / 막내 #12b76a / 둘째 #f79009 / 큰형 #d92d20), 가격은 흰 테두리 없이 선 하나, 굵기 = 스토캐스틱(1.4)의 3배. 2026-09-19 대표.
+  if(SHOW.px){ds.push(line(px,'#1849a9',4.2,'y',1));NM.push('종가');}
+  if(SHOW.k5){ds.push(line(k5,'#12b76a',1.4,'y2'));NM.push('막내');}
+  if(SHOW.k10){ds.push(line(k10,'#f79009',1.4,'y2'));NM.push('둘째');}
   // 큰형은 가장 두껍게, 전부 실선. 2026-09-19 대표 「파동선 전부 실선, 큰형 가장 두껍게」(점선은 그 전날 지시).
-  if(SHOW.k20){ds.push(line(k20,'#7048e8',2.4,'y2'));NM.push('큰형');}
+  if(SHOW.k20){ds.push(line(k20,'#d92d20',2.0,'y2'));NM.push('큰형');}
   ds.push({data:labels.map(()=>CUT),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
   ds.push({data:labels.map(()=>100-CUT),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4});
 
@@ -443,7 +443,7 @@ function render(){
     // 지금 보는 시간축의 3형제 %K·%D를 차트 왼쪽 위에 얹는다.
     (function(){
       const q=(o)=>{const v=o.k[b],d=o.d[b];return S10(v)+' / '+S10(d);};
-      const items=[['막내','#e8590c',r.K.k5],['둘째','#0b1220',r.K.k10],['큰형','#7048e8',r.K.k20]];
+      const items=[['막내','#12b76a',r.K.k5],['둘째','#f79009',r.K.k10],['큰형','#d92d20',r.K.k20]];
       g.save();g.font='bold 12px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
       let x=ca.left+6;const y=ca.top+14;
       const txts=items.map(it=>it[0]+' '+q(it[2]));
@@ -1106,19 +1106,19 @@ function drawSet(tf,cid,r,cy,sp5){
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
     k5.push(r.K.k5.k[i]);k10.push(r.K.k10.k[i]);k20.push(r.K.k20.k[i]);}
   const ln=(d,col,w,ax,o)=>({data:d,borderColor:col,borderWidth:w,pointRadius:0,tension:.25,yAxisID:ax,order:o});
-  const ds=[ln(px,'rgba(255,255,255,.95)',7,'y',2), ln(px,'#0ca678',3.4,'y',1),
-            ln(k5,'#e8590c',1.3,'y2',3), ln(k10,'#0b1220',1.3,'y2',3),
-            ln(k20,'#7048e8',2.4,'y2',3),
+  const ds=[ln(px,'#1849a9',4.2,'y',1),
+            ln(k5,'#12b76a',1.4,'y2',3), ln(k10,'#f79009',1.4,'y2',3),
+            ln(k20,'#d92d20',2.0,'y2',3),
             {data:labels.map(()=>20),borderColor:'rgba(217,45,32,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4},
             {data:labels.map(()=>80),borderColor:'rgba(24,73,169,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,yAxisID:'y2',order:4}];
-  const NM=[null,'가격','막내','둘째','큰형'];
+  const NM=['가격','막내','둘째','큰형'];
   const plug={id:'s'+tf,beforeDatasetsDraw(ch){
     const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
     const X=i=>xs.getPixelForValue(i-a);
     // 타이밍 탭과 같은 자리에 3형제 %K/%D
     (function(){
       const q=o=>{const v=o.k[b],d=o.d[b];return S10(v)+' / '+S10(d);};
-      const items=[['막내','#e8590c',r.K.k5],['둘째','#0b1220',r.K.k10],['큰형','#7048e8',r.K.k20]];
+      const items=[['막내','#12b76a',r.K.k5],['둘째','#f79009',r.K.k10],['큰형','#d92d20',r.K.k20]];
       g.save();g.font='bold 11px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
       const txts=items.map(it=>it[0]+' '+q(it[2]));
       const w=txts.reduce((s2,t)=>s2+g.measureText(t).width+14,0)+6;
@@ -1148,11 +1148,11 @@ function drawSet(tf,cid,r,cy,sp5){
       // 240분도 3형제 바닥이면 세모 하나 더(가중).
       buySig(r.K).filter(o=>o.no.includes('①')).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);const tx='적극매수①';
         const heavy=I240.inZone(r.ts[i]);
-        g.save();g.fillStyle='#e8590c';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
+        g.save();g.fillStyle='#7048e8';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
         g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();
         g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
         const w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
-        g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);
+        g.fillStyle='#7048e8';g.fillText(tx,x,ca.bottom-46);
         if(heavy){g.fillStyle='#d92d20';g.beginPath();g.moveTo(x,ca.bottom-60);g.lineTo(x-6,ca.bottom-72);g.lineTo(x+6,ca.bottom-72);g.closePath();g.fill();
           g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();const t2='가중(240 바닥)',w2=g.measureText(t2).width+8;
           g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w2/2,ca.bottom-86,w2,13);g.fillStyle='#d92d20';g.fillText(t2,x,ca.bottom-76);}
@@ -1340,7 +1340,7 @@ async function renderW(){
   el.innerHTML=`<div class="bar"><span class="sub">표시</span>${togb}<span style="width:14px"></span><span class="sub">구간 폭</span>${spanb}</div>`
     +`<div class="wbox"><canvas id="cvW"></canvas></div>`
     +`<div class="info"><span id="wd0">-</span><span id="wmid">-</span><span id="wd1">-</span></div>`
-    +`<div class="lg"><span><i style="background:#0ca678;height:4px"></i>가격</span>${leg}<span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동 · 끌기 = 이동</span></div>`
+    +`<div class="lg"><span><i style="background:#1849a9;height:4px"></i>가격</span>${leg}<span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동 · 끌기 = 이동</span></div>`
     +`<p class="note">각 선은 그 시간축 <b>막내(5·3·3) %K</b> 하나입니다. 화면은 0~10.`
     +` 가로축은 켜져 있는 선 중 가장 잘은 봉을 따르고, 굵은 봉의 값은 <b>그 봉 시각부터 다음 봉까지 같은 값으로 이어</b> 그립니다.`
     +` 5분봉 원본은 60거래일이라 더 긴 구간을 보려면 막내5분봉을 끄십시오(60분 축 3년). 붉은 점선 ${S10(CUT)} · 푸른 점선 ${S10(100-CUT)}.</p>`;
@@ -1372,7 +1372,7 @@ function drawW(){
   const a=WPOS,b=a+span-1;
   const labels=[],px=[];for(let i=a;i<=b;i++){labels.push(fmtT(base.ts[i]));px.push(base.c[i]);}
   const line=(d,col,w,ax,o,dash)=>({data:d,borderColor:col,borderWidth:w,borderDash:dash||[],pointRadius:0,tension:.2,yAxisID:ax,order:o,spanGaps:false});
-  const ds=[line(px,'rgba(255,255,255,.95)',7,'y',2),line(px,'#0ca678',3.4,'y',1)],NM=[null,'가격'];
+  const ds=[line(px,'#1849a9',4.2,'y',1)],NM=['가격'];
   const show=WTFS.filter(tf=>WSHOW[tf]&&WMIN[tf]>=WMIN[WBASE]&&WROWS.some(r=>r.tf===tf));
   for(const tf of show){const r=WROWS.find(x=>x.tf===tf);
     const d=(tf===WBASE)?r.w.slice(a,b+1):base.ts.slice(a,b+1).map(t=>wAt(r.ts,r.w,t));
