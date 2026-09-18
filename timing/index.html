@@ -474,6 +474,17 @@ function chunkDay(o,k){
     i=j;}
   return {ts,h,l,c};}
 
+// 1분봉을 «시계» 기준으로 묶는다 — 09:00(KST) 기점 mins분 단위. 봉 시각은 묶음 시작 시각, 09:00 이전 봉은 버린다.
+function chunkClock(o,mins){
+  const ts=[],h=[],l=[],c=[];const step=mins*60;let key=null,hi=0,lo=0,cl=0;
+  for(let i=0;i<o.ts.length;i++){const t=o.ts[i];
+    const since9=((t+32400)%86400+86400)%86400-32400; if(since9<0)continue;
+    const k=t-since9+Math.floor(since9/step)*step;
+    if(k!==key){if(key!==null){ts.push(key);h.push(hi);l.push(lo);c.push(cl);}key=k;hi=o.h[i];lo=o.l[i];cl=o.c[i];}
+    else{if(o.h[i]>hi)hi=o.h[i];if(o.l[i]<lo)lo=o.l[i];cl=o.c[i];}}
+  if(key!==null){ts.push(key);h.push(hi);l.push(lo);c.push(cl);}
+  return {ts,h,l,c};}
+
 // 누적 원본(gz)을 받아 훨씬 긴 이력으로 다시 계산한다. 화면용 300봉으로는 표본이 모자란다.
 async function loadRawRows(code){
   try{
@@ -493,6 +504,9 @@ async function loadRawRows(code){
     const o={};
     for(const tf of ['1m','3m','5m','30m','60m'])if(d[tf]&&d[tf].t&&d[tf].t.length>80)
       o[tf]={ts:d[tf].t,h:d[tf].h,l:d[tf].l,c:d[tf].c};
+    // 저장소 누적원본(gz)에는 3분봉이 없다(공급기 /raw 에만 있다). 없으면 1분봉을 09:00 기점 3분 단위로
+    // 묶어 만든다 — 공급기 clock_chunk·collect_min.clock_chunk 와 같은 규칙. 2026-09-18
+    if(!o['3m']&&o['1m'])o['3m']=chunkClock(o['1m'],3);
     if(o['5m'])o['10m']=chunkDay(o['5m'],2);
     if(o['60m']){o['120m']=chunkDay(o['60m'],2);o['240m']=chunkDay(o['60m'],4);}
     const out=[];
