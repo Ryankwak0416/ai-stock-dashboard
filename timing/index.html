@@ -198,9 +198,26 @@ function fmtT(t){if(t==null)return '-';
     return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
   return String(t).slice(2);}
 
+// ───────── 장중 실시간 공급기 (차트를 보는 PC에서 도는 127.0.0.1:8787) ─────────
+// 브라우저에서 네이버·야후를 직접 부르면 CORS로 막힌다 — 2026-09-18 전 경로 실측.
+// 그래서 PC에서 도는 공급기가 «저장소 누적원본 + 오늘 1분봉»을 합쳐 저장소와 같은 모양으로
+// 내놓고, 이 페이지는 그것을 «먼저» 찾아본다. 꺼져 있으면 저장소 파일로 그대로 돌아간다.
+// 공급기가 없다고 화면이 죽지 않는다 — 어제까지의 값으로 평소대로 보인다.
+const LIVE_URL='http://127.0.0.1:8787';
+let LIVE={on:false,last:null};
+async function loadMin(code){
+  try{
+    const r=await fetch(`${LIVE_URL}/min/${code}.json`,{signal:AbortSignal.timeout(8000)});
+    if(r.ok){const j=await r.json();
+      if(j&&j.sig&&j.sig['60m']){LIVE={on:true,last:j.liveLast||null};return j;}}
+  }catch(e){}
+  LIVE={on:false,last:null};
+  return fetch(`../stoch/min/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null);
+}
+
 async function loadOne(code){
   const [mn,dl]=await Promise.all([
-    fetch(`../stoch/min/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null),
+    loadMin(code),
     fetch(`../stoch/data/${code}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).catch(()=>null)]);
   const rows=[];
   if(mn&&mn.sig)for(const tf of MIN){const s=mn.sig[tf];if(!s)continue;
@@ -390,7 +407,9 @@ function render(){
    +'⚠ <b>이 교정 전에 돌린 검증 수치는 모두 무효</b>입니다. 그 숫자를 근거로 넣었던 «정배열 적극매도 격하»도 되돌렸습니다. '
    +'바른 식으로 다시 검증한 뒤 조건을 다시 정합니다.<br>'
    +'⚠ 수수료·세금은 계산에 넣지 않았습니다. 갱신 '
-   +(DATA.mn&&DATA.mn.updated?DATA.mn.updated.replace('T',' ').slice(0,16)+' UTC':'-');
+   +(DATA.mn&&DATA.mn.updated?DATA.mn.updated.replace('T',' ').slice(0,16)+' UTC':'-')
+   +(LIVE.on?` · <b class="lo">실시간 ON</b> — 공급기가 오늘 ${LIVE.last||'-'} 봉까지 붙였습니다`
+            :' · <b>실시간 OFF</b> — 저장소 파일(평일 15:10 수집분)입니다');
 }
 
 // ───────── 검증 (매수·매도 결과) ─────────
