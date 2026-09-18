@@ -62,7 +62,12 @@ h2{font-size:15px;margin:18px 0 6px}
 td.num{font-variant-numeric:tabular-nums}
 .pos{color:var(--buy);font-weight:600}.neg{color:var(--sell);font-weight:600}
 .small{font-size:11px;color:var(--sub)}
-.cbox{position:relative;height:340px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
+.tf{padding:6px 12px;border:1px solid #c9ced8;border-bottom:none;border-radius:9px 9px 0 0;
+  background:#eef1f5;font-weight:700;font-size:12px;cursor:pointer;color:#475467;line-height:1.25;text-align:center}
+.tf.on{background:#fff;color:#1849a9;border-color:#1849a9}
+.tf b{display:block;font-size:14px;margin-top:1px}
+#tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
+.cbox{position:relative;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
 .scrollrow input[type=range]{flex:1;accent-color:#1849a9}
 .info{font-size:12px;color:var(--sub);display:flex;justify-content:space-between;margin-top:4px}
@@ -114,15 +119,14 @@ td.num{font-variant-numeric:tabular-nums}
   <span><i style="background:#0ca678"></i>둘째 10·6·6</span>
   <span><i style="background:#7048e8;height:3px"></i>큰형 20·12·12</span>
   <span>▲ 적극매수 성립(3형제 동시 과매도) · ▼ 적극매도 성립(동시 과매수)</span>
-  <span>바탕색 = 이평 배열(붉은 정배열 · 푸른 역배열) · 아래 갈색칸 = 이평 수렴중</span>
 </div>
 
 <p class="note" id="foot"></p>
 </div>
 </div>
 <script>
-const MIN=['1m','5m','10m','30m','60m','120m','240m'];
-const LBL={'1m':'1분','5m':'5분','10m':'10분','30m':'30분','60m':'60분','120m':'120분','240m':'240분','D':'일봉','W':'주봉','M':'월봉'};
+const MIN=['1m','3m','5m','10m','30m','60m','120m','240m'];
+const LBL={'1m':'1분','3m':'3분','5m':'5분','10m':'10분','30m':'30분','60m':'60분','120m':'120분','240m':'240분','D':'일봉','W':'주봉','M':'월봉'};
 const SUPER=['5m','60m','240m'];
 const ROLE={'5m':'단타','60m':'스윙','240m':'추세'};
 const RTAG=tf=>ROLE[tf]?`<span class="role">${ROLE[tf]}</span>`:'';
@@ -267,28 +271,7 @@ function head(){
     +`${px!=null?(+px).toLocaleString():'-'} · ${tot}칸 중 <b>매수 ${nB}</b>(적극 ${nSB}) / <b>매도 ${nS}</b>(적극 ${nSS})`
     +`${nHot?` · <span class="tag hot">과열 ${nHot}</span>`:''} · ${vs}</div></div>`;
 
-  const mR=data.rows.filter(r=>MIN.includes(r.tf)),mOK=mR.filter(r=>!st[r.tf].lack);
-  const mAvg=mOK.length?mOK.reduce((x,r)=>x+ef[r.tf].s,0)/mOK.length:null;
-  const aS=mAvg==null?0:(mAvg>=1.5?2:mAvg>=.5?1:mAvg<=-1.5?-2:mAvg<=-.5?-1:0);
-  const rowHtml=r=>{
-    const s=st[r.tf],e=ef[r.tf],ma=maState(r.c),bc=baseCount(r.K.k5.k,60);
-    const lbl=s.lack?'<span class="c0">데이터 부족</span>'
-             :e.hot?'<span class="tag hot">과열 주의</span>':SN[s.s];
-    return `<tr class="pick ${r.tf===TF?'sel':''}" data-tf="${r.tf}">
-      <td><b>${r.label}</b>${RTAG(r.tf)}</td>
-      <td class="st ${e.hot?'':SC[s.s]}">${lbl}</td>
-      <td>${kc(s.v[0])}</td><td>${kc(s.v[1])}</td><td>${kc(s.v[2])}</td>
-      <td>${ma.a===1?'<span class="lo">정배열</span>':ma.a===-1?'<span class="hi">역배열</span>':'<span class="c0">—</span>'}${ma.cv?'<span class="tag cv">수렴중</span>':''}</td>
-      <td>${bc}</td><td class="sub">${fmtT(r.ts[r.ts.length-1])}</td></tr>`;};
-  const avgHtml=`<tr class="avg"><td><b>분봉 평균</b></td><td class="st ${SC[aS]}">${SN[aS]}</td>
-    <td colspan="5" style="text-align:left" class="sub">1분~240분 7개 봉의 평균 ${mAvg==null?'-':mAvg.toFixed(2)}
-      (적극매수 +2 / 상승추세 +1 / 중립 0 / 하락추세 −1 / 적극매도 −2)</td><td></td></tr>`;
-  const body=mR.map(rowHtml).join('')+avgHtml
-    +data.rows.filter(r=>['D','W','M'].includes(r.tf)).map(rowHtml).join('');
-  document.getElementById('tbl').innerHTML=
-    `<table><thead><tr><th>봉</th><th style="text-align:center">상태</th><th>막내</th><th>둘째</th><th>큰형</th>
-     <th style="text-align:left">이평 20·60</th><th>다지기</th><th style="text-align:left">최근봉</th></tr></thead><tbody>${body}</tbody></table>`;
-  document.querySelectorAll('[data-tf]').forEach(el=>el.onclick=()=>{TF=el.dataset.tf;POS=1e9;render();});
+  document.getElementById('tbl').innerHTML='';
 }
 
 function render(){
@@ -296,8 +279,12 @@ function render(){
   if(!data||!data.rows.length){document.getElementById('vd').innerHTML='<div class="err">이 종목의 분봉 데이터가 아직 없습니다.</div>';return;}
   if(!data.rows.some(r=>r.tf===TF))TF=data.rows[0].tf;
   head();
-  document.getElementById('tfbar').innerHTML='<span class="sub">차트 봉</span>'+
-    data.rows.map(r=>`<button class="sm ${r.tf===TF?'on':''}" data-ctf="${r.tf}">${r.label}${ROLE[r.tf]?' · '+ROLE[r.tf]:''}</button>`).join('');
+  // 시간축 탭 — 라벨 아래에 그 봉의 «큰형 %K»를 박아 전 시간축 요약표를 대신한다.
+  document.getElementById('tfbar').innerHTML=
+    data.rows.map(r=>{const v=lastVal(r.K.k20.k);
+      const col=v==null?'#9aa0a6':(v<=CUT?'#1849a9':(v>=100-CUT?'#d92d20':'#344054'));
+      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12">`
+        +`${r.label}<b style="color:${col}">${v==null?'-':Math.round(v)}</b></button>`;}).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
@@ -320,8 +307,6 @@ function render(){
   for(let i=0;i<N;i++){const q=stateAt(r.K,i),p=i?stateAt(r.K,i-1):{s:0};
     if(!q.lack&&q.s===2&&p.s!==2)BUY.push(i);
     if(!q.lack&&q.s===-2&&p.s!==-2)SELL.push(i);}
-  const MAA=new Array(N).fill(0),MAC=new Array(N).fill(false);
-  for(let i=Math.max(0,a-1);i<=b&&i<N;i++){const m=maCalc(r.c,i);MAA[i]=m.a;MAC[i]=m.cv;}
 
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
@@ -339,22 +324,19 @@ function render(){
 
   const tap={id:'tap',beforeDatasetsDraw(ch){
     const ca=ch.chartArea,xs=ch.scales.x;if(!ca||!xs)return;const g=ch.ctx;
-    // 배경 채움 = 이평 배열. 붉은 바탕 정배열 / 푸른 바탕 역배열 (매수·매도 타점은 화살표로만)
-    let i0=a;
-    while(i0<=b){const v=MAA[i0];let j=i0;
-      while(j+1<=b&&MAA[j+1]===v)j++;
-      if(v){const x1=xs.getPixelForValue(i0-a),x2=(j<b)?xs.getPixelForValue(j+1-a):xs.getPixelForValue(j-a)+2;
-        g.save();g.fillStyle=(v>0)?'rgba(217,45,32,.10)':'rgba(24,73,169,.10)';
-        g.fillRect(x1,ca.top,Math.max(2,x2-x1),ca.bottom-ca.top);g.restore();}
-      i0=j+1;}
-    // 수렴중 띠 (차트 하단)
-    const SB=9, by0=ca.bottom-SB;
-    for(let i=a;i<=b;i++){if(!MAC[i])continue;
-      const x1=xs.getPixelForValue(i-a),x2=(i<b)?xs.getPixelForValue(i+1-a):x1+2;
-      g.save();g.fillStyle='rgba(180,83,9,.55)';
-      g.fillRect(x1,by0,Math.max(1.5,x2-x1),SB);g.restore();}
-    g.save();g.font='10px -apple-system,Malgun Gothic,sans-serif';g.fillStyle='#6b7280';
-    g.textAlign='left';g.fillText('바탕 붉은색 정배열 / 푸른색 역배열   ·   아래 갈색칸 이평 수렴중',ca.left+3,by0-3);g.restore();
+    // 이평 배열 바탕색·수렴 띠는 2026-09-18 사장님 지시로 제거했다(판정에 쓰지 않는다).
+    const by0=ca.bottom;
+    // 지금 보는 시간축의 3형제 %K·%D를 차트 왼쪽 위에 얹는다.
+    (function(){
+      const q=(o)=>{const v=o.k[b],d=o.d[b];return (v==null?'-':Math.round(v))+' / '+(d==null?'-':Math.round(d));};
+      const items=[['막내 5·3·3','#e8590c',r.K.k5],['둘째 10·6·6','#0ca678',r.K.k10],['큰형 20·12·12','#7048e8',r.K.k20]];
+      g.save();g.font='bold 12px -apple-system,Malgun Gothic,sans-serif';g.textAlign='left';
+      let x=ca.left+6;const y=ca.top+14;
+      const txts=items.map(it=>it[0]+' '+q(it[2]));
+      const w=txts.reduce((s2,t)=>s2+g.measureText(t).width+16,0)+6;
+      g.fillStyle='rgba(255,255,255,.88)';g.fillRect(ca.left+2,ca.top+2,w,18);
+      items.forEach((it,i)=>{g.fillStyle=it[1];g.fillText(txts[i],x,y);x+=g.measureText(txts[i]).width+16;});
+      g.restore();})();
     const mark=(list,ln,fl,dir,tx)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
       g.save();g.strokeStyle=ln;g.lineWidth=1.3;g.setLineDash([5,4]);
       g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
@@ -452,7 +434,7 @@ async function loadRawRows(code){
       d=JSON.parse(txt);
     }
     const o={};
-    for(const tf of ['1m','5m','30m','60m'])if(d[tf]&&d[tf].t&&d[tf].t.length>80)
+    for(const tf of ['1m','3m','5m','30m','60m'])if(d[tf]&&d[tf].t&&d[tf].t.length>80)
       o[tf]={ts:d[tf].t,h:d[tf].h,l:d[tf].l,c:d[tf].c};
     if(o['5m'])o['10m']=chunkDay(o['5m'],2);
     if(o['60m']){o['120m']=chunkDay(o['60m'],2);o['240m']=chunkDay(o['60m'],4);}
