@@ -129,7 +129,7 @@ def clock_chunk(bars, mins):
 
 
 # ─────────────── 3형제 매수 규칙 (2026-09-18 대표 지시 · 페이지 buySig/sellSig/pairUp 과 동일) ───────────────
-BUYP = dict(FLOOR=20, RISE=20, TURN=3, WIN1=12, WIN2=12)
+BUYP = dict(FLOOR=20, RISE=20, WIN1=12, WIN2=12)   # 2026-09-19 정정: 큰형이 FLOOR 아래로 내려와 있다가 올라가는 첫 봉
 TFS_ALL = ["1m", "3m", "5m", "10m", "30m", "60m", "120m", "240m"]
 
 
@@ -148,10 +148,9 @@ def buy_sig(r, P=BUYP):
         if t1 is not None and t2 is None and i >= t1 and i - t1 <= P["WIN1"] and tr(b, i):
             t2, used = i, False
         if (t2 is not None and not used and i > t2 and i - t2 <= P["WIN2"]
-                and None not in (a[i], b[i], a[i - 1], b[i - 1], g[i], gd[i], g[i - 1], gd[i - 1])
+                and None not in (a[i], b[i], g[i], g[i - 1])
                 and a[i] - a[t1] >= P["RISE"] and b[i] - b[t2] >= P["RISE"]
-                and a[i] > a[i - 1] and b[i] > b[i - 1]
-                and g[i] > gd[i] and g[i - 1] <= gd[i - 1] and g[i] - g[i - 1] >= P["TURN"]):
+                and g[i - 1] <= P["FLOOR"] and g[i] > g[i - 1]):
             out.append(i)
             used = True
     return out
@@ -407,7 +406,7 @@ def main():
         per[code] = pa
 
     sell_nm = "적극매도(3형제 동시 80↑) 새 성립" if args.sell == "aggr" else "큰형 80 위 데드크로스"
-    print(f"■ 매수 신호 → 매도 신호 · 3형제 매수 규칙 (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} TURN {BUYP['TURN']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
+    print(f"■ 매수 신호 → 매도 신호 · 3형제 매수 규칙 (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
     tot, topn = [], 0
     for tf in TFS_ALL:
         print(pair_row(tf, PT[tf][0], PT[tf][1])); tot += PT[tf][0]; topn += PT[tf][1]
