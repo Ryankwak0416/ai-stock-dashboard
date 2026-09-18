@@ -133,15 +133,31 @@ BUYP = dict(FLOOR=20, RISE=20, WIN1=12, WIN2=12)   # 2026-09-19 정정: 큰형�
 TFS_ALL = ["1m", "3m", "5m", "10m", "30m", "60m", "120m", "240m"]
 
 
-def buy_sig(r, P=BUYP):
-    a, b, g, gd = r["k5"], r["k10"], r["k20"], r["d20"]
+def state_at(r, i):
+    v = (r["k5"][i], r["k10"][i], r["k20"][i])
+    if None in v:
+        return None
+    if all(x <= 20 for x in v):
+        return 2
+    if all(x >= 80 for x in v):
+        return -2
+    return 0
+
+
+# 규칙 목록 — 페이지 BUY_RULES·SELL_RULES 와 같다. 규칙은 여기에 «더한다» (2026-09-19 대표).
+def buy_rule1(r, P=BUYP):
+    """① 3형제 동시 FLOOR 이하가 새로 성립한 봉 (종전 적극매수)."""
+    return [i for i in range(1, len(r["c"])) if state_at(r, i) == 2 and state_at(r, i - 1) != 2]
+
+
+def buy_rule2(r, P=BUYP):
+    """② 막내 바닥 → 둘째 바닥 → 둘 다 RISE 이상 회복 → 큰형이 FLOOR 아래에서 올라가는 첫 봉."""
+    a, b, g = r["k5"], r["k10"], r["k20"]
     N = len(a)
     def tr(x, i):
         return (x[i] is not None and x[i - 1] is not None and x[i + 1] is not None
                 and x[i] <= x[i - 1] and x[i + 1] > x[i] and x[i] <= P["FLOOR"])
-    out = []
-    t1 = t2 = None
-    used = False
+    out, t1, t2, used = [], None, None, False
     for i in range(1, N - 1):
         if tr(a, i):
             t1, t2, used = i, None, False
@@ -156,33 +172,50 @@ def buy_sig(r, P=BUYP):
     return out
 
 
-def state_at(r, i):
-    v = (r["k5"][i], r["k10"][i], r["k20"][i])
-    if None in v:
-        return None
-    if all(x <= 20 for x in v):
-        return 2
-    if all(x >= 80 for x in v):
-        return -2
-    return 0
+def sell_rule1(r, P=BUYP):
+    return [i for i in range(1, len(r["c"])) if state_at(r, i) == -2 and state_at(r, i - 1) != -2]
 
 
-def old_buy_sig(r):
-    """종전 적극매수(3형제 동시 20 이하)가 새로 성립한 봉 — 비교용."""
-    return [i for i in range(1, len(r["c"])) if state_at(r, i) == 2 and state_at(r, i - 1) != 2]
+def sell_rule2(r, P=BUYP):
+    a, b, g = r["k5"], r["k10"], r["k20"]
+    N = len(a)
+    TOP = 100 - P["FLOOR"]
+    def pk(x, i):
+        return (x[i] is not None and x[i - 1] is not None and x[i + 1] is not None
+                and x[i] >= x[i - 1] and x[i + 1] < x[i] and x[i] >= TOP)
+    out, t1, t2, used = [], None, None, False
+    for i in range(1, N - 1):
+        if pk(a, i):
+            t1, t2, used = i, None, False
+        if t1 is not None and t2 is None and i >= t1 and i - t1 <= P["WIN1"] and pk(b, i):
+            t2, used = i, False
+        if (t2 is not None and not used and i > t2 and i - t2 <= P["WIN2"]
+                and None not in (a[i], b[i], g[i], g[i - 1])
+                and a[t1] - a[i] >= P["RISE"] and b[t2] - b[i] >= P["RISE"]
+                and g[i - 1] >= TOP and g[i] < g[i - 1]):
+            out.append(i)
+            used = True
+    return out
+
+
+BUY_RULES = [("①", buy_rule1), ("②", buy_rule2)]
+SELL_RULES = [("①", sell_rule1), ("②", sell_rule2)]
+
+
+def sig_union(rules, r):
+    return sorted({i for _, fn in rules for i in fn(r)})
+
+
+def buy_sig(r):
+    return sig_union(BUY_RULES, r)
 
 
 def sell_sig(r, mode="dead"):
+    if mode in ("rule", "aggr"):
+        return sig_union(SELL_RULES, r)
     g, gd = r["k20"], r["d20"]
-    out = []
-    for i in range(1, len(g)):
-        if mode == "aggr":
-            if state_at(r, i) == -2 and state_at(r, i - 1) != -2:
-                out.append(i)
-        elif (None not in (g[i], gd[i], g[i - 1], gd[i - 1])
-              and g[i] < gd[i] and g[i - 1] >= gd[i - 1] and g[i - 1] >= 80):
-            out.append(i)
-    return out
+    return [i for i in range(1, len(g)) if None not in (g[i], gd[i], g[i - 1], gd[i - 1])
+            and g[i] < gd[i] and g[i - 1] >= gd[i - 1] and g[i - 1] >= 80]
 
 
 def pair_up(r, buys, sells):
@@ -319,7 +352,7 @@ def main():
     ap.add_argument("--exclude-inverse", action="store_true")
     ap.add_argument("--exclude-leverage", action="store_true")
     ap.add_argument("--only", default=None)
-    ap.add_argument("--sell", default="dead", choices=["dead", "aggr"], help="매수→매도 표의 매도 신호")
+    ap.add_argument("--sell", default="dead", choices=["dead", "rule"], help="매수→매도 표의 매도 신호")
     args = ap.parse_args()
 
     files = sorted(glob.glob(os.path.join(RAW, "*.json.gz")))
@@ -336,7 +369,7 @@ def main():
     dd = Acc()
     used = []
     PT = {tf: [[], 0] for tf in TFS_ALL}     # 3형제 매수 규칙 — [짝 목록, 진행중 수]
-    PO = {tf: [[], 0] for tf in TFS_ALL}     # 종전 적극매수 — 비교
+    PR = [{tf: [[], 0] for tf in TFS_ALL} for _ in BUY_RULES]   # 규칙 하나씩
 
     for f in files:
         code = os.path.basename(f)[:-8]
@@ -369,8 +402,9 @@ def main():
             sells = sell_sig(rr, args.sell)
             pr, _d, op = pair_up(rr, buy_sig(rr), sells)
             PT[tf][0].extend(pr); PT[tf][1] += (1 if op is not None else 0)
-            pr, _d, op = pair_up(rr, old_buy_sig(rr), sells)
-            PO[tf][0].extend(pr); PO[tf][1] += (1 if op is not None else 0)
+            for k, (_no, fn) in enumerate(BUY_RULES):
+                pr, _d, op = pair_up(rr, fn(rr), sells)
+                PR[k][tf][0].extend(pr); PR[k][tf][1] += (1 if op is not None else 0)
         C = r60["c"]
         pa = Acc()
         for c in cy:
@@ -405,17 +439,18 @@ def main():
                     R["peak"].add(pct(c["ep"], c["peak"]))
         per[code] = pa
 
-    sell_nm = "적극매도(3형제 동시 80↑) 새 성립" if args.sell == "aggr" else "큰형 80 위 데드크로스"
-    print(f"■ 매수 신호 → 매도 신호 · 3형제 매수 규칙 (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
+    sell_nm = "매도 규칙 ①+②" if args.sell == "rule" else "큰형 80 위 데드크로스"
+    print(f"■ 매수 신호 → 매도 신호 · 매수 규칙 전부(①+②) (FLOOR {BUYP['FLOOR']} RISE {BUYP['RISE']} WIN {BUYP['WIN1']}/{BUYP['WIN2']}) · 매도 = {sell_nm}")
     tot, topn = [], 0
     for tf in TFS_ALL:
         print(pair_row(tf, PT[tf][0], PT[tf][1])); tot += PT[tf][0]; topn += PT[tf][1]
     print(pair_row("합계", tot, topn))
-    print("■ 비교 — 종전 적극매수(3형제 동시 20↓) 새 성립")
-    tot, topn = [], 0
-    for tf in TFS_ALL:
-        print(pair_row(tf, PO[tf][0], PO[tf][1])); tot += PO[tf][0]; topn += PO[tf][1]
-    print(pair_row("합계", tot, topn))
+    for k, (no, _fn) in enumerate(BUY_RULES):
+        print(f"■ 규칙 {no}만")
+        tot, topn = [], 0
+        for tf in TFS_ALL:
+            print(pair_row(tf, PR[k][tf][0], PR[k][tf][1])); tot += PR[k][tf][0]; topn += PR[k][tf][1]
+        print(pair_row("합계", tot, topn))
     print()
     print(f"종목 {len(used)}개 · 사이클 {n_cyc}개 · 그중 80 미도달(무산) "
           f"{n_miss}개 ({n_miss/max(n_cyc,1)*100:.0f}%)")

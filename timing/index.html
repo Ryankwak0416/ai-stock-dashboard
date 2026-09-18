@@ -126,7 +126,7 @@ td.num{font-variant-numeric:tabular-nums}
   <span><i style="background:#e8590c"></i>막내</span>
   <span><i style="background:#0b1220;height:2px"></i>둘째</span>
   <span><i style="background:#7048e8;height:4px"></i>큰형 (가장 두껍게)</span>
-  <span>▲ 매수(3형제 매수 규칙 — 막내 바닥 → 둘째 바닥 → 둘 다 2.0 이상 회복 → 큰형이 2.0 아래서 올라가는 첫 봉) · ▼ 적극매도 성립(동시 과매수)</span>
+  <span>▲ 매수 ①3형제 동시 2.0↓ ②막내·둘째 바닥 → 2.0 이상 회복 → 큰형 2.0 아래서 반등 · ▼ 매도는 그 반대 ①동시 8.0↑ ②꼭대기 뒤 큰형 8.0 위에서 꺾임</span>
   <span>차트 위에서 <b>휠</b> = 구간 넓게·좁게 · <b>Shift+휠</b> = 좌우 이동</span>
 </div>
 
@@ -187,12 +187,15 @@ function stateAt(K,i){
   const up=d.filter(x=>x>0).length,dn=d.filter(x=>x<0).length;
   return {s:up>=2?1:(dn>=2?-1:0),v};}
 function rowState(K){return stateAt(K,K.k5.k.length-1);}
-// ── 3형제 매수 규칙 (2026-09-18 대표 지시, 계획서 _계획_260918_매수규칙_막내점선_결과표.md §2) ──
-// 막내가 바닥(FLOOR 이하 저점)을 찍고, 그 뒤 둘째가 바닥을 찍고, 둘 다 저점보다 RISE 이상 올라 있을 때,
-// 큰형이 FLOOR 아래로 내려와 있다가 올라가는 첫 봉이 매수다. 값은 내부 0~100.
-// 2026-09-19 02:3x 대표 정정 「큰형이 2포인트 아래로 내려와서 올라가는 순간이 매수 포인트」 — 종전(골든크로스·높이 무관)은 네이버 60분에서 큰형 2.9→3.6 자리에 찍혀 틀렸다.
+// ══ 매수·매도 규칙 목록 (2026-09-19 대표 「매수조건은 여러 개, 바꾸지 말고 추가해서 적용」) ══
+// 규칙은 아래 목록에 «더한다». 어느 하나라도 성립하면 그 봉이 신호다. 표시엔 규칙 번호(①②…)를 붙인다.
+// 값은 내부 0~100(화면 S10). 파라미터는 BUYP 한 곳.
 const BUYP={FLOOR:20,RISE:20,WIN1:12,WIN2:12};
-function buySig(K,P){P=P||BUYP;const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[];
+// ① 3형제 동시 FLOOR 이하가 새로 성립한 봉 (종전 «적극매수»)
+function buyRule1(K,P){const out=[];for(let i=1;i<K.k5.k.length;i++){const q=stateAt(K,i),p=stateAt(K,i-1);if(!q.lack&&q.s===2&&p.s!==2)out.push(i);}return out;}
+// ② 막내 바닥(≤FLOOR 저점) → 둘째 바닥 → 둘 다 저점보다 RISE 이상 올라 있을 때 큰형이 FLOOR 아래에서 올라가는 첫 봉
+//    (2026-09-19 02:3x 대표 「큰형이 2포인트 아래로 내려와서 올라가는 순간」)
+function buyRule2(K,P){const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[];
   const tr=(x,i)=>x[i]!=null&&x[i-1]!=null&&x[i+1]!=null&&x[i]<=x[i-1]&&x[i+1]>x[i]&&x[i]<=P.FLOOR;
   let t1=null,t2=null,used=false;
   for(let i=1;i<N-1;i++){
@@ -200,13 +203,32 @@ function buySig(K,P){P=P||BUYP;const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out
     if(t1!=null&&t2==null&&i>=t1&&i-t1<=P.WIN1&&tr(b,i)){t2=i;used=false;}
     if(t2!=null&&!used&&i>t2&&i-t2<=P.WIN2&&a[i]!=null&&b[i]!=null&&g[i]!=null&&g[i-1]!=null
        &&a[i]-a[t1]>=P.RISE&&b[i]-b[t2]>=P.RISE
-       &&g[i-1]<=P.FLOOR&&g[i]>g[i-1]){out.push({i,t1,t2});used=true;}}
+       &&g[i-1]<=P.FLOOR&&g[i]>g[i-1]){out.push(i);used=true;}}
   return out;}
-// 매도 신호 — 'dead' = 큰형 8.0 이상에서 %K가 %D 하향돌파(세팅 탭 ▼매도와 같다) / 'aggr' = 3형제 동시 8.0 이상이 새로 성립한 봉
-function sellSig(K,mode){const g=K.k20.k,gd=K.k20.d,N=g.length,out=[];
-  for(let i=1;i<N;i++){
-    if(mode==='aggr'){const q=stateAt(K,i),p=stateAt(K,i-1);if(!q.lack&&q.s===-2&&p.s!==-2)out.push(i);}
-    else if(g[i]!=null&&gd[i]!=null&&g[i-1]!=null&&gd[i-1]!=null&&g[i]<gd[i]&&g[i-1]>=gd[i-1]&&g[i-1]>=80)out.push(i);}
+// 매도는 그 반대 — ① 3형제 동시 (100−FLOOR) 이상이 새로 성립 / ② 막내 꼭대기 → 둘째 꼭대기 → 둘 다 RISE 이상 내려와 있을 때 큰형이 (100−FLOOR) 위에서 내려가는 첫 봉
+function sellRule1(K,P){const out=[];for(let i=1;i<K.k5.k.length;i++){const q=stateAt(K,i),p=stateAt(K,i-1);if(!q.lack&&q.s===-2&&p.s!==-2)out.push(i);}return out;}
+function sellRule2(K,P){const a=K.k5.k,b=K.k10.k,g=K.k20.k,N=a.length,out=[],TOP=100-P.FLOOR;
+  const pk=(x,i)=>x[i]!=null&&x[i-1]!=null&&x[i+1]!=null&&x[i]>=x[i-1]&&x[i+1]<x[i]&&x[i]>=TOP;
+  let t1=null,t2=null,used=false;
+  for(let i=1;i<N-1;i++){
+    if(pk(a,i)){t1=i;t2=null;used=false;}
+    if(t1!=null&&t2==null&&i>=t1&&i-t1<=P.WIN1&&pk(b,i)){t2=i;used=false;}
+    if(t2!=null&&!used&&i>t2&&i-t2<=P.WIN2&&a[i]!=null&&b[i]!=null&&g[i]!=null&&g[i-1]!=null
+       &&a[t1]-a[i]>=P.RISE&&b[t2]-b[i]>=P.RISE
+       &&g[i-1]>=TOP&&g[i]<g[i-1]){out.push(i);used=true;}}
+  return out;}
+const BUY_RULES=[{no:'①',name:'3형제 동시 2.0↓',fn:buyRule1},{no:'②',name:'막내·둘째 바닥 뒤 큰형 2.0↓ 반등',fn:buyRule2}];
+const SELL_RULES=[{no:'①',name:'3형제 동시 8.0↑',fn:sellRule1},{no:'②',name:'막내·둘째 꼭대기 뒤 큰형 8.0↑ 꺾임',fn:sellRule2}];
+// 규칙 목록을 합친다 → [{i,no}] 시각순. 같은 봉에 둘이 걸리면 번호를 이어 붙인다(①②).
+function sigUnion(rules,K,P){P=P||BUYP;const m=new Map();
+  for(const r of rules)for(const i of r.fn(K,P))m.set(i,(m.get(i)||'')+r.no);
+  return [...m.keys()].sort((x,y)=>x-y).map(i=>({i,no:m.get(i)}));}
+function buySig(K,P){return sigUnion(BUY_RULES,K,P);}
+// 매도 신호 — 'dead' = 큰형 8.0 이상에서 %K가 %D 하향돌파(세팅 탭 ▼매도와 같다) / 'rule' = 매도 규칙 목록(①②…)
+function sellSig(K,mode){
+  if(mode==='rule'||mode==='aggr')return sigUnion(SELL_RULES,K).map(o=>o.i);
+  const g=K.k20.k,gd=K.k20.d,N=g.length,out=[];
+  for(let i=1;i<N;i++)if(g[i]!=null&&gd[i]!=null&&g[i-1]!=null&&gd[i-1]!=null&&g[i]<gd[i]&&g[i-1]>=gd[i-1]&&g[i-1]>=80)out.push(i);
   return out;}
 // 매수 → 다음 매도 신호 짝. 포지션은 하나 — 매도 전에 나온 매수는 dup 로 센다. 마지막이 매도 없이 끝나면 open(그 매수 봉).
 function pairUp(row,buys,sells){const c=row.c,out=[];let si=0,hold=-1,dup=0,open=null;
@@ -331,11 +353,10 @@ function render(){
   head();
   // 시간축 탭 — 라벨 아래에 그 봉의 «큰형 %K»를 박아 전 시간축 요약표를 대신한다.
   // 탭마다 마지막 신호를 적는다 — ▲매수(3형제 매수 규칙)가 ▼적극매도보다 뒤면 「▲매수 N봉전」, 반대면 「▼매도 N봉전」. 2026-09-19 대표 지시.
-  const lastSig=r=>{const n=r.c.length-1;const bs=buySig(r.K).map(o=>o.i);let sl=-1;
-    for(let i=n;i>=1;i--){const q=stateAt(r.K,i),p=stateAt(r.K,i-1);if(!q.lack&&q.s===-2&&p.s!==-2){sl=i;break;}}
-    const bl=bs.length?bs[bs.length-1]:-1;
-    if(bl<0&&sl<0)return '<em class="none">-</em>';
-    return bl>sl?`<em class="buy">▲매수 ${n-bl}봉전</em>`:`<em class="sell">▼매도 ${n-sl}봉전</em>`;};
+  const lastSig=r=>{const n=r.c.length-1;const bs=buySig(r.K),ss=sigUnion(SELL_RULES,r.K);
+    const B=bs.length?bs[bs.length-1]:null,S=ss.length?ss[ss.length-1]:null;
+    if(!B&&!S)return '<em class="none">-</em>';
+    return (B&&(!S||B.i>S.i))?`<em class="buy">▲매수${B.no} ${n-B.i}봉전</em>`:`<em class="sell">▼매도${S.no} ${n-S.i}봉전</em>`;};
   document.getElementById('tfbar').innerHTML=
     data.rows.map(r=>{const v=lastVal(r.K.k20.k);
       const col=v==null?'#9aa0a6':(v<=CUT?'#1849a9':(v>=100-CUT?'#d92d20':'#344054'));
@@ -378,10 +399,10 @@ function render(){
   document.getElementById('d1').textContent=fmtT(r.ts[b]);
   document.getElementById('mid').textContent=`${LBL[TF]} ${span}봉 / 전체 ${N}봉`;
 
-  // ▲매수 = 3형제 매수 규칙(buySig). 종전 «3형제 동시 2.0↓» 적극매수 표시는 2026-09-18 대표 지시로 교체(검증 탭에 비교 줄로 남긴다).
-  const BUY=buySig(r.K).map(o=>o.i),SELL=[];
-  for(let i=1;i<N;i++){const q=stateAt(r.K,i),p=stateAt(r.K,i-1);
-    if(!q.lack&&q.s===-2&&p.s!==-2)SELL.push(i);}
+  // ▲매수·▼매도 = 규칙 목록(BUY_RULES·SELL_RULES)의 합. 표시 글자에 규칙 번호를 붙인다.
+  const BUYO=buySig(r.K),SELLO=sigUnion(SELL_RULES,r.K);
+  const BUY=BUYO.map(o=>o.i),SELL=SELLO.map(o=>o.i);
+  const BNO=Object.fromEntries(BUYO.map(o=>[o.i,o.no])),SNO=Object.fromEntries(SELLO.map(o=>[o.i,o.no]));
 
   const labels=[],px=[],k5=[],k10=[],k20=[];
   for(let i=a;i<=b;i++){labels.push(fmtT(r.ts[i]));px.push(r.c[i]);
@@ -413,7 +434,7 @@ function render(){
       g.fillStyle='rgba(255,255,255,.88)';g.fillRect(ca.left+2,ca.top+2,w,18);
       items.forEach((it,i)=>{g.fillStyle=it[1];g.fillText(txts[i],x,y);x+=g.measureText(txts[i]).width+16;});
       g.restore();})();
-    const mark=(list,ln,fl,dir,tx)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);
+    const mark=(list,ln,fl,dir,tx0,NO)=>{list.forEach(i=>{if(i<a||i>b)return;const x=xs.getPixelForValue(i-a);const tx=tx0+(NO&&NO[i]?NO[i]:'');
       g.save();g.strokeStyle=ln;g.lineWidth=1.3;g.setLineDash([5,4]);
       g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
       g.fillStyle=fl;g.beginPath();
@@ -428,8 +449,8 @@ function render(){
       g.fillStyle='rgba(255,255,255,.85)';g.fillRect(x-w/2,ty-11,w,14);
       g.fillStyle=fl;g.fillText(tx,x,ty);
       g.restore();});};
-    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'매수');
-    mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1,'적극매도');}};
+    mark(BUY,'rgba(217,45,32,.6)','#d92d20',1,'매수',BNO);
+    mark(SELL,'rgba(24,73,169,.6)','#1849a9',-1,'매도',SNO);}};
 
   // 차트 위에서 휠 = 구간 폭 조정, Shift+휠 = 좌우 이동. 커서 자리를 기준으로 확대·축소한다.
   const box=document.querySelector('.cbox');
@@ -480,7 +501,7 @@ function render(){
   document.getElementById('foot').innerHTML=
     `<b>적극매수</b> = 3형제 %K가 모두 ${S10(CUT)} 이하 · <b>적극매도</b> = 모두 ${S10(100-CUT)} 이상 · `
    +`<b>상승추세</b> = 셋 중 둘 이상이 ${TRN}봉 전보다 높음. 적극과 추세는 섞지 않고 개수도 따로 셉니다.<br>`
-   +`차트의 <b>▲▼가 조건이 새로 성립한 자리</b>입니다 — 붉은 ▲는 <b>3형제 매수 규칙</b>(막내가 ${S10(BUYP.FLOOR)} 이하 바닥을 찍고 → 둘째가 바닥을 찍고 → 둘 다 저점보다 ${S10(BUYP.RISE)} 이상 올라 있을 때 큰형이 ${S10(BUYP.FLOOR)} 아래로 내려와 있다가 올라가는 첫 봉), 푸른 ▼는 적극매도. 위 적극매수 칸 색은 종전 기준 그대로입니다.<br>`
+   +`차트의 <b>▲▼가 규칙이 새로 성립한 자리</b>이고 글자의 번호가 어느 규칙인지입니다 — 매수 ${BUY_RULES.map(x=>x.no+' '+x.name).join(' / ')} · 매도 ${SELL_RULES.map(x=>x.no+' '+x.name).join(' / ')}. 규칙은 앞으로 목록에 더해집니다.<br>`
    +'<b>봉 주기별 쓰임</b> — <b>5분봉 = 단타</b>, <b>60분봉 = 스윙</b>(사흘~2주), <b>240분봉 = 추세</b>(며칠~몇 주). '
    +'스윙이면 60분봉에서 타점을 잡되 일봉이 어느 쪽인지 반드시 같이 보십시오.<br>'
    +'<b>★ 수퍼매수</b> = 5분·60분·240분봉 동시 적극매수. 간격을 크게 벌린 셋이라 서로 다른 시간대를 확인합니다.<br>'
@@ -785,7 +806,7 @@ function setCycleTable(r60,r240){
 // ── 검증 탭 맨 위 표 — 매수 신호 → 매도 신호 (계획서 §4) ──
 let VSELL='dead';
 function buysOf(row,kind){
-  if(kind==='old'){const o=[];for(let i=1;i<row.c.length;i++){const q=stateAt(row.K,i),p=stateAt(row.K,i-1);if(!q.lack&&q.s===2&&p.s!==2)o.push(i);}return o;}
+  if(kind&&kind.startsWith('r')){const r=BUY_RULES[+kind.slice(1)];return r?r.fn(row.K,BUYP):[];}   // 'r0','r1' = 규칙 하나만
   return buySig(row.K).map(x=>x.i);}
 function pairByTf(list,kind){const byTf={};
   for(const t of list)for(const r of t.rows){const p=pairUp(r,buysOf(r,kind),sellSig(r.K,VSELL));
@@ -802,12 +823,12 @@ function pairRowsHtml(byTf,label){let body='',tot=[],openT=0,dupT=0;
   return `<h2>${label}${dupT?` <span class="small">(매도 전 매수 ${dupT}건 제외)</span>`:''}</h2>`
     +`<table><thead><tr><th>봉</th><th>건수</th><th>승률</th><th>평균</th><th>최악</th><th>최고</th><th>평균 보유(봉)</th><th>진행 중</th></tr></thead><tbody>${body}</tbody></table>`;}
 function pairSection(list,who){
-  const sellNm=VSELL==='aggr'?'적극매도(3형제 동시 8.0↑)가 새로 성립한 봉':'큰형 8.0 이상에서 %K가 %D 하향돌파(데드크로스)';
+  const sellNm=VSELL==='rule'?('매도 규칙 '+SELL_RULES.map(x=>x.no+' '+x.name).join(' / ')):'큰형 8.0 이상에서 %K가 %D 하향돌파(데드크로스)';
   return `<h2 style="margin-top:6px">매수 신호 → 매도 신호 · ${who}</h2>`
-    +`<p class="note" style="margin:0 0 6px">매수 = <b>3형제 매수 규칙</b> — 막내가 ${S10(BUYP.FLOOR)} 이하 바닥을 찍고, 그 뒤 둘째가 바닥을 찍고, 둘 다 저점보다 ${S10(BUYP.RISE)} 이상 올라 있을 때 큰형이 ${S10(BUYP.FLOOR)} 아래로 내려와 있다가 올라가는 첫 봉. `
+    +`<p class="note" style="margin:0 0 6px">매수 = <b>매수 규칙 목록 중 하나라도 성립한 봉</b> — ${BUY_RULES.map(x=>x.no+' '+x.name).join(' / ')}. `
     +`매도 = <b>${sellNm}</b>. 매수 봉 종가에 사서 다음 매도 신호 봉 종가에 판 수익률이며, 매도 전에 나온 매수는 세지 않고 수수료·세금은 없습니다.</p>`
-    +pairRowsHtml(pairByTf(list,'new'),'3형제 매수 규칙')
-    +pairRowsHtml(pairByTf(list,'old'),'비교 — 종전 적극매수(3형제 동시 2.0↓)');}
+    +pairRowsHtml(pairByTf(list,'new'),'매수 규칙 전부(①+②)')
+    +BUY_RULES.map((x,k)=>pairRowsHtml(pairByTf(list,'r'+k),'규칙 '+x.no+'만 — '+x.name)).join('');}
 function pairDetail(row){
   const p=pairUp(row,buysOf(row,'new'),sellSig(row.K,VSELL)),last=p.pairs.slice(-20).reverse();let b='';
   for(const x of last)b+=`<tr><td class="small">${fmtT(row.ts[x.i])}</td><td class="num">${(+row.c[x.i]).toLocaleString()}</td><td class="small">${fmtT(row.ts[x.j])}</td>`
@@ -821,7 +842,7 @@ async function renderV(){
   const mb=`<button class="sm ${VMODE==='one'?'on':''}" data-vm="one">이 종목</button>`
           +`<button class="sm ${VMODE==='all'?'on':''}" data-vm="all">관심 ${WL.length}종목 합산</button>`;
   const hb=HOLDS.map(h=>`<button class="sm ${h===VHOLD?'on':''}" data-hold="${h}">${h}봉 뒤</button>`).join('');
-  const sb=`<button class="sm ${VSELL==='dead'?'on':''}" data-vs="dead">8.0 위 데드크로스</button><button class="sm ${VSELL==='aggr'?'on':''}" data-vs="aggr">적극매도</button>`;
+  const sb=`<button class="sm ${VSELL==='dead'?'on':''}" data-vs="dead">8.0 위 데드크로스</button><button class="sm ${VSELL==='rule'?'on':''}" data-vs="rule">매도 규칙(①②)</button>`;
   const bar=`<div class="bar">${mb}<span class="sub" style="margin-left:10px">매도 신호</span>${sb}<span class="sub" style="margin-left:10px">보유 기간</span>${hb}</div>`;
   const wire=()=>{
     el.querySelectorAll('[data-hold]').forEach(b=>b.onclick=()=>{VHOLD=+b.dataset.hold;renderV();});
@@ -1025,11 +1046,11 @@ function drawSet(tf,cid,r,cy,sp5){
       mark(cy.BUY,'#d92d20',1,'매수');
       mark(cy.SELL,'#1849a9',-1,'매도');
       // 3형제 매수 규칙(buySig) 표식 — 세팅 사이클과 별개로 얹는다(계획서 §2-4). 주황 ▼「3형제 매수」, 사이클 ▲보다 위 칸.
-      buySig(r.K).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);
+      buySig(r.K).forEach(o=>{const i=o.i;if(i<a||i>b)return;const x=X(i);const tx='매수'+o.no;
         g.save();g.fillStyle='#e8590c';g.beginPath();g.moveTo(x,ca.bottom-30);g.lineTo(x-6,ca.bottom-42);g.lineTo(x+6,ca.bottom-42);g.closePath();g.fill();
         g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();
         g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
-        const tx='3형제 매수',w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
+        const w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ca.bottom-56,w,13);
         g.fillStyle='#e8590c';g.fillText(tx,x,ca.bottom-46);g.restore();});
     }
     if(tf==='5m'&&sp5){
