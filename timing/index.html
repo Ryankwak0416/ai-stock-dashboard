@@ -69,6 +69,8 @@ td.num{font-variant-numeric:tabular-nums}
 .wbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .wbox.drag{cursor:grabbing}
 .sbox.drag{cursor:grabbing}
+.sbox .xl{position:absolute;top:6px;bottom:6px;width:0;border-left:1px dashed #d92d20;pointer-events:none;display:none}
+.sbox .xl b{position:absolute;top:0;left:3px;font-size:10px;color:#d92d20;background:rgba(255,255,255,.9);padding:0 3px;border-radius:3px;white-space:nowrap}
 .tf b{display:block;font-size:14px;margin-top:1px}
 .tf em{display:block;font-style:normal;font-size:10px;font-weight:700;margin-top:1px;line-height:1.1}
 .tf em.buy{color:#d92d20}.tf em.sell{color:#1849a9}.tf em.none{color:#c9ced8}
@@ -951,6 +953,8 @@ let SMUL=1;
 // 세팅 탭 차트도 스캐너처럼 끌어서 이동·휠로 확대축소한다 (260918 사장님 지시).
 // SBARS = 그 차트가 보여줄 봉수, SOFF = 오른쪽 끝에서 몇 봉 뒤로 물러났는지.
 let SBARS={}, SOFF={};
+// 동기 커서 — 한 차트 위 마우스 자리(봉 시각)를 세 차트에 같은 시각의 세로 점선으로 같이 보인다. 2026-09-19 대표 제안. SSYNC 로 켜고 끈다.
+let SSYNC=true, SVIEW={};
 
 function sSeries(tf){return SROWS?SROWS.find(r=>r.tf===tf):null;}
 
@@ -1145,7 +1149,7 @@ async function renderS(){
       <br><span class="gate ${gt.cls}">${gt.txt}</span>${slTxt}</div>
   </div>
   <div class="steps">${steps}</div>
-  <div class="bar"><span class="sub">구간</span>${spanb}</div>
+  <div class="bar"><span class="sub">구간</span>${spanb}<span style="width:14px"></span><button class="sm ${SSYNC?'on':''}" data-ssync="1" title="마우스 자리의 시각을 세 차트에 같이 표시">동기 커서 ${SSYNC?'켜짐':'꺼짐'}</button></div>
   ${SSET_HTML()}
   <p class="note">
     <b>이 매매의 목적은 하나입니다 — 60분 큰형이 바닥일 때 사서, 60분 큰형이 8.0에 올 때 판다.</b>
@@ -1168,6 +1172,7 @@ async function renderS(){
     ⚠ 5분 분할이 성적을 개선하는지는 아직 검증되지 않았습니다 — 5분봉 보유량이 60거래일뿐이어서
     검증 숫자는 전부 «60분 단일 진입» 기준입니다.
   </p>`;
+  el.querySelectorAll('[data-ssync]').forEach(b=>b.onclick=()=>{SSYNC=!SSYNC;syncHide();renderS();});
   el.querySelectorAll('[data-smul]').forEach(b=>b.onclick=()=>{
     SMUL=+b.dataset.smul; SBARS={}; SOFF={}; renderS();});
   // 차트마다 끌어서 이동 · 휠로 확대축소 (스캐너와 같은 배율 ×1.25 / ×0.8, 최소 20봉)
@@ -1177,7 +1182,8 @@ async function renderS(){
     const bars=()=>{const rr=sSeries(tf);return rr?rr.c.length:0;};
     box.addEventListener('pointerdown',e=>{dg=true;sx=e.clientX;so=SOFF[tf]||0;box.classList.add('drag');
       try{box.setPointerCapture(e.pointerId);}catch(_){}});
-    box.addEventListener('pointermove',e=>{if(!dg)return;
+    box.addEventListener('pointerleave',()=>syncHide());
+    box.addEventListener('pointermove',e=>{if(!dg){syncCursor(tf,e.clientX);return;}
       const N=bars(),span=Math.max(20,Math.min(SBARS[tf]||SBASE[tf],N));
       SOFF[tf]=Math.max(0,Math.min(N-span,so-Math.round((e.clientX-sx)/(box.clientWidth||600)*span)*-1));
       if(SREDRAW)SREDRAW(tf); else renderS();});
@@ -1191,11 +1197,30 @@ async function renderS(){
       if(SREDRAW)SREDRAW(tf); else renderS();},{passive:false});});
   for(const [tf,cid] of SORD){
     const rr=sSeries(tf); if(!rr)continue;
-    drawSet(tf,cid,rr,cy,sp5);}
+    SVIEW[tf]=drawSet(tf,cid,rr,cy,sp5);}
   SREDRAW=(tf)=>{const e=SORD.find(x=>x[0]===tf); if(!e)return;
-    const rr=sSeries(tf); if(!rr)return; drawSet(tf,e[1],rr,cy,sp5);};
+    const rr=sSeries(tf); if(!rr)return; SVIEW[tf]=drawSet(tf,e[1],rr,cy,sp5);};
 }
 let SREDRAW=null;
+function syncHide(){document.querySelectorAll('#paneS .sbox .xl').forEach(x=>x.style.display='none');}
+function syncCursor(tf,clientX){
+  if(!SSYNC){syncHide();return;}
+  const e0=SORD.find(x=>x[0]===tf); if(!e0)return;
+  const ch=SCH[e0[1]],v=SVIEW[tf],r=sSeries(tf); if(!ch||!v||!r)return;
+  const cv=ch.canvas.getBoundingClientRect();
+  const idx=Math.round(ch.scales.x.getValueForPixel(clientX-cv.left));
+  const bi=v.a+idx; if(bi<v.a||bi>v.b){syncHide();return;}
+  const T=r.ts[bi];
+  for(const [tf2,cid2] of SORD){
+    const ch2=SCH[cid2],v2=SVIEW[tf2],r2=sSeries(tf2),box=document.querySelector(`#paneS .sbox[data-stf="${tf2}"]`);
+    const xl=box&&box.querySelector('.xl'); if(!ch2||!v2||!r2||!xl)continue;
+    // T 이하의 마지막 봉(굵은 봉은 그 시각을 품은 봉)
+    let lo=0,hi=r2.ts.length-1,j=-1;while(lo<=hi){const m=(lo+hi)>>1;if(r2.ts[m]<=T){j=m;lo=m+1;}else hi=m-1;}
+    if(j<v2.a||j>v2.b){xl.style.display='none';continue;}
+    const cv2=ch2.canvas.getBoundingClientRect(),bx=box.getBoundingClientRect();
+    const x=ch2.scales.x.getPixelForValue(j-v2.a)+(cv2.left-bx.left);
+    xl.style.left=x+'px';xl.style.display='block';
+    xl.querySelector('b').textContent=(tf2===tf?'':'≈ ')+fmtT(r2.ts[j])+' · '+S10(r2.K.k20.k[j]);}}
 function SSET_HTML(){
   return SORD.map(([tf,cid])=>{
     const rr=sSeries(tf);
@@ -1207,7 +1232,7 @@ function SSET_HTML(){
     return `<div class="shead"><span><b>${LBL[tf]}봉</b> <span class="role">${role}</span> <span class="sub">${desc}</span></span>
       <span class="sub">막내 ${fk(rr.K.k5.k[rr.K.k5.k.length-1])} · 둘째 ${fk(rr.K.k10.k[rr.K.k10.k.length-1])} · 큰형 ${fk(rr.K.k20.k[rr.K.k20.k.length-1])}
       · ${st.lack?'-':SN[st.s]}${slp}</span></div>
-      <div class="sbox" data-stf="${tf}"><canvas id="${cid}"></canvas></div>`;}).join('');
+      <div class="sbox" data-stf="${tf}"><canvas id="${cid}"></canvas><div class="xl"><b></b></div></div>`;}).join('');
 }
 
 // ═══════════ 테스트파동 탭 (2026-09-19 대표 지시 · 계획서 _계획_260919_테스트파동탭.md) ═══════════
