@@ -64,6 +64,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 
 <div class="tabs" id="tabs">
   <div class="tab on" data-t="score">보조지표 106개 방향성</div>
+  <div class="tab" data-t="bt">보조지표106 방향성 검증</div>
   <div class="tab" data-t="stoch">스토캐스틱 3형제</div>
   <div class="tab" data-t="boll">볼린저밴드</div>
   <div class="tab" data-t="macd">MACD</div>
@@ -71,7 +72,6 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
   <div class="tab" data-t="ma">이동평균선</div>
   <div class="tab" data-t="mtf">10축 점수판</div>
   <div class="tab" data-t="scr">종목 스크리너</div>
-  <div class="tab" data-t="bt">백테스트</div>
 </div>
 <div class="card" style="border-radius:0 12px 12px 12px">
   <div class="leg" id="leg"></div>
@@ -81,7 +81,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 <div class="note" id="tabnote"></div>
 <p class="small"><b>종합 스코어</b>는 <code>stoch/indicators106.py</code>가 매일 장마감 후 계산합니다. 106개 지표를 각각 <b>과거 250일 백분위(0~100)</b>로 정규화해 스케일을 통일하고, 서로 상관이 높은 지표는 <b>중복군으로 묶어 1/그룹크기</b> 가중치를 줍니다(SMA5~SMA200처럼 같은 정보를 여러 번 세지 않기 위함). 카테고리 가중치는 추세 .20 / 모멘텀 .20 / 이동평균 .18 / 거래량 .15 / 변동성 .12 / 지지저항 .07 / 통계 .04 / 캔들패턴 .04 로 <b>공개·고정</b>돼 있습니다.
 스토캐스틱은 저장소가 계산한 %D 값(D5=5·3 / D10=10·6 / D20=20·12)이며 %K가 없어 골든크로스 판정은 하지 않습니다. 볼린저(20·2σ)·MACD(12·26·9)·RSI(14)는 종가로 이 페이지가 직접 계산합니다.
-<b>기계적 타점은 규칙이 발화한 지점일 뿐 수익을 보장하지 않습니다.</b> 백테스트 탭에서 이 스코어의 실제 성적을 벤치와 비교해 보세요.</p>
+<b>기계적 타점은 규칙이 발화한 지점일 뿐 수익을 보장하지 않습니다.</b> 「보조지표106 방향성 검증」 탭에서 이 타점대로 샀을 때의 승률·수익률을 봅니다.</p>
 </div>
 <script>
 const DATA_DIR='../stoch/data/', MIN_DIR='../stoch/min/';
@@ -499,7 +499,7 @@ function btTable(rows,dir){
       <td class="small">${(o.m>=0?'+':'')+o.m.toFixed(2)}%</td>
       <td class="${ok?'buy':'sell'}">${(o.ex>=0?'+':'')+o.ex.toFixed(2)}%p</td>
       <td class="${ok?'buy':'sell'}">${ok?'✓ 나았다':'✗ 못했다'}</td></tr>`;}).join('');
-  return `<table><thead><tr><th>기간</th><th>타점 수</th><th>${dir>0?'타점에 샀을 때 평균':'신호 후 평균'}</th><th>아무 날이나 샀을 때</th><th>차이</th><th>판정</th></tr></thead><tbody>${t}</tbody></table>`;}
+  return `<table><thead><tr><th>보유 기간</th><th>타점 수</th><th>${dir>0?'타점에 샀을 때 평균 수익률':'매도 타점 뒤 평균 등락'}</th><th>아무 날이나 샀을 때 평균</th><th>차이(%p)</th><th>판정</th></tr></thead><tbody>${t}</tbody></table>`;}
 function backtest(){
   const B=bt1(BUY,1),S=bt1(SELL,-1);
   const bw=B.filter(o=>o.n&&o.ex>0).length, bn=B.filter(o=>o.n).length;
@@ -509,11 +509,12 @@ function backtest(){
     : `<b>매수 규칙</b>은 ${bn}개 기간 중 <b class="${bw?'buy':'sell'}">${bw}개</b>에서 무작위 진입보다 나았고, <b>매도 규칙</b>은 ${sn}개 중 <b class="${sw?'buy':'sell'}">${sw}개</b>에서 하락을 피하는 데 도움이 됐습니다.`;
   const kw = bn===0?'':(bw===bn&&sw===sn?'<b class="buy">이 종목에서는 규칙이 대체로 통했습니다.</b>':(bw===0&&sw===0?'<b class="sell">이 종목에서는 규칙이 통하지 않았습니다.</b>':'일부 기간에서만 통했습니다 — 신뢰하기 이릅니다.'));
   return `<div class="note" style="background:#f1f5f9;border-color:#cbd5e1;border-left-color:#475467;margin:10px 0 4px">
-      <b>이 화면이 답하는 질문</b> — "이 타점대로 샀으면, 아무 날이나 산 것보다 나았을까?"<br>
-      타점의 성적을 <b>무작위 진입 평균(벤치)</b>과 맞대어 그 차이만 봅니다. 상승장에서는 아무렇게나 사도 승률이 높으니, 승률이 아니라 <b>차이(%p)</b>가 판단 기준입니다.<br>
+      <b>무엇을 검증하나</b> — 보조지표 106개 방향성(−100~+100)이 <b>+${TH6.buy}를 위로 뚫는 봉</b>을 ▲매수 타점, <b>${TH6.sell}을 아래로 뚫는 봉</b>을 ▼매도 타점으로 잡고,
+      ▲가 뜬 <b>다음 날 종가에 사서 5일·20일·60일 뒤 종가에 판</b> 승률과 평균 수익률을 잽니다. 매도 타점은 그 뒤 실제로 덜 올랐는지(내렸는지)를 같은 기간으로 잽니다.<br>
+      <b>어떻게 판정하나</b> — 같은 종목에서 <b>아무 날이나 사서 같은 기간 들고 있었을 때의 평균(벤치)</b>과 맞대어 그 차이(%p)를 봅니다. 상승장에서는 아무 날에 사도 승률이 높으니 승률보다 <b>차이가 +인지</b>가 판단 기준입니다. 수수료·세금은 넣지 않았습니다.<br>
       ${msg} ${kw}${few?'<br><b class="sell">주의: 타점 표본이 20건 미만이라 통계적 결론으로 쓰기엔 부족합니다.</b>':''}</div>
-    <p class="small" style="margin:12px 0 2px"><b>▲ 매수 타점 검증</b> — 타점 다음 봉 종가로 사서 N일 뒤 종가에 팔았다고 가정</p>${btTable(B,1)}
-    <p class="small" style="margin:14px 0 2px"><b>▼ 매도 타점 검증</b> — 신호 뒤 실제로 덜 올랐는지(차이가 +면 회피 효과 있음)</p>${btTable(S,-1)}`;}
+    <p class="small" style="margin:12px 0 2px"><b>▲ 매수 타점 검증</b> — 방향성이 +${TH6.buy}를 위로 뚫은 다음 날 종가에 사서 5·20·60일 뒤 종가에 팔았을 때</p>${btTable(B,1)}
+    <p class="small" style="margin:14px 0 2px"><b>▼ 매도 타점 검증</b> — 방향성이 ${TH6.sell}을 아래로 뚫은 다음 날부터 5·20·60일 동안 아무 날에 판 것보다 덜 올랐는지(차이가 +면 팔아서 피한 효과 있음)</p>${btTable(S,-1)}`;}
 function verdict(){
   if(has6()&&IN6){
     const i=N-1,s=S6[i],cnt=IN6.cnt||{},AG=IN6.ag||[],DIR=IN6.dir||0;
