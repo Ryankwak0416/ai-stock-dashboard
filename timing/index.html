@@ -1173,6 +1173,9 @@ async function renderS(){
     검증 숫자는 전부 «60분 단일 진입» 기준입니다.
   </p>`;
   el.querySelectorAll('[data-ssync]').forEach(b=>b.onclick=()=>{SSYNC=!SSYNC;syncHide();renderS();});
+  // 차트마다 구간 폭 따로 (2026-09-19 대표 「각 봉의 구간 크기는 각자 따로 조정」)
+  el.querySelectorAll('[data-swtf]').forEach(b=>b.onclick=()=>{const tf=b.dataset.swtf,n=+b.dataset.swn,rr=sSeries(tf);if(!rr)return;
+    SBARS[tf]=n===0?rr.c.length:n;SOFF[tf]=0;renderS();});
   el.querySelectorAll('[data-smul]').forEach(b=>b.onclick=()=>{
     SMUL=+b.dataset.smul; SBARS={}; SOFF={}; renderS();});
   // 차트마다 끌어서 이동 · 휠로 확대축소 (스캐너와 같은 배율 ×1.25 / ×0.8, 최소 20봉)
@@ -1231,7 +1234,8 @@ function SSET_HTML(){
     const slp=(tf==='240m'&&I240.slope!=null)?` · 큰형 기울기 <b style="color:${I240.slope>=0?'#d92d20':'#1849a9'}">${I240.slope>=0?'+':''}${(I240.slope/10).toFixed(1)} ${I240.slope>=0?'상승':'하락'}</b>`:'';
     return `<div class="shead"><span><b>${LBL[tf]}봉</b> <span class="role">${role}</span> <span class="sub">${desc}</span></span>
       <span class="sub">막내 ${fk(rr.K.k5.k[rr.K.k5.k.length-1])} · 둘째 ${fk(rr.K.k10.k[rr.K.k10.k.length-1])} · 큰형 ${fk(rr.K.k20.k[rr.K.k20.k.length-1])}
-      · ${st.lack?'-':SN[st.s]}${slp}</span></div>
+      · ${st.lack?'-':SN[st.s]}${slp}
+      <span style="margin-left:10px">폭 ${[60,120,250,500,0].map(n=>`<button class="sm ${(n===0?(SBARS[tf]>=rr.c.length):(SBARS[tf]===n))?'on':''}" data-swtf="${tf}" data-swn="${n}" style="padding:1px 6px;font-size:11px">${n||'전체'}</button>`).join('')}</span></span></div>
       <div class="sbox" data-stf="${tf}"><canvas id="${cid}"></canvas><div class="xl"><b></b></div></div>`;}).join('');
 }
 
