@@ -805,13 +805,12 @@ function showTab(n){
 //   상위 제약      = 240분 큰형이 20 근처로 무너져 있으면 60분 반등은 무산됐다(7월 폭락기 5연속)
 let SROWS=null, SSPAN=3, SCH={};
 const SSPANS=[[0.7,'좁게'],[1,'기본'],[1.6,'넓게'],[2.6,'아주 넓게']];
-const SBASE={'240m':60,'60m':120,'5m':140,'3m':200};
+const SBASE={'240m':60,'60m':120,'5m':140};
 const SROLE={'60m':['메인','큰형 바닥 → 매수 / 큰형 8.0 → 매도'],
              '5m':['분할','단기 고·저점으로 담는 자리를 정한다'],
-             '3m':['분할 세밀','5분보다 잘게 — 담는 자리를 좁힌다'],
              '240m':['흐름','큰 흐름만 본다']};
 // 화면 배치 = 위에서 아래로 60분(메인) → 5분(분할) → 240분(흐름)
-const SORD=[['60m','cvS6'],['5m','cvS5'],['3m','cvS3'],['240m','cvS4']];
+const SORD=[['60m','cvS6'],['5m','cvS5'],['240m','cvS4']];
 let SMUL=1;
 // 세팅 탭 차트도 스캐너처럼 끌어서 이동·휠로 확대축소한다 (260918 사장님 지시).
 // SBARS = 그 차트가 보여줄 봉수, SOFF = 오른쪽 끝에서 몇 봉 뒤로 물러났는지.
@@ -909,10 +908,7 @@ function drawSet(tf,cid,r,cy,sp5){
       items.forEach((it,i)=>{g.fillStyle=it[1];g.fillText(txts[i],x,y);x+=g.measureText(txts[i]).width+14;});
       g.restore();})();
     if(tf==='60m'){
-      const zone=(list,fill)=>list.forEach(z=>{const s0=Math.max(z[0],a),e0=Math.min(z[1],b);
-        if(e0<a||s0>b)return;const x1=X(s0),x2=X(e0);
-        g.save();g.fillStyle=fill;g.fillRect(x1-1,ca.top,Math.max(2,x2-x1+2),ca.bottom-ca.top);g.restore();});
-      zone(cy.ZL,'rgba(217,45,32,.13)');zone(cy.ZH,'rgba(24,73,169,.13)');
+      // 큰형 2.0 이하·8.0 이상 구간의 세로 띠는 2026-09-18 사장님 지시로 지웠다. ▲매수·▼매도 표시만 남긴다.
       const mark=(list,col,dir,tx)=>list.forEach(i=>{if(i<a||i>b)return;const x=X(i);
         g.save();g.strokeStyle=col;g.lineWidth=1.3;g.setLineDash([5,4]);
         g.beginPath();g.moveTo(x,ca.top);g.lineTo(x,ca.bottom);g.stroke();g.setLineDash([]);
@@ -925,7 +921,7 @@ function drawSet(tf,cid,r,cy,sp5){
         g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w/2,ty-11,w,14);
         g.fillStyle=col;g.fillText(tx,x,ty);g.restore();});
       mark(cy.BUY,'#d92d20',1,'매수');
-      mark(cy.SELL,'#1849a9',-1,'청산');
+      mark(cy.SELL,'#1849a9',-1,'매도');
     }
     if(tf==='5m'&&sp5){
       const COL={'막내':'#e8590c','둘째':'#0ca678','큰형':'#7048e8'};
@@ -985,10 +981,10 @@ async function renderS(){
   <p class="note">
     <b>이 매매의 목적은 하나입니다 — 60분 큰형이 바닥일 때 사서, 60분 큰형이 8.0에 올 때 판다.</b>
     그래서 기준봉은 60분봉 하나이고, 화면도 위에서부터 <b>60분(메인) → 5분(분할) → 240분(흐름)</b> 순으로 놓았습니다.<br>
-    <b>60분 — 메인.</b> 붉은 세로 띠가 큰형 2.0 이하입니다. 이 구간이 «바닥 구간»이고,
-    띠가 끝나며 큰형이 2.0 위로 올라서는 자리가 ▲<b>매수</b>(반등 확인)입니다.
-    푸른 띠는 큰형 8.0 이상 — 목표 지점에 왔다는 뜻이지만 여기서 바로 팔지 않습니다.
-    8.0 위에서 %K가 %D를 꺾고 내려오는 ▼<b>청산</b>이 매도 시점입니다.
+    <b>60분 — 메인.</b> 큰형 2.0 이하가 «바닥 구간»이고,
+    큰형이 2.0 위로 올라서는 자리가 ▲<b>매수</b>(반등 확인)입니다.
+    큰형 8.0 이상은 목표 지점에 왔다는 뜻이지만 여기서 바로 팔지 않습니다.
+    8.0 위에서 %K가 %D를 꺾고 내려오는 자리가 ▼<b>매도</b>입니다.
     실측에서 데드크로스가 사이클 최고가의 78%를 가져갔습니다(+9.63% vs 상한 +12.27%).<br>
     <b>5분 — 분할.</b> 단기 고·저점을 보고 «어디서 얼마나 담을지»만 정합니다. 매수·매도 판정은 하지 않습니다.
     차트 아래 작은 삼각형이 <b>막·둘·큰</b> 각각의 분할 트리거입니다.<br>

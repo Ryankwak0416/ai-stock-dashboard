@@ -44,8 +44,11 @@ ACC = ("1m", "5m", "30m", "60m")
 FETCH = [("1m", "1m", "8d"), ("5m", "5m", "60d"), ("30m", "30m", "60d"), ("60m", "60m", "730d")]
 # 묶어서 만드는 시간축: (라벨, 원본라벨, 묶을 봉수)
 DERIVE = [("10m", "5m", 2), ("120m", "60m", 2), ("240m", "60m", 4)]
+# 시계 기준으로 묶어서 만드는 시간축: (라벨, 원본라벨, 분). 3분봉은 1분봉에서 09:00 기점 3분 단위로 —
+# 공급기(stoch_live_server.clock_chunk)와 같은 규칙이라 공급기가 꺼져 있어도 타이밍 탭 3분 탭이 같은 봉을 본다. 2026-09-18
+DERIVE_CLOCK = [("3m", "1m", 3)]
 # 시간축별 보관 봉수
-KEEP = {"1m": 7800, "5m": 4700, "10m": 2400, "30m": 1600, "60m": 4400, "120m": 2200, "240m": 1200}
+KEEP = {"1m": 7800, "3m": 2600, "5m": 4700, "10m": 2400, "30m": 1600, "60m": 4400, "120m": 2200, "240m": 1200}
 TRIO = [("k5", 5, 3, 3), ("k10", 10, 6, 6), ("k20", 20, 12, 12)]   # 이름, 기간n, 슬로잉, %D기간
 
 
@@ -81,6 +84,24 @@ def chunk_by_day(df, k):
             out.append((b.index[0], b["h"].max(), b["l"].min(), b["c"].iloc[-1]))
     r = pd.DataFrame(out, columns=["t", "h", "l", "c"]).set_index("t")
     return r.sort_index()
+
+
+def clock_chunk(df, mins):
+    """1분봉을 «시계» 기준으로 묶는다 — 09:00 기점 mins분 단위 (공급기 clock_chunk와 같은 규칙).
+
+    개수로 묶으면(chunk_by_day) 거래가 없어 1분봉이 빠지는 종목에서 경계가 밀린다.
+    09:00 이전 봉은 버린다. 봉 시각은 묶음의 시작 시각이다."""
+    if df.empty:
+        return df
+    base = df.index.normalize() + pd.Timedelta(hours=9)
+    off = ((df.index - base).total_seconds() // 60).astype(int)
+    m = off >= 0
+    d = df[m]
+    key = base[m] + pd.to_timedelta((off[m] // mins) * mins, unit="m")
+    g = d.groupby(key)
+    out = pd.DataFrame({"h": g["h"].max(), "l": g["l"].min(), "c": g["c"].last()})
+    out.index.name = None
+    return out.sort_index()
 
 
 def fetch(yf, ticker, interval, period):
@@ -264,9 +285,12 @@ def main():
         for label, src, k in DERIVE:
             if src in raw and not raw[src].empty:
                 allt[label] = chunk_by_day(raw[src], k).tail(KEEP[label])
+        for label, src, mins in DERIVE_CLOCK:
+            if src in raw and not raw[src].empty:
+                allt[label] = clock_chunk(raw[src], mins).tail(KEEP[label])
 
         sig = {}
-        for label in ["1m", "5m", "10m", "30m", "60m", "120m", "240m"]:
+        for label in ["1m", "3m", "5m", "10m", "30m", "60m", "120m", "240m"]:
             if label in allt:
                 b = sig_block(allt[label], SIG_BARS)
                 if b:
