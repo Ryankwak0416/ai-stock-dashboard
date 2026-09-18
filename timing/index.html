@@ -93,6 +93,7 @@ td.num{font-variant-numeric:tabular-nums}
   <button id="tabS">60분봉 매매세팅</button>
   <button id="tabV">검증 (매수·매도 결과)</button>
   <span class="sub" id="nomin"></span>
+  <span id="livebadge" style="margin-left:auto;font-size:12px"></span>
 </div>
 
 <div id="paneS" class="pane"></div>
@@ -950,6 +951,39 @@ function SSET_HTML(){
       <div class="sbox"><canvas id="${cid}"></canvas></div>`;}).join('');
 }
 
+// ───────── 실시간 공급기 스위치 ─────────
+// 브라우저는 PC의 프로그램을 직접 켜지 못한다. 그래서 PC에 한 번 등록해 둔
+// 「stochlive://」 프로토콜을 부른다 — 윈도가 그 등록을 보고 공급기를 창 없이 띄운다.
+// 끄기는 공급기의 /stop 을 부르면 된다.
+function liveBadge(){
+  const el=document.getElementById('livebadge'); if(!el)return;
+  const btn='padding:2px 8px;font-size:12px;margin-left:6px';
+  if(LIVE.on){
+    el.innerHTML=`<b style="color:#2e7d32">● 실시간 ON</b>`
+      +` <span class="sub">오늘 ${LIVE.last||'-'} 봉까지</span>`
+      +`<button id="liveoff" style="${btn}">끄기</button>`;
+    document.getElementById('liveoff').onclick=async()=>{
+      try{await fetch(LIVE_URL+'/stop',{signal:AbortSignal.timeout(2000)});}catch(e){}
+      await new Promise(r=>setTimeout(r,900)); go();};
+  }else{
+    el.innerHTML=`<b style="color:#9aa0a6">○ 실시간 OFF</b>`
+      +` <span class="sub">전일 수집분</span>`
+      +`<button id="liveon" style="${btn}">공급기 켜기</button>`;
+    const b=document.getElementById('liveon');
+    b.onclick=async()=>{
+      b.disabled=true; b.textContent='켜는 중…';
+      location.href='stochlive://start';
+      for(let i=0;i<12;i++){
+        await new Promise(r=>setTimeout(r,1200));
+        try{const r=await fetch(LIVE_URL+'/ping',{signal:AbortSignal.timeout(1500)});
+            if(r.ok){go();return;}}catch(e){}
+      }
+      b.disabled=false; b.textContent='공급기 켜기';
+      alert('공급기가 응답하지 않습니다.\n이 PC에서 처음이라면 _주식실시간 폴더의 «자동시작_설치.bat»을 한 번만 실행해 주십시오.');
+    };
+  }
+}
+
 async function go(){
   document.getElementById('vd').innerHTML='<p class="sub">불러오는 중…</p>';
   VROWS=null;
@@ -961,7 +995,7 @@ async function go(){
         '<span class="tag">분봉 없음 — 관심 20종목만 분봉을 모읍니다. 이 종목은 일·주·월봉만 나옵니다.</span>';}
     else{document.getElementById('nomin').innerHTML='';
       if(!DATA.rows.some(r=>r.tf===TF))TF='60m';}
-    render();
+    render(); liveBadge();
     SROWS=null;
     if(TAB==='V')renderV();
     if(TAB==='S')renderS();
