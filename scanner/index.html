@@ -586,6 +586,7 @@ async function load(code,name){
   SER=CACHE[code];N=SER.length;span=252;pos=Math.max(0,N-span);
   S6=SER.map(r=>r[F.S6]); IN6=R6[code]||null; AG6=(IN6&&IN6.ag)?IN6.ag:[];
   recompute();mark(252);refresh();
+  try{const u=$('upd');if(u&&SER&&SER.length){const base=u.textContent.split(' · 마지막 봉')[0];u.textContent=base+' · 마지막 봉 '+fd(SER[SER.length-1][F.D]);}}catch(e){}
 }
 function mark(b){document.querySelectorAll('#spans .pre').forEach(x=>x.classList.toggle('on',b!==null&&+x.dataset.b===b));}
 function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');const cur=sel.value;sel.innerHTML='';
@@ -595,7 +596,7 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   try{
     const r=await fetch(DATA_DIR+'index.json',{cache:'no-store'});
     const j=await r.json();LIST=j.tickers||[];$('built').textContent='데이터 갱신: '+(j.built||'-')+' · '+LIST.length+'종목';
-    $('upd').textContent='마지막 데이터 업데이트 — 일봉·106지표 '+(j.built||'-')+' · '+LIST.length+'종목';
+    $('upd').textContent='마지막 데이터 업데이트 — 일봉·106지표 수집 '+(j.built||'-')+' · '+LIST.length+'종목';
     fill();
     const first=LIST.find(t=>t.code==='005930')||LIST[0];
     $('sel').value=first.code;await load(first.code,first.name);

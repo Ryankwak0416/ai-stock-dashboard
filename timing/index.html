@@ -1447,10 +1447,15 @@ async function go(){
     render(); liveBadge();
     // 마지막 데이터 업데이트 시각 — 2026-09-19 대표 「메인페이지에 마지막 데이터 업데이트 시간이 필요하다」
     (function(){const el=document.getElementById('upd');if(!el)return;
+      // «자료의 마지막 봉 시각»을 앞세운다 — 공급기 재계산 시각은 장이 없는 날에도 흘러 오해를 부른다(09-19 대표 화면 지적).
+      const r60=DATA.rows.find(r=>r.tf==='60m')||DATA.rows.find(r=>MIN.includes(r.tf));
+      const lastMin=r60&&r60.ts.length?fmtT(r60.ts[r60.ts.length-1]):'-';
+      const rD=DATA.rows.find(r=>r.tf==='D');const lastD=rD&&rD.ts.length?String(rD.ts[rD.ts.length-1]):'-';
       const mu=DATA.mn&&DATA.mn.updated?new Date(DATA.mn.updated):null;
       const kst=mu?new Date(mu.getTime()+9*3600*1000).toISOString().replace('T',' ').slice(0,16)+' KST':'-';
-      el.innerHTML='마지막 데이터 업데이트 — 분봉(1~240분) '+kst+(DAILY_BUILT?' · 일봉 '+DAILY_BUILT:'')
-        +(LIVE.on?' · <b style="color:#2e7d32">실시간 공급기 ON</b>, 오늘 '+(LIVE.last||'-')+' 봉까지':' · 실시간 공급기 OFF(전일 수집분)');})();
+      el.innerHTML='마지막 데이터 업데이트 — 분봉 마지막 봉 <b>'+lastMin+'</b> · 일봉 마지막 <b>'+lastD+'</b>'
+        +' <span style="font-weight:400">(분봉 '+(LIVE.on?'공급기 계산':'수집')+' '+kst+(DAILY_BUILT?' · 일봉 수집 '+DAILY_BUILT:'')+')</span>'
+        +(LIVE.on?' · <b style="color:#2e7d32">실시간 공급기 ON</b>'+(LIVE.last?', 오늘 '+LIVE.last+' 봉까지':' (오늘 새 봉 없음)'):' · 실시간 공급기 OFF');})();
     SROWS=null; WROWS=null; WPOS=1e9;
     if(TAB==='W')renderW();
     if(TAB==='C')renderC();
