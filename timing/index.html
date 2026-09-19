@@ -90,6 +90,7 @@ td.num{font-variant-numeric:tabular-nums}
 <div class="wrap">
 <h1>스토캐스틱 주관 매수매도 타이밍</h1>
 <p class="sub">막내(5,3) · 둘째(10,6) · 큰형(20,12) — 1분봉부터 월봉까지 같은 방식으로 판정합니다.</p>
+<p class="sub" id="upd" style="margin-top:-4px;font-weight:700;color:#344054">마지막 데이터 업데이트 — 불러오는 중…</p>
 
 <div class="bar">
   <input type="text" id="q" list="tk" placeholder="종목명 또는 코드 검색 (500종목)" autocomplete="off">
@@ -143,6 +144,7 @@ const ROLE={'5m':'단타','60m':'스윙','240m':'추세'};
 const RTAG=tf=>ROLE[tf]?`<span class="role">${ROLE[tf]}</span>`:'';
 const SPANS=[[60,'60봉'],[120,'120봉'],[250,'250봉'],[0,'전체']];
 // TRN=1 고정 — 추세는 «현재 기준 기울기»(마지막 봉 − 직전 봉 > 0 이면 상승). 2026-09-19 대표 「파동 해석은 현재 기준, 추세 드롭다운은 없앤다」.
+let DAILY_BUILT='';   // 일봉 자료 갱신 시각(index.json built)
 let CUT=20,TRN=1,CODE=null,TF='60m',SPAN=120,POS=1e9,NAMES={},WL=[],DATA=null,chart=null;
 let SHOW={px:true,k5:true,k10:true,k20:true};
 const SPANOPT=[30,40,60,80,100,120,160,200,250,300,0];
@@ -1443,6 +1445,12 @@ async function go(){
     else{document.getElementById('nomin').innerHTML='';
       if(!DATA.rows.some(r=>r.tf===TF))TF='60m';}
     render(); liveBadge();
+    // 마지막 데이터 업데이트 시각 — 2026-09-19 대표 「메인페이지에 마지막 데이터 업데이트 시간이 필요하다」
+    (function(){const el=document.getElementById('upd');if(!el)return;
+      const mu=DATA.mn&&DATA.mn.updated?new Date(DATA.mn.updated):null;
+      const kst=mu?new Date(mu.getTime()+9*3600*1000).toISOString().replace('T',' ').slice(0,16)+' KST':'-';
+      el.innerHTML='마지막 데이터 업데이트 — 분봉(1~240분) '+kst+(DAILY_BUILT?' · 일봉 '+DAILY_BUILT:'')
+        +(LIVE.on?' · <b style="color:#2e7d32">실시간 공급기 ON</b>, 오늘 '+(LIVE.last||'-')+' 봉까지':' · 실시간 공급기 OFF(전일 수집분)');})();
     SROWS=null; WROWS=null; WPOS=1e9;
     if(TAB==='W')renderW();
     if(TAB==='C')renderC();
@@ -1453,6 +1461,7 @@ async function go(){
 (async function(){
   let ALL=[];
   try{const idx=await fetch('../stoch/data/index.json').then(r=>r.json());
+    DAILY_BUILT=idx.built||'';
     ALL=(idx.tickers||[]).filter(t=>t.market!=='INDEX');
     ALL.forEach(t=>NAMES[t.code]=t.name);}catch(e){}
   try{WL=await fetch('../stoch/watchlist.json').then(r=>r.json());}catch(e){WL=[];}

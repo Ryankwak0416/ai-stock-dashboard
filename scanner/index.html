@@ -40,6 +40,7 @@ td.l{text-align:left}.buy{color:#067647;font-weight:700}.sell{color:#b42318;font
 </style>
 <div class="wrap">
 <h1>멀티지표 매매 스캐너</h1>
+<p class="sub" id="upd" style="font-weight:700;color:#344054;margin:0 0 4px">마지막 데이터 업데이트 — 불러오는 중…</p>
 <p class="sub">전 세계에서 쓰이는 <b>보조지표 106개</b>를 백분위로 정규화해 평균낸 <b>종합 스코어(0~100)</b>로 매수·매도 타점을 표시. 개별 지표(스토캐스틱 3형제·볼린저·MACD·RSI)는 탭에서 따로 봅니다. 데이터는 이 저장소가 자동 생성한 <code>stoch/data</code>를 읽습니다.</p>
 
 <div id="verdict" class="vb neu"><div><div class="big neu">데이터 불러오는 중…</div></div></div>
@@ -594,6 +595,7 @@ function fill(){const q=$('q').value.trim().toLowerCase();const sel=$('sel');con
   try{
     const r=await fetch(DATA_DIR+'index.json',{cache:'no-store'});
     const j=await r.json();LIST=j.tickers||[];$('built').textContent='데이터 갱신: '+(j.built||'-')+' · '+LIST.length+'종목';
+    $('upd').textContent='마지막 데이터 업데이트 — 일봉·106지표 '+(j.built||'-')+' · '+LIST.length+'종목';
     fill();
     const first=LIST.find(t=>t.code==='005930')||LIST[0];
     $('sel').value=first.code;await load(first.code,first.name);
