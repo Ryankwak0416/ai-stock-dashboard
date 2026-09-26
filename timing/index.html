@@ -65,8 +65,10 @@ td.num{font-variant-numeric:tabular-nums}
 .tf{padding:6px 12px;border:1px solid #c9ced8;border-bottom:none;border-radius:9px 9px 0 0;
   background:#eef1f5;font-weight:700;font-size:12px;cursor:pointer;color:#475467;line-height:1.25;text-align:center}
 .tf.on{background:#fff;color:#1849a9;border-color:#1849a9}
-.tf{border-top:4px solid #d92d20;min-width:86px}.tf.on{border-top-color:#b42318;box-shadow:0 -2px 0 #b42318 inset}   /* 칸 머리 붉은 띠 — 봉끼리 구분. 2026-09-26 대표 */
-.tfl{display:block;font-size:13px;font-weight:800;color:#b42318;border-bottom:1px solid #fecdca;padding-bottom:2px;margin:0 -4px 2px}
+.tf{border-top:5px solid transparent;min-width:86px}.tf.on{box-shadow:0 -2px 0 #1a1a1a inset;border-top-color:transparent}   /* 칸 머리 붉은 띠 = 상방인 칸에만 있다, 하방·전환은 없다. 2026-09-26 대표 「라인이 있고 없고의 차이」 */
+.tf.du{border-top-color:#d92d20}
+.tfl{display:block;font-size:13px;font-weight:800;padding-bottom:2px;margin:0 -4px 2px;border-bottom:1px solid #e4e7ec}
+.tf.du .tfl{color:#b42318}
 .cbox.drag{cursor:grabbing}
 .wbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .wbox.drag{cursor:grabbing}
@@ -455,7 +457,8 @@ function render(){
   document.getElementById('tfbar').innerHTML=
     data.rows.map(r=>{const v=lastVal(r.K.k20.k),c=cellOf(r);
       const col=v==null?'#9aa0a6':(v<=CUT?'#d92d20':(v>=100-CUT?'#1849a9':'#344054'));
-      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12 / 방향(둘째·큰형 %K와 %D) · 위치 / 마지막 신호${p9Title(c)}">`
+      const dc=!c?'':(c.dir>0?' du':(c.dir<0?' dd':' dm'));
+      return `<button class="tf${dc} ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12 / 방향(둘째·큰형 %K와 %D) · 위치 / 마지막 신호${p9Title(c)}">`
         +`<span class="tfl">${r.label}</span><b style="color:${col}">${S10(v)}</b>${dirPos(c)}${lastSig(r,c)}</button>`;}).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
