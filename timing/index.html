@@ -289,7 +289,7 @@ function fmtT(t){if(t==null)return '-';
 // 내놓고, 이 페이지는 그것을 «먼저» 찾아본다. 꺼져 있으면 저장소 파일로 그대로 돌아간다.
 // 공급기가 없다고 화면이 죽지 않는다 — 어제까지의 값으로 평소대로 보인다.
 const LIVE_URL='http://127.0.0.1:8787';
-const LIVE_VER_NEED=3;
+const LIVE_VER_NEED=4;   // 4 = 저장소에 없는 종목도 분봉을 만든다 (2026-09-26)
 let LIVE={on:false,last:null,ver:0};
 async function loadMin(code){
   try{
@@ -1440,8 +1440,25 @@ async function go(){
     DATA=await loadOne(CODE);POS=1e9;
     const hasMin=DATA.rows.some(r=>MIN.includes(r.tf));
     if(!hasMin){TF='D';
-      document.getElementById('nomin').innerHTML=
-        '<span class="tag">분봉 없음 — 관심 20종목만 분봉을 모읍니다. 이 종목은 일·주·월봉만 나옵니다.</span>';}
+      // 관심종목 밖 종목 — 저장소엔 분봉이 없고, 공급기(v4~)가 그 자리에서 야후·네이버로 만든다. 2026-09-26 대표.
+      let pv=0;try{const pr=await fetch(LIVE_URL+'/ping',{signal:AbortSignal.timeout(1500)});if(pr.ok)pv=(await pr.json()).ver||1;}catch(e){}
+      const nm=document.getElementById('nomin');
+      const why=pv===0?'이 종목은 저장소에 분봉이 없습니다(관심종목만 매일 모읍니다). <b>이 PC에서 공급기를 켜면</b> 이 종목 분봉(60분 3년·5분 60일·1분 7일)을 바로 받아 옵니다.'
+        :(pv<4?`공급기가 옛 판(v${pv})이라 저장소에 없는 종목의 분봉을 만들지 못합니다. 옆 단추로 새 판을 다시 켜십시오.`
+              :'공급기가 이 종목 분봉을 받아 오지 못했습니다(원천 응답 없음). 잠시 뒤 다시 여십시오.');
+      nm.innerHTML='<span class="tag">분봉 없음 — '+why+'</span>'
+        +(pv===0?' <button id="nmOn" style="padding:2px 8px;font-size:12px">공급기 켜기</button>'
+          :(pv<4?' <button id="nmOn" style="padding:2px 8px;font-size:12px">공급기 다시 켜기</button>':''));
+      const nb=document.getElementById('nmOn');
+      if(nb)nb.onclick=async()=>{nb.disabled=true;nb.textContent='켜는 중…';
+        if(pv>0){try{await fetch(LIVE_URL+'/stop',{signal:AbortSignal.timeout(2000)});}catch(e){}
+          await new Promise(r=>setTimeout(r,1500));}
+        location.href='stochlive://start';
+        for(let i=0;i<15;i++){await new Promise(r=>setTimeout(r,1200));
+          try{const r=await fetch(LIVE_URL+'/ping',{signal:AbortSignal.timeout(1500)});
+            if(r.ok&&((await r.json()).ver||1)>=4){go();return;}}catch(e){}}
+        nb.disabled=false;nb.textContent='공급기 켜기';
+        alert('공급기가 응답하지 않습니다.\n이 PC에서 처음이라면 _주식실시간 폴더의 «공급기_등록_최초1회.bat»을 한 번만 실행해 주십시오.');};}
     else{document.getElementById('nomin').innerHTML='';
       if(!DATA.rows.some(r=>r.tf===TF))TF='60m';}
     render(); liveBadge();
