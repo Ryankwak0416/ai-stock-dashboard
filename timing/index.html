@@ -317,6 +317,56 @@ function dirHistHtml(acc,who){
     +`<p class="note" style="margin:0 0 6px">과거 60분봉마다 그 시각까지의 자료로 머리글 결론을 다시 만들고, 그 60분 종가에서 1일(7봉)·5일(35봉) 뒤 60분 종가까지의 변화를 셌습니다. 5분 자료가 있는 최근 약 60거래일만 · 칸 = 분봉 전부 + 전일까지 일봉(주·월봉 제외) · 수수료 없음.</p>`
     +`<table><thead><tr><th>결론</th><th>건수</th><th>1일 뒤 평균</th><th>오른 비율</th><th>5일 뒤 평균</th><th>오른 비율</th></tr></thead><tbody>${b||'<tr><td colspan="6" class="small">자료 부족</td></tr>'}</tbody></table>`
     +`<p class="note" style="margin-top:4px">머리글이 60분봉마다 바뀐 비율 ${acc.steps?(acc.flips/acc.steps*100).toFixed(1):'-'}%</p>`;}
+// ══ 매수 후보 확률 대장 (2026-09-26 대표 「확률적으로 기록 … 계획서를 작성해서 적용」 · _계획_260926_확률대장.md) ══
+// 후보 자리·꼬리표 정의는 stoch/prob_build.py 와 같다(바꾸면 둘 다). 확률은 저장소 stoch/prob/prob_table.json 에서 찾는다.
+let PROB=null, PEV=null;
+async function loadProb(){if(PROB)return PROB;
+  try{PROB=await fetch(`../stoch/prob/prob_table.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.ok?r.json():null);}catch(e){PROB=null;}return PROB;}
+const PLAD=[['5m','k5'],['5m','k10'],['5m','k20'],['30m','k5'],['30m','k10'],['60m','k10'],['60m','k20']];
+function firstGE(ts,T){let lo=0,hi=ts.length;while(lo<hi){const m=(lo+hi)>>1;if(ts[m]<T)lo=m+1;else hi=m;}return lo;}
+function pTrough(r,key,t0,t1,cap){const t=r.ts,k=r.K[key].k,j0=firstGE(t,t0),j1=lastLE(t,t1);let best=null;
+  for(let x=Math.max(1,j0);x<=Math.min(j1,k.length-2);x++){if(k[x]==null||k[x-1]==null||k[x+1]==null)continue;
+    if(k[x]<=k[x-1]&&k[x]<k[x+1]&&k[x]<=cap)best=t[x];}return best;}
+function probEvents(rows){
+  const R={};rows.forEach(r=>R[r.tf]=r);const r=R['60m'],r240=R['240m'],r5=R['5m'],r30=R['30m'];if(!r||!r240)return [];
+  const g=r.K.k20.k,C=r.c,T=r.ts,N=C.length,out=[];
+  const low5=x=>['k5','k10','k20'].every(k=>r5.K[k].k[x]!=null&&r5.K[k].k[x]<=20);
+  for(let i=12;i<N-1;i++){
+    if(g[i]==null||g[i+1]==null)continue;
+    const w=g.slice(Math.max(0,i-6),i+7).filter(x=>x!=null);
+    if(g[i]!==Math.min(...w)||g[i+1]<=g[i]||g[i]>40)continue;
+    let pkLast=-1;for(let x=Math.max(0,i-40);x<i;x++)if(g[x]!=null&&g[x]>=60)pkLast=x;
+    if(pkLast<0)continue;
+    const e=i+1,tag={};
+    tag.T1=g[i]<=20?'2.0↓':(g[i]<=30?'2.0~3.0':'3.0~4.0');
+    let p1=false;for(let x=pkLast;x<=e;x++){const s=stateAt(r.K,x);if(!s.lack&&s.s===2){p1=true;break;}}
+    tag.T2=p1?'있음':'없음';
+    const j=lastLE(r240.ts,T[e]),G=r240.K.k20.k;
+    if(j>=1&&G[j]!=null&&G[j-1]!=null){tag.T3=G[j]>G[j-1]?'상승':'하락';tag.T4=G[j]>70?'예':'아니오';}else{tag.T3=tag.T4='자료 없음';}
+    const t0=T[pkLast],t1=T[e]+3599;
+    if(r5&&r5.ts.length&&r5.ts[0]<=t0&&r5.ts[r5.ts.length-1]>=T[e]){
+      const j1=lastLE(r5.ts,t1),j0d=Math.max(1,j1-78);let has=false;for(let x=j0d;x<=j1;x++)if(low5(x)){has=true;break;}
+      tag.T5=has?'있음':'없음';
+      const j0=firstGE(r5.ts,t0);let n3=0,on=false;for(let x=j0;x<=j1;x++){const c=low5(x);if(c&&!on)n3++;on=c;}
+      tag.T6=n3>=2?'2번 이상':'0~1번';
+      if(r30&&r30.ts.length&&r30.ts[0]<=t0){const RR={'5m':r5,'30m':r30,'60m':r};
+        const tr=PLAD.map(([tf,key])=>(tf==='60m'&&key==='k20')?T[i]:pTrough(RR[tf],key,t0,t1,tf==='60m'?40:30));
+        let np=0,ok=0;for(let q=0;q<tr.length-1;q++)if(tr[q]&&tr[q+1]){np++;if(tr[q+1]>=tr[q])ok++;}
+        const sc=np?ok/np:0;tag.T7=(tr.every(Boolean)&&sc>=0.66)?'0.66 이상':'미만';}
+      else tag.T7='자료 없음';
+    }else{tag.T5=tag.T6=tag.T7='자료 없음';}
+    let pkx=Math.max(0,i-40);for(let x=pkx;x<=i;x++)if(C[x]>C[pkx])pkx=x;
+    const drop=(C[i]/C[pkx]-1)*100;tag.T8=drop>-3?'−3% 이내':(drop>-7?'−3~−7%':'−7% 넘게');
+    out.push({i:e,t:T[e],px:C[e],g:g[i],tag});}
+  return out;}
+function probLookup(tag){if(!PROB||!PROB.table)return null;
+  const cols=(PROB.prio||[]).filter(c=>tag[c]!=null&&tag[c]!=='자료 없음');
+  for(const n of [3,2,1]){if(cols.length<n)continue;
+    const k=cols.slice(0,n).slice().sort().map(c=>c+'='+tag[c]).join('|'),s=PROB.table[k];
+    if(s&&s.n>=(PROB.min_n||30))return {k,...s};}
+  return null;}
+const pColor=p=>p==null?'#98a2b3':(p>=40?'#b42318':(p>=30?'#dc6803':'#667085'));
+const pKeyTxt=k=>!k?'':k.split('|').map(x=>{const [c,v]=x.split('=');return ((PROB&&PROB.tags&&PROB.tags[c])||c)+' '+v;}).join(' · ');
 // 매수 → 다음 매도 신호 짝. 포지션은 하나 — 매도 전에 나온 매수는 dup 로 센다. 마지막이 매도 없이 끝나면 open(그 매수 봉).
 function pairUp(row,buys,sells){const c=row.c,out=[];let si=0,hold=-1,dup=0,open=null;
   for(const i of buys){if(i<=hold){dup++;continue;}
@@ -1044,6 +1094,22 @@ async function renderV(){
   wire();}
 
 // ═══════════ 60분봉매매법검증 탭 (2026-09-19 대표 「검수를 따로 분리」) — 종전 검증 탭의 60분 사이클 검증을 옮겨 왔다 ═══════════
+// 60분봉매매법검증 탭 맨 아래 — 확률 대장(꼬리표 하나씩 · 기준선)과 전진 기록 최근 20줄. 2026-09-26
+async function probSection(){await loadProb();if(!PROB)return '<h2 style="margin-top:26px">매수 후보 확률 대장</h2><p class="sub">확률 대장 파일(stoch/prob/prob_table.json)이 아직 없습니다.</p>';
+  const ord=['T1','T2','T3','T4','T5','T6','T7','T8'];let b='';
+  for(const c of ord){const ks=Object.keys(PROB.table).filter(k=>!k.includes('|')&&k.startsWith(c+'=')).sort();
+    ks.forEach((k,ix)=>{const s=PROB.table[k];b+=`<tr>${ix===0?`<td rowspan="${ks.length}"><b>${c}</b> ${PROB.tags[c]||''}</td>`:''}<td>${k.split('=')[1]}</td><td class="num">${s.n}</td>`
+      +`<td class="num" style="color:${pColor(s.n>=PROB.min_n?s.p:null)}"><b>${s.p}%</b></td><td class="num ${s.r35>0?'pos':'neg'}">${s.r35>0?'+':''}${s.r35}%</td><td class="num small">${s.dd}%</td></tr>`;});}
+  let sig=[];try{const t=await fetch(`../stoch/prob/signals.jsonl?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.ok?r.text():'');sig=t.split(/\r?\n/).filter(Boolean).map(x=>JSON.parse(x));}catch(e){}
+  const rs=sig.slice(-20).reverse().map(o=>`<tr><td>${NAMES[o.code]||o.code} <span class="small">${o.code}</span></td><td class="small">${o.at}</td><td class="num">${(+o.px).toLocaleString()}</td>`
+    +`<td class="num" style="color:${pColor(o.p)}">${o.p==null?'표본부족':o.p+'% · '+o.n+'건'}</td>`
+    +`<td class="small">${o.res?(o.res.hit?'<b class="pos">적중</b>':'빗나감')+' · 35봉 뒤 '+(o.res.r35>0?'+':'')+o.res.r35+'%':'결과 대기(10일)'}</td></tr>`).join('');
+  return `<h2 style="margin-top:26px">매수 후보 확률 대장 · 관심 ${PROB.codes}종목 · 갱신 ${PROB.built}</h2>`
+    +`<p class="note" style="margin:0 0 6px">후보 = 60분 큰형이 4.0 이하에서 골을 만들고 다음 봉에 오른 것이 확인된 봉(앞 40봉 안 큰형 6.0 이상 눌림). 결과 = ${PROB.result}. `
+    +`전체 기준선 <b>${PROB.base.n}건 · 적중 ${PROB.base.p}%</b> · 35봉 뒤 ${PROB.base.r35}% · 최대 하락 ${PROB.base.dd}%. 건수 ${PROB.min_n} 미만은 회색. 꼬리표는 원칙이 늘면 칸이 더해집니다(지우지 않음).</p>`
+    +`<table><thead><tr><th>꼬리표</th><th>값</th><th>건수</th><th>10일 +10%</th><th>35봉 뒤</th><th>최대 하락</th></tr></thead><tbody>${b}</tbody></table>`
+    +`<h2 style="margin-top:18px">전진 기록 — 실제로 뜬 후보와 그때 붙은 확률 (최근 20줄)</h2>`
+    +`<table><thead><tr><th>종목</th><th>후보 시각</th><th>가격</th><th>그때 확률</th><th>결과</th></tr></thead><tbody>${rs||'<tr><td colspan="5" class="small">아직 없습니다</td></tr>'}</tbody></table>`;}
 let CMODE='one';
 async function renderC(){
   const el=document.getElementById('paneC');
@@ -1059,7 +1125,7 @@ async function renderC(){
       const pe=document.getElementById('cp');
       VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
     const LS=VALL.map(t=>({code:t.code,r60:t.rows.find(r=>r.tf==='60m'),r240:t.rows.find(r=>r.tf==='240m'),r5:t.rows.find(r=>r.tf==='5m')})).filter(x=>x.r60);
-    el.innerHTML=bar+`<h2 style="margin-top:6px">60분봉매매법 검증 · ${LS.length}종목 합산</h2>`+rule+setTables(LS);
+    el.innerHTML=bar+`<h2 style="margin-top:6px">60분봉매매법 검증 · ${LS.length}종목 합산</h2>`+rule+setTables(LS)+await probSection();
     wire();return;}
   if(VROWS===null){
     el.innerHTML=bar+'<p class="sub">누적 원본을 불러와 다시 계산하는 중…</p>';
@@ -1070,7 +1136,7 @@ async function renderC(){
   const r60=VROWS.rows.find(r=>r.tf==='60m'), r240=VROWS.rows.find(r=>r.tf==='240m'), r5=VROWS.rows.find(r=>r.tf==='5m');
   el.innerHTML=bar+(r60
     ? `<h2 style="margin-top:6px">60분봉매매법 검증 · ${NAMES[CODE]||CODE}</h2>`+rule.replace('수수료·세금 없음.',`60분봉 ${r60.c.length}봉 구간. 수수료·세금 없음.`)
-      +setTables([{code:CODE,r60,r240,r5}])+setCycleTable(r60,r240,r5)
+      +setTables([{code:CODE,r60,r240,r5}])+setCycleTable(r60,r240,r5)+await probSection()
     : '<div class="err">이 종목은 60분봉이 없어 검증을 할 수 없습니다.</div>');
   wire();}
 
@@ -1244,6 +1310,13 @@ function drawSet(tf,cid,r,cy,sp5){
           g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();const t2='가중(240 바닥)',w2=g.measureText(t2).width+8;
           g.fillStyle='rgba(255,255,255,.88)';g.fillRect(x-w2/2,ca.bottom-86,w2,13);g.fillStyle='#d92d20';g.fillText(t2,x,ca.bottom-76);}
         g.restore();});
+      // 매수 후보(60분 큰형 4.0 이하 골 돌아섬) — 같은 조건의 과거 적중률(10일 안 +10%)을 작은 글자로. 2026-09-26 확률 대장.
+      (PEV||[]).forEach(ev=>{const i=ev.i;if(i<a||i>b)return;const x=X(i),pr=probLookup(ev.tag),p=pr?pr.p:null;
+        const tx=pr?`후보 ${p}%·${pr.n}건`:'후보 표본부족';
+        g.save();g.fillStyle=pColor(p);g.beginPath();g.arc(x,ca.top+40,3.5,0,Math.PI*2);g.fill();
+        g.font='bold 10px -apple-system,Malgun Gothic,sans-serif';g.textAlign='center';
+        const w=g.measureText(tx).width+8;g.fillStyle='rgba(255,255,255,.9)';g.fillRect(x-w/2,ca.top+46,w,13);
+        g.fillStyle=pColor(p);g.fillText(tx,x,ca.top+56);g.restore();});
     }
     if(tf==='240m'){
       // 3형제 동시 2.0↓ 구간 = 매수 가능 구간 — 옅은 붉은 세로 띠
@@ -1298,13 +1371,19 @@ async function renderS(){
     return `<div class="step ${on?'on':(done?'done':'')}"><b>${x}</b>${desc}</div>`;}).join('');
   const spanb=SSPANS.map(([m,t])=>`<button class="sm ${m===SMUL?'on':''}" data-smul="${m}">${t}</button>`).join('');
   const pxNow=r60.c[r60.c.length-1];
+  // 확률 대장 — 가장 최근 매수 후보와 같은 조건의 과거 적중률 (2026-09-26)
+  await loadProb(); PEV=probEvents(SROWS);
+  const lev=PEV.length?PEV[PEV.length-1]:null, lpr=lev?probLookup(lev.tag):null;
+  const probTxt=!lev?'':`<br>최근 매수 후보 <b>${fmtT(lev.t)}</b> (${r60.c.length-1-lev.i}봉 전 · 큰형 골 ${S10(lev.g)}) — `
+    +(lpr?`같은 조건 과거 <b>${lpr.n}건</b> 중 10일 안 +10% <b style="color:${pColor(lpr.p)}">${lpr.p}%</b> · 35봉 뒤 평균 ${lpr.r35>0?'+':''}${lpr.r35}% <span class="small">(${pKeyTxt(lpr.k)} · 전체 기준선 ${PROB.base.p}%)</span>`
+         :(PROB?'같은 조건 표본 부족':'확률 대장 파일 없음'));
 
   el.innerHTML=`
   <div class="verdict ${cy.stage==='분할매수'||cy.stage==='보유'?'buy':(cy.stage==='매도 준비'?'sell':'')}">
     <div class="big">${cy.stage}</div>
     <div class="meta">${NAMES[CODE]||CODE} ${CODE} · ${pxNow!=null?(+pxNow).toLocaleString():'-'} ·
       60분 큰형 ${S10(cy.k)} / %D ${S10(cy.d)} ${agg}
-      <br><span class="gate ${gt.cls}">${gt.txt}</span>${slTxt}</div>
+      <br><span class="gate ${gt.cls}">${gt.txt}</span>${slTxt}${probTxt}</div>
   </div>
   <div class="steps">${steps}</div>
   <div class="bar"><span class="sub">구간</span>${spanb}<span style="width:14px"></span><button class="sm ${SSYNC?'on':''}" data-ssync="1" title="마우스 자리의 시각을 세 차트에 같이 표시">동기 커서 ${SSYNC?'켜짐':'꺼짐'}</button></div>
