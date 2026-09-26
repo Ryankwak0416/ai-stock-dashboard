@@ -74,6 +74,9 @@ td.num{font-variant-numeric:tabular-nums}
 .tf b{display:block;font-size:14px;margin-top:1px}
 .tf em{display:block;font-style:normal;font-size:10px;font-weight:700;margin-top:1px;line-height:1.1}
 .tf em.buy{color:#d92d20}.tf em.sell{color:#1849a9}.tf em.none{color:#c9ced8}.tf em.mid{color:#667085}.tf em.old{opacity:.4}
+.dchip{display:inline-block;padding:0 5px;border-radius:4px;font-weight:700;line-height:1.35}   /* 방향 딱지 — 신호 글자(색 글씨)와 구별되게 바탕색을 칠한다. 2026-09-26 대표 */
+.dchip.u{background:#d92d20;color:#fff}.dchip.d{background:#1849a9;color:#fff}.dchip.m{background:#e4e7ec;color:#475467}
+.tf em.pos{color:#475467;font-weight:600}
 #tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
 .cbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
@@ -414,7 +417,7 @@ function head(){
   const data=DATA,cells={};
   data.rows.forEach(r=>{cells[r.tf]=cellAt(r.K,r.K.k5.k.length-1);});
   const R=conclude(cells),tot=Object.values(cells).filter(Boolean).length;
-  const dtx=d=>d>0?'<b style="color:#d92d20">▲상방</b>':(d<0?'<b style="color:#1849a9">▼하방</b>':'<b style="color:#667085">↔전환 중</b>');
+  const dtx=d=>d>0?'<span class="dchip u">▲상방</span>':(d<0?'<span class="dchip d">▼하방</span>':'<span class="dchip m">↔전환 중</span>');
   const gtx=Object.entries(R.G).filter(([,g])=>g.n).map(([nm,g])=>`${nm} ${dtx(g.dir)}${g.lo?` 바닥 ${g.lo}`:''}${g.hi?` 과열 ${g.hi}`:''}`).join(' · ');
   const alert=R.nSB>=3?` <span class="tag" style="background:#fef3f2;color:#b42318;font-size:12px">적극매수 칸 ${R.nSB}</span>`
              :(R.nSS>=3?` <span class="tag" style="background:#eff6ff;color:#1849a9;font-size:12px">적극매도 칸 ${R.nSS}</span>`:'');
@@ -437,7 +440,7 @@ function render(){
   // 숫자 색은 차트 바탕 띠와 같게(2.0↓ 붉은·8.0↑ 푸른). P9 — 막내 8.0↑이면 «형↑»(형 둘 상승 중, 더 오를 수 있음)·«형↓»(매도 근접).
   const cellOf=r=>cellAt(r.K,r.K.k5.k.length-1);
   const dirPos=c=>{if(!c)return '<em class="none">-</em>';
-    const d=c.dir>0?'<em class="buy">▲상방':(c.dir<0?'<em class="sell">▼하방':'<em class="mid">↔전환');
+    const d='<em class="pos">'+(c.dir>0?'<span class="dchip u">▲상방</span>':(c.dir<0?'<span class="dchip d">▼하방</span>':'<span class="dchip m">↔전환</span>'));
     const p9=c.dir>0?'·형↑':(c.dir<0?'·형↓':'');
     const p=c.pos===2?' · 바닥':(c.pos===-2?' · 과열'+p9:(c.m8?' · 막내8↑'+p9:(c.m2?' · 막내2↓':'')));
     return d+p+'</em>';};
