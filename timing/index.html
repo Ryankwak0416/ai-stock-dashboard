@@ -1567,11 +1567,11 @@ async function go(){
 }
 (async function(){
   let ALL=[];
-  try{const idx=await fetch('../stoch/data/index.json').then(r=>r.json());
+  try{const idx=await fetch(`../stoch/data/index.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json());   // 캐시된 옛 목록을 쓰지 않는다 — 9/25 목록 붕괴 뒤 브라우저가 10분 캐시(max-age=600)로 이름 없는 목록을 계속 썼다. 2026-09-26
     DAILY_BUILT=idx.built||'';
     ALL=(idx.tickers||[]).filter(t=>t.market!=='INDEX');
     ALL.forEach(t=>NAMES[t.code]=t.name);}catch(e){}
-  try{WL=await fetch('../stoch/watchlist.json').then(r=>r.json());}catch(e){WL=[];}
+  try{WL=await fetch(`../stoch/watchlist.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json());}catch(e){WL=[];}
   const sel=document.getElementById('sel');
   sel.innerHTML='<option value="">관심 20종목</option>'
     +WL.map(c=>`<option value="${c}">${NAMES[c]||c} (${c})</option>`).join('');
