@@ -104,7 +104,7 @@ def series(bars):
     k10, d10 = slow_stoch(h, l, c, 10, 6, 6)
     k20, d20 = slow_stoch(h, l, c, 20, 12, 12)
     return {"t": bars["t"], "c": c,
-            "k5": k5, "k10": k10, "k20": k20, "d20": d20}
+            "k5": k5, "k10": k10, "k20": k20, "d5": d5, "d10": d10, "d20": d20}
 
 
 def clock_chunk(bars, mins):
@@ -126,6 +126,102 @@ def clock_chunk(bars, mins):
             if l[i] < out["l"][-1]: out["l"][-1] = l[i]
             out["c"][-1] = c[i]
     return out
+
+
+# ─────────────── 10개방향성 칸·머리글 판정 (2026-09-26 · 페이지 dirAt/cellAt/grpOf/conclude/dirHist 와 같다) ───────────────
+DGRP = [("단기", ["1m", "3m", "5m", "10m"]), ("중기", ["30m", "60m", "120m"]), ("장기", ["240m", "D", "W", "M"])]
+DW = {"1m": 1, "3m": 1, "5m": 1, "10m": 1, "30m": 2, "60m": 3, "120m": 2, "240m": 3, "D": 3, "W": 3, "M": 3}
+SUPER = ["5m", "60m", "240m"]
+DCONC = ["★ 수퍼매수 타이밍", "분할매수 자리", "분할매수 대기", "상방 진행", "상승 흐름 속 눌림", "전환 중",
+         "하락 흐름 속 반등", "하방 진행", "과열 속 상승", "매도 준비", "★ 수퍼매도 타이밍"]
+DIRV_TF = ["1m", "3m", "5m", "10m", "30m", "60m", "120m", "240m"]
+
+
+def cell_at(r, i):
+    st = state_at(r, i)
+    if st is None:
+        return None
+    a, ad, b, bd = r["k10"][i], r["d10"][i], r["k20"][i], r["d20"][i]
+    if None in (a, ad, b, bd):
+        return None
+    u1, u2 = a > ad, b > bd
+    d = 1 if (u1 and u2) else (-1 if (not u1 and not u2) else 0)
+    return {"dir": d, "pos": st}
+
+
+def grp_of(cells, tfs):
+    sw = sd = lo = hi = n = 0
+    for tf in tfs:
+        c = cells.get(tf)
+        if not c:
+            continue
+        n += 1; sw += DW[tf]; sd += DW[tf] * c["dir"]
+        if c["pos"] == 2: lo += 1
+        if c["pos"] == -2: hi += 1
+    d = 0 if n == 0 else (1 if 3 * sd >= sw else (-1 if 3 * sd <= -sw else 0))
+    return {"n": n, "dir": d, "lo": lo, "hi": hi}
+
+
+def conclude(cells):
+    G = {nm: grp_of(cells, tfs) for nm, tfs in DGRP}
+    S, M, L = G["단기"], G["중기"], G["장기"]
+    if all(cells.get(tf) and cells[tf]["pos"] == 2 for tf in SUPER): return "★ 수퍼매수 타이밍"
+    if all(cells.get(tf) and cells[tf]["pos"] == -2 for tf in SUPER): return "★ 수퍼매도 타이밍"
+    if M["lo"] > 0: return "분할매수 자리" if S["dir"] > 0 else "분할매수 대기"
+    if M["hi"] > 0:
+        if S["dir"] < 0: return "매도 준비"
+        return "과열 속 상승" if (M["dir"] > 0 or L["dir"] > 0) else "매도 준비"
+    if L["dir"] > 0 and M["dir"] > 0: return "상방 진행"
+    if L["dir"] < 0 and M["dir"] < 0: return "하방 진행"
+    if L["dir"] > 0 and M["dir"] < 0: return "상승 흐름 속 눌림"
+    if L["dir"] < 0 and M["dir"] > 0: return "하락 흐름 속 반등"
+    return "전환 중"
+
+
+def last_le(ts, T):
+    import bisect
+    return bisect.bisect_right(ts, T) - 1
+
+
+def dir_hist(R, dl, acc):
+    """머리글 결론을 과거 60분봉마다 다시 만들어 1일(7봉)·5일(35봉) 뒤 60분 종가와 비교. 5분 자료 구간만.
+    칸 = 분봉 전부(그 시각 이전 마지막 봉) + 전일까지 일봉. 주·월봉 제외."""
+    r60, r5 = R.get("60m"), R.get("5m")
+    if not r60 or not r5 or not dl:
+        return
+    import datetime as _dt
+    kst = _dt.timezone(_dt.timedelta(hours=9))
+    dts = [int(_dt.datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=kst).timestamp()) for x in dl["dates"]]
+    DK = series({"t": dts, "h": dl["high"], "l": dl["low"], "c": dl["close"]})
+    t0 = r5["t"][0]
+    prev = None
+    for i in range(len(r60["t"]) - 35):
+        if r60["t"][i] < t0 + 3 * 86400:
+            continue
+        T = r60["t"][i] + 3599
+        cells = {}
+        for tf in DIRV_TF:
+            r = R.get(tf)
+            if not r:
+                continue
+            j = last_le(r["t"], T)
+            if j < 3:
+                continue
+            cells[tf] = cell_at(r, j)
+        day = (r60["t"][i] + 32400) // 86400 * 86400 - 32400
+        jd = last_le(dts, day - 1)
+        if jd > 3:
+            cells["D"] = cell_at(DK, jd)
+        vt = conclude(cells)
+        c0 = r60["c"][i]
+        r1 = (r60["c"][i + 7] / c0 - 1) * 100
+        r5d = (r60["c"][i + 35] / c0 - 1) * 100
+        for k in (vt, "전체"):
+            a = acc["by"].setdefault(k, [0, 0.0, 0.0, 0, 0])
+            a[0] += 1; a[1] += r1; a[2] += r5d; a[3] += (r1 > 0); a[4] += (r5d > 0)
+        if prev is not None:
+            acc["steps"] += 1; acc["flips"] += (vt != prev)
+        prev = vt
 
 
 # ─────────────── 3형제 매수 규칙 (2026-09-18 대표 지시 · 페이지 buySig/sellSig/pairUp 과 동일) ───────────────
@@ -411,6 +507,7 @@ def main():
     used = []
     PT = {tf: [[], 0] for tf in TFS_ALL}     # 3형제 매수 규칙 — [짝 목록, 진행중 수]
     PR = [{tf: [[], 0] for tf in TFS_ALL} for _ in BUY_RULES]   # 규칙 하나씩
+    DIRACC = {"by": {}, "flips": 0, "steps": 0}   # 10개방向성 머리글 결론별
 
     for f in files:
         code = os.path.basename(f)[:-8]
@@ -437,6 +534,10 @@ def main():
         if "60m" in allt:
             allt["120m"] = chunk_day(allt["60m"], 2)
             allt["240m"] = chunk_day(allt["60m"], 4)
+        # 10개방향성 머리글 결론별 (페이지 방향성검증결과 맨 아래 표)
+        dpath = os.path.join(HERE, "data", code + ".json")
+        dlj = json.load(open(dpath, encoding="utf-8")) if os.path.exists(dpath) else None
+        dir_hist({tf: series(allt[tf]) for tf in TFS_ALL if tf in allt and len(allt[tf]["c"]) > 80}, dlj, DIRACC)
         for tf in TFS_ALL:
             if tf not in allt or len(allt[tf]["c"]) <= 80:
                 continue
@@ -522,6 +623,15 @@ def main():
     print(f"■ 5분 분할매수 평균가 기준 (5분 자료 있는 사이클 {sp_n}개 · 사이클당 평균 {sum(sp_cnt)/len(sp_cnt) if sp_cnt else 0:.1f}몫)")
     for k, nm in (("hit80", "80 도달 즉시"), ("missCut", "무산→손절"), ("combo", "합쳐서(도달 즉시+손절)"), ("hold", "끝까지 보유")):
         print(" ", SP[k].row(nm))
+    print()
+    print("■ 10개방향성 머리글 결론별 — 60분봉마다 다시 계산, 1일(7봉)·5일(35봉) 뒤 (5분 자료 구간 · 칸 = 분봉 전부 + 전일까지 일봉)")
+    for k in DCONC + ["전체"]:
+        a = DIRACC["by"].get(k)
+        if not a:
+            continue
+        print(f"  {k:<14} {a[0]:6d}건  1일뒤 {a[1]/a[0]:+6.2f}% (오른 {a[3]/a[0]*100:3.0f}%)  5일뒤 {a[2]/a[0]:+6.2f}% (오른 {a[4]/a[0]*100:3.0f}%)")
+    if DIRACC["steps"]:
+        print(f"  머리글이 60분봉마다 바뀐 비율 {DIRACC['flips']/DIRACC['steps']*100:.1f}%")
     print()
     print("■ 진입 전 최저 (20↓ 시작 → 진입까지)")
     print(" ", dd.row("구간최저"))

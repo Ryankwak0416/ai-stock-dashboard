@@ -73,7 +73,7 @@ td.num{font-variant-numeric:tabular-nums}
 .sbox .xl b{position:absolute;top:0;left:4px;font-size:11px;font-weight:700;color:#0891b2;background:rgba(255,255,255,.92);padding:1px 4px;border-radius:3px;white-space:nowrap}
 .tf b{display:block;font-size:14px;margin-top:1px}
 .tf em{display:block;font-style:normal;font-size:10px;font-weight:700;margin-top:1px;line-height:1.1}
-.tf em.buy{color:#d92d20}.tf em.sell{color:#1849a9}.tf em.none{color:#c9ced8}
+.tf em.buy{color:#d92d20}.tf em.sell{color:#1849a9}.tf em.none{color:#c9ced8}.tf em.mid{color:#667085}.tf em.old{opacity:.4}
 #tfbar{gap:4px;margin-bottom:0;border-bottom:1px solid #c9ced8;padding-bottom:0}
 .cbox{position:relative;cursor:grab;touch-action:none;height:480px;background:var(--pan);border:1px solid var(--line);border-radius:10px;padding:8px}
 .scrollrow{display:flex;gap:8px;align-items:center;margin-top:8px}
@@ -249,6 +249,67 @@ function sellSig(K,mode){
   const g=K.k20.k,gd=K.k20.d,N=g.length,out=[];
   for(let i=1;i<N;i++)if(g[i]!=null&&gd[i]!=null&&g[i-1]!=null&&gd[i-1]!=null&&g[i]<gd[i]&&g[i-1]>=gd[i-1]&&g[i-1]>=80)out.push(i);
   return out;}
+// ══ 10개방향성 칸·머리글 판정 (2026-09-26 대표 「일관성 있게 판단해서 진행」 · _계획_260926_10개방향성탭_재구성.md) ══
+// 방향 = 둘째·큰형 둘 다 %K>%D → 상방(1) / 둘 다 아래 → 하방(-1) / 엇갈림 → 전환 중(0).
+//   16종목 실측 «지금 흐름과 일치» 86~88% (종전 «직전 1봉, 셋 중 둘» 60~62%).
+// 위치 = stateAt 의 ±2 (3형제 동시 2.0↓ = P1 적극매수 구간 «바닥», 8.0↑ = P1 적극매도 구간 «과열»). 막내 8.0↑ 이면 P9.
+// 이 판정은 표시층이다 — BUY_RULES/SELL_RULES(매수·매도 규칙)는 건드리지 않는다. verify_setting.py 에 같은 계산이 있다.
+function dirAt(K,i){const a=K.k10.k[i],ad=K.k10.d[i],b=K.k20.k[i],bd=K.k20.d[i];
+  if(a==null||ad==null||b==null||bd==null)return null;
+  const u1=a>ad,u2=b>bd;return u1&&u2?1:(!u1&&!u2?-1:0);}
+function cellAt(K,i){const s=stateAt(K,i);if(s.lack)return null;const d=dirAt(K,i);if(d==null)return null;
+  return {dir:d,pos:s.s===2?2:(s.s===-2?-2:0),m8:K.k5.k[i]>=100-CUT,m2:K.k5.k[i]<=CUT};}
+const DGRP=[['단기',['1m','3m','5m','10m']],['중기',['30m','60m','120m']],['장기',['240m','D','W','M']]];
+const DW={'1m':1,'3m':1,'5m':1,'10m':1,'30m':2,'60m':3,'120m':2,'240m':3,'D':3,'W':3,'M':3};
+// 묶음 방향 = 봉 길이 가중 합이 총 가중의 1/3 이상이면 상방, −1/3 이하면 하방, 그 사이 전환 중
+function grpOf(cells,tfs){let sw=0,sd=0,lo=0,hi=0,n=0;
+  for(const tf of tfs){const c=cells[tf];if(!c)continue;n++;sw+=DW[tf];sd+=DW[tf]*c.dir;if(c.pos===2)lo++;if(c.pos===-2)hi++;}
+  return {n,dir:n===0?0:(3*sd>=sw?1:(3*sd<=-sw?-1:0)),lo,hi};}
+const DCONC=['★ 수퍼매수 타이밍','분할매수 자리','분할매수 대기','상방 진행','상승 흐름 속 눌림','전환 중','하락 흐름 속 반등','하방 진행','과열 속 상승','매도 준비','★ 수퍼매도 타이밍'];
+function conclude(cells){
+  const G={};for(const [nm,tfs] of DGRP)G[nm]=grpOf(cells,tfs);
+  const S=G['단기'],M=G['중기'],L=G['장기'],cs=Object.values(cells).filter(Boolean);
+  const nSB=cs.filter(c=>c.pos===2).length,nSS=cs.filter(c=>c.pos===-2).length;
+  let vc='',vt,vs;
+  if(SUPER.every(tf=>cells[tf]&&cells[tf].pos===2)){vc='buy';vt='★ 수퍼매수 타이밍';vs='5분·60분·240분봉이 동시에 3형제 2.0 이하입니다.';}
+  else if(SUPER.every(tf=>cells[tf]&&cells[tf].pos===-2)){vc='sell';vt='★ 수퍼매도 타이밍';vs='5분·60분·240분봉이 동시에 3형제 8.0 이상입니다.';}
+  else if(M.lo>0){vc='buy';
+    if(S.dir>0){vt='분할매수 자리';vs='중기 바닥(3형제 2.0 이하)에서 단기가 상방으로 돌았습니다.';}
+    else{vt='분할매수 대기';vs='중기 바닥(3형제 2.0 이하) — 단기는 아직 상방이 아닙니다.';}}
+  else if(M.hi>0){
+    if(S.dir<0){vc='sell';vt='매도 준비';vs='중기 과열(3형제 8.0 이상)에서 단기가 하방으로 꺾였습니다.';}
+    else if(M.dir>0||L.dir>0){vt='과열 속 상승';vs='중기 과열(3형제 8.0 이상)이지만 형들이 아직 상방입니다 — P9 «더 오를 수 있음». 단기 꺾임을 기다립니다.';}
+    else{vc='sell';vt='매도 준비';vs='중기 과열(3형제 8.0 이상)에서 형들의 상승이 멈췄습니다 — P9 «매도 근접».';}}
+  else if(L.dir>0&&M.dir>0){vc='buy';vt='상방 진행';vs='장기·중기 모두 상방입니다.';}
+  else if(L.dir<0&&M.dir<0){vc='sell';vt='하방 진행';vs='장기·중기 모두 하방입니다.';}
+  else if(L.dir>0&&M.dir<0){vt='상승 흐름 속 눌림';vs='장기는 상방, 중기는 하방입니다.';}
+  else if(L.dir<0&&M.dir>0){vt='하락 흐름 속 반등';vs='장기는 하방, 중기는 상방입니다.';}
+  else{vt='전환 중';vs='장기나 중기의 방향이 엇갈립니다(둘째·큰형이 서로 다른 쪽).';}
+  return {vc,vt,vs,G,nSB,nSS};}
+function lastLE(ts,T){let lo=0,hi=ts.length-1,r=-1;while(lo<=hi){const m=(lo+hi)>>1;if(ts[m]<=T){r=m;lo=m+1;}else hi=m-1;}return r;}
+// 머리글 결론을 과거 60분봉마다 다시 만들어 1일(7봉)·5일(35봉) 뒤 60분 종가와 비교. 5분 자료가 있는 구간만.
+// 칸 = 분봉 전부(그 시각 이전 마지막 봉) + 전일까지 일봉. 주·월봉은 그 주·달이 끝나야 확정이라 뺀다.
+const DIRV_TF=['1m','3m','5m','10m','30m','60m','120m','240m'];
+function dirHist(rows,dl,acc){acc=acc||{by:{},flips:0,steps:0};
+  const R={};rows.forEach(r=>R[r.tf]=r);const r60=R['60m'],r5=R['5m'];if(!r60||!r5||!dl||!dl.close)return acc;
+  const dts=dl.dates.map(x=>Math.floor(new Date(x+'T00:00:00+09:00').getTime()/1000)),DK=trio(dl.high,dl.low,dl.close);
+  const t0=r5.ts[0];let prev=null;
+  for(let i=0;i<r60.ts.length-35;i++){if(r60.ts[i]<t0+3*86400)continue;
+    const T=r60.ts[i]+3599,cells={};
+    for(const tf of DIRV_TF){const r=R[tf];if(!r)continue;const j=lastLE(r.ts,T);if(j<3)continue;cells[tf]=cellAt(r.K,j);}
+    const day=Math.floor((r60.ts[i]+32400)/86400)*86400-32400,jd=lastLE(dts,day-1);if(jd>3)cells['D']=cellAt(DK,jd);
+    const vt=conclude(cells).vt,c0=r60.c[i],r1=(r60.c[i+7]/c0-1)*100,r5d=(r60.c[i+35]/c0-1)*100;
+    for(const k of [vt,'전체']){const a=acc.by[k]=acc.by[k]||{n:0,s1:0,s5:0,p1:0,p5:0};a.n++;a.s1+=r1;a.s5+=r5d;if(r1>0)a.p1++;if(r5d>0)a.p5++;}
+    if(prev!==null){acc.steps++;if(vt!==prev)acc.flips++;}prev=vt;}
+  return acc;}
+function dirHistHtml(acc,who){
+  const f=(a,k)=>{const v=a['s'+k]/a.n;return `<td class="num ${v>0?'pos':'neg'}">${(v>0?'+':'')+v.toFixed(2)}%</td><td class="num small">${Math.round(a['p'+k]/a.n*100)}%</td>`;};
+  let b='';for(const k of DCONC.concat(['전체'])){const a=acc.by[k];if(!a)continue;
+    b+=`<tr${k==='전체'?' class="avg"':''}><td><b>${k}</b></td><td class="num">${a.n}</td>${f(a,1)}${f(a,5)}</tr>`;}
+  return `<h2 style="margin-top:26px">스토캐스틱10개방향성 머리글 결론별 — 그 뒤 1일·5일 · ${who}</h2>`
+    +`<p class="note" style="margin:0 0 6px">과거 60분봉마다 그 시각까지의 자료로 머리글 결론을 다시 만들고, 그 60분 종가에서 1일(7봉)·5일(35봉) 뒤 60분 종가까지의 변화를 셌습니다. 5분 자료가 있는 최근 약 60거래일만 · 칸 = 분봉 전부 + 전일까지 일봉(주·월봉 제외) · 수수료 없음.</p>`
+    +`<table><thead><tr><th>결론</th><th>건수</th><th>1일 뒤 평균</th><th>오른 비율</th><th>5일 뒤 평균</th><th>오른 비율</th></tr></thead><tbody>${b||'<tr><td colspan="6" class="small">자료 부족</td></tr>'}</tbody></table>`
+    +`<p class="note" style="margin-top:4px">머리글이 60분봉마다 바뀐 비율 ${acc.steps?(acc.flips/acc.steps*100).toFixed(1):'-'}%</p>`;}
 // 매수 → 다음 매도 신호 짝. 포지션은 하나 — 매도 전에 나온 매수는 dup 로 센다. 마지막이 매도 없이 끝나면 open(그 매수 봉).
 function pairUp(row,buys,sells){const c=row.c,out=[];let si=0,hold=-1,dup=0,open=null;
   for(const i of buys){if(i<=hold){dup++;continue;}
@@ -310,6 +371,12 @@ async function loadOne(code){
     rows.push({tf,label:LBL[tf],ts:s.t,c:s.c,
       K:{k5:{k:s.k5k,d:s.k5d},k10:{k:s.k10k,d:s.k10d},k20:{k:s.k20k,d:s.k20d}}});}
   if(dl&&dl.close)for(const md of ['D','W','M']){
+    // 월봉 — 일봉 500개(2년)로 다시 묶으면 큰형(20,12)이 봉 수 부족으로 늘 빈칸이었다(점검 A5).
+    // 수집 파일 tf.M(collect_stoch, 같은 HTS 식, 10년여)의 %K를 쓰고 %D는 같은 EMA로 만든다. 2026-09-26
+    const tm=md==='M'&&dl.tf&&dl.tf.M&&dl.tf.M.k20?dl.tf.M:null;
+    if(tm){const ed=(k,dp)=>{const d=Array(k.length).fill(null),a=2/(dp+1);let p=null;
+        for(let i=0;i<k.length;i++){if(k[i]==null)continue;p=(p==null)?k[i]:p+a*(k[i]-p);d[i]=p;}return {k,d};};
+      rows.push({tf:md,label:LBL[md],ts:tm.dates,c:tm.close,K:{k5:ed(tm.k5,3),k10:ed(tm.k10,6),k20:ed(tm.k20,12)}});continue;}
     const g=md==='D'?{t:dl.dates,h:dl.high,l:dl.low,c:dl.close}:regroup(dl.dates,dl.high,dl.low,dl.close,md);
     rows.push({tf:md,label:LBL[md],ts:g.t,c:g.c,K:trio(g.h,g.l,g.c)});}
   return {mn,dl,rows};}
@@ -340,27 +407,21 @@ const kc=x=>x==null?'<span class="c0">-</span>':(x<=CUT?`<span class="lo">${S10(
 function effState(r,st){
   return {s:st[r.tf].s,hot:false};}
 
+// 머리글 — 칸을 단기·중기·장기 세 묶음으로 모아 한 줄 결론(conclude)을 낸다. 2026-09-26 대표 「일관성 있게 판단해서 진행」.
+// 종전 «칸 수 비교(매수 우위·매도 우위)»는 16종목 60일 재현에서 실제 흐름과 거꾸로 나와 뺐다(계획서 §2-3).
+// 적극 칸 3개 이상(종전 «적극매수·적극매도 우세»)은 재현에서 맞았으므로 경보 꼬리표로 남긴다.
 function head(){
-  const data=DATA,st={};data.rows.forEach(r=>st[r.tf]=rowState(r.K));
-  const ef={};data.rows.forEach(r=>ef[r.tf]=effState(r,st));
-  const SV=data.rows.filter(r=>!st[r.tf].lack).map(r=>ef[r.tf]);
-  const nB=SV.filter(x=>x.s>0).length,nSB=SV.filter(x=>x.s===2).length;
-  const nS=SV.filter(x=>x.s<0).length,nSS=SV.filter(x=>x.s===-2).length,tot=SV.length;
-  const nHot=SV.filter(x=>x.hot).length;
-  const sup=SUPER.every(tf=>ef[tf]&&ef[tf].s===2),supS=SUPER.every(tf=>ef[tf]&&ef[tf].s===-2);
-  let vc='',vt,vs;
-  if(sup){vc='buy';vt='★ 수퍼매수 타이밍';vs='5분·60분·240분봉이 동시에 적극매수입니다.';}
-  else if(supS){vc='sell';vt='★ 수퍼매도 타이밍';vs='5분·60분·240분봉이 동시에 적극매도입니다.';}
-  else if(nSB>=3){vc='buy';vt='적극매수 우세';vs=tot+'칸 중 '+nSB+'칸이 적극매수입니다.';}
-  else if(nSS>=3){vc='sell';vt='적극매도 우세';vs=tot+'칸 중 '+nSS+'칸이 적극매도입니다.';}
-  else if(nB>nS){vc='buy';vt='매수 우위';vs='적극매수 칸은 적습니다. 상승추세 위주입니다.';}
-  else if(nS>nB){vc='sell';vt='매도 우위';vs='적극매도 칸은 적습니다. 하락추세 위주입니다.';}
-  else{vt='중립';vs='어느 쪽으로도 기울지 않았습니다.';}
+  const data=DATA,cells={};
+  data.rows.forEach(r=>{cells[r.tf]=cellAt(r.K,r.K.k5.k.length-1);});
+  const R=conclude(cells),tot=Object.values(cells).filter(Boolean).length;
+  const dtx=d=>d>0?'<b style="color:#d92d20">▲상방</b>':(d<0?'<b style="color:#1849a9">▼하방</b>':'<b style="color:#667085">↔전환 중</b>');
+  const gtx=Object.entries(R.G).filter(([,g])=>g.n).map(([nm,g])=>`${nm} ${dtx(g.dir)}${g.lo?` 바닥 ${g.lo}`:''}${g.hi?` 과열 ${g.hi}`:''}`).join(' · ');
+  const alert=R.nSB>=3?` <span class="tag" style="background:#fef3f2;color:#b42318;font-size:12px">적극매수 칸 ${R.nSB}</span>`
+             :(R.nSS>=3?` <span class="tag" style="background:#eff6ff;color:#1849a9;font-size:12px">적극매도 칸 ${R.nSS}</span>`:'');
   const px=data.rows[0].c[data.rows[0].c.length-1];
   document.getElementById('vd').innerHTML=
-    `<div class="verdict ${vc}"><div class="big">${vt}</div><div class="meta">${data.dl?data.dl.name:CODE} ${CODE} · `
-    +`${px!=null?(+px).toLocaleString():'-'} · ${tot}칸 중 <b>매수 ${nB}</b>(적극 ${nSB}) / <b>매도 ${nS}</b>(적극 ${nSS})`
-    +`${nHot?` · <span class="tag hot">과열 ${nHot}</span>`:''} · ${vs}</div></div>`;
+    `<div class="verdict ${R.vc}"><div class="big">${R.vt}${alert}</div><div class="meta">${data.dl?data.dl.name:CODE} ${CODE} · `
+    +`${px!=null?(+px).toLocaleString():'-'} · ${tot}칸 · ${gtx}<br>${R.vs}</div></div>`;
 
   document.getElementById('tbl').innerHTML='';
 }
@@ -372,15 +433,25 @@ function render(){
   head();
   // 시간축 탭 — 라벨 아래에 그 봉의 «큰형 %K»를 박아 전 시간축 요약표를 대신한다.
   // 탭마다 마지막 신호를 적는다 — ▲매수(3형제 매수 규칙)가 ▼적극매도보다 뒤면 「▲매수 N봉전」, 반대면 「▼매도 N봉전」. 2026-09-19 대표 지시.
-  const lastSig=r=>{const n=r.c.length-1;const bs=buySig(r.K),ss=sigUnion(SELL_RULES,r.K);
+  // 칸 = 큰형 숫자 / 방향·위치 / 마지막 신호(시각). 2026-09-26 — 신호가 지금 방향과 반대면 흐리게.
+  // 숫자 색은 차트 바탕 띠와 같게(2.0↓ 붉은·8.0↑ 푸른). P9 — 막내 8.0↑이면 «형↑»(형 둘 상승 중, 더 오를 수 있음)·«형↓»(매도 근접).
+  const cellOf=r=>cellAt(r.K,r.K.k5.k.length-1);
+  const dirPos=c=>{if(!c)return '<em class="none">-</em>';
+    const d=c.dir>0?'<em class="buy">▲상방':(c.dir<0?'<em class="sell">▼하방':'<em class="mid">↔전환');
+    const p9=c.dir>0?'·형↑':(c.dir<0?'·형↓':'');
+    const p=c.pos===2?' · 바닥':(c.pos===-2?' · 과열'+p9:(c.m8?' · 막내8↑'+p9:(c.m2?' · 막내2↓':'')));
+    return d+p+'</em>';};
+  const p9Title=c=>!c||!c.m8?'':(c.dir>0?' · P9 막내 8.0↑, 둘째·큰형 상승 중 — 더 오를 수 있음':(c.dir<0?' · P9 막내 8.0↑, 둘째·큰형 하락 — 매도 근접':' · P9 막내 8.0↑ — 매도 타이밍 근접(형들 엇갈림)'));
+  const lastSig=(r,c)=>{const bs=buySig(r.K),ss=sigUnion(SELL_RULES,r.K);
     const B=bs.length?bs[bs.length-1]:null,S=ss.length?ss[ss.length-1]:null;
     if(!B&&!S)return '<em class="none">-</em>';
-    return (B&&(!S||B.i>S.i))?`<em class="buy">▲매수${B.no} ${n-B.i}봉전</em>`:`<em class="sell">▼매도${S.no} ${n-S.i}봉전</em>`;};
+    const isB=B&&(!S||B.i>S.i),x=isB?B:S,old=c&&((isB&&c.dir<0)||(!isB&&c.dir>0))?' old':'';
+    return `<em class="${isB?'buy':'sell'}${old}">${isB?'▲매수':'▼매도'}${x.no} ${fmtT(r.ts[x.i])}</em>`;};
   document.getElementById('tfbar').innerHTML=
-    data.rows.map(r=>{const v=lastVal(r.K.k20.k);
-      const col=v==null?'#9aa0a6':(v<=CUT?'#1849a9':(v>=100-CUT?'#d92d20':'#344054'));
-      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12 · 아래는 마지막 신호">`
-        +`${r.label}<b style="color:${col}">${S10(v)}</b>${lastSig(r)}</button>`;}).join('');
+    data.rows.map(r=>{const v=lastVal(r.K.k20.k),c=cellOf(r);
+      const col=v==null?'#9aa0a6':(v<=CUT?'#d92d20':(v>=100-CUT?'#1849a9':'#344054'));
+      return `<button class="tf ${r.tf===TF?'on':''}" data-ctf="${r.tf}" title="큰형 20·12·12 / 방향(둘째·큰형 %K와 %D) · 위치 / 마지막 신호${p9Title(c)}">`
+        +`${r.label}<b style="color:${col}">${S10(v)}</b>${dirPos(c)}${lastSig(r,c)}</button>`;}).join('');
   const si=Math.max(0,SPANOPT.indexOf(SPAN));
   document.getElementById('spanbar').innerHTML=
     '<span class="sub">구간 폭</span><input type="range" id="sp" min="0" max="'+(SPANOPT.length-1)+'" value="'+si+'" style="width:190px;accent-color:#1849a9">'
@@ -518,8 +589,9 @@ function render(){
   document.getElementById('mid').textContent=`${LBL[TF]} · 폭 ${span}봉 / 전체 ${N}봉 · 이 구간 ▲${BUY.filter(i=>i>=a&&i<=b).length} ▼${SELL.filter(i=>i>=a&&i<=b).length}`;
 
   document.getElementById('foot').innerHTML=
-    `<b>적극매수</b> = 3형제 %K가 모두 ${S10(CUT)} 이하 · <b>적극매도</b> = 모두 ${S10(100-CUT)} 이상 · `
-   +`<b>상승추세</b> = 현재 기준 기울기 — 셋 중 둘 이상이 직전 봉보다 높음(기울기 +). 3형제 동시 ${S10(CUT)} 이하는 기울기와 무관하게 적극매수입니다.<br>`
+    `<b>칸 읽는 법</b> — 숫자 = 큰형 %K · <b>▲상방</b> = 둘째·큰형 모두 %K가 %D 위 · <b>▼하방</b> = 둘 다 아래 · <b>↔전환</b> = 둘이 엇갈림. `
+   +`<b>바닥</b> = 3형제 모두 ${S10(CUT)} 이하(적극매수 구간) · <b>과열</b> = 모두 ${S10(100-CUT)} 이상(적극매도 구간) · <b>막내8↑·형↑</b> = P9 «막내 8 이상, 형들 상승 중 — 더 오를 수 있음», <b>형↓</b> = «매도 근접». 맨 아래 줄은 마지막 매수·매도 규칙 신호와 그 시각(지금 방향과 반대면 흐리게).<br>`
+   +`<b>머리글</b> = 단기(1·3·5·10분)·중기(30·60·120분)·장기(240분·일·주·월) 묶음의 방향(봉 길이 가중)과 위치로 낸 결론입니다 — 중기 바닥이면 분할매수, 중기 과열이면 단기 꺾임에 매도 준비, 그 밖엔 장기·중기 방향. 결론별 그 뒤 1일·5일 결과는 «방향성검증결과» 탭 맨 아래에 있습니다.<br>`
    +`차트의 <b>▲▼가 규칙이 새로 성립한 자리</b>이고 글자의 번호가 어느 규칙인지입니다 — 매수 ${BUY_RULES.map(x=>x.no+' '+x.name).join(' / ')} · 매도 ${SELL_RULES.map(x=>x.no+' '+x.name).join(' / ')}. 규칙은 앞으로 목록에 더해집니다.<br>`
    +'<b>봉 주기별 쓰임</b> — <b>5분봉 = 단타</b>, <b>60분봉 = 스윙</b>(사흘~2주), <b>240분봉 = 추세</b>(며칠~몇 주). '
    +'스윙이면 60분봉에서 타점을 잡되 일봉이 어느 쪽인지 반드시 같이 보십시오.<br>'
@@ -528,7 +600,7 @@ function render(){
    +'그동안 가격이 저점을 낮추지 않았어야 응축입니다.<br>'
    +'· 야후 분봉이 14:55까지만 주는 구간은 <b>네이버 1분봉으로 15:30까지 메웁니다</b>(그 구간 고·저가는 1분 종가의 최대·최소). '
    +'1분봉은 8일치부터 시작해 매일 쌓입니다.<br>'
-   +'⚠ 월봉 큰형(20,12)은 일봉 500봉으로는 기간이 모자라 «데이터 부족»입니다.<br>'
+   +'월봉은 수집 파일의 10년여 월봉을 씁니다(일봉 500봉으로 묶으면 큰형이 봉 수 부족이었습니다).<br>'
    +'<b>계산식 교정(2026-09-17)</b> — %K·%D를 HTS 정식으로 바꿨습니다. '
    +'Σ(종가−n기간최저)/Σ(n기간최고−n기간최저), %D는 지수이동평균입니다. '
    +'사장님 HTS가 내보낸 60분봉 900봉과 오차 0으로 맞췄습니다. '
@@ -542,7 +614,7 @@ function render(){
 }
 
 // ───────── 방향성검증결과 (구 «검증 (매수·매도 결과)») — 시간축별 매수→매도 규칙 표·규칙별 표·기준① 단독 표. 60분 사이클 검증은 60분봉매매법검증 탭 ─────────
-let VHOLD=20, VROWS=null, VTAB=false, VMODE='one', VALL=null;
+let VHOLD=20, VROWS=null, VTAB=false, VMODE='one', VALL=null; let VDIR=null;   // 10개방향성 머리글 결론별 합산(2026-09-26)
 const HOLDS=[5,10,20,40];
 
 function dayKey(t){return Math.floor((t+32400)/86400);}   // KST 기준 날짜
@@ -921,6 +993,9 @@ async function renderV(){
       wire();
       const pe=document.getElementById('vp');
       VALL=await loadAll((d,n)=>{if(pe)pe.textContent=`${d}/${n}`;});}
+    if(VDIR===null){const acc={by:{},flips:0,steps:0};
+      for(const t of VALL){const dl=await fetch(`../stoch/data/${t.code}.json`).then(r=>r.ok?r.json():null).catch(()=>null);dirHist(t.rows,dl,acc);}
+      VDIR=acc;}
     el.innerHTML=bar
       +pairSection(VALL,`${VALL.length}종목 합산`)
       +`<h2 style="margin-top:26px">참고 — 기준① 단독</h2>
@@ -931,7 +1006,8 @@ async function renderV(){
          정배열·역배열 차이를 판정할 수 없어서, 조건을 고칠지 말지는 이 표를 보고 정합니다.
          일·주·월봉은 합산에 넣지 않았습니다(종목별 파일을 따로 받아야 해서 무겁습니다).<br>
          ⚠ 5분봉은 60일, 60분봉은 3년 구간입니다. <b>그 구간이 상승장이었다면 매수 쪽이 통째로 좋게 나옵니다.</b>
-         절대 수치보다 <b>칸끼리의 차이</b>를 보십시오. 수수료·세금은 넣지 않았습니다.</p>`;
+         절대 수치보다 <b>칸끼리의 차이</b>를 보십시오. 수수료·세금은 넣지 않았습니다.</p>`
+      +dirHistHtml(VDIR,`${VALL.length}종목 합산`);
     wire(); return;}
 
   if(VROWS===null){
@@ -955,7 +1031,8 @@ async function renderV(){
                   :'⚠ 누적 원본이 없어 <b>화면용 300봉</b>만 썼습니다. 표본이 적습니다.'}
        일·주·월봉은 일봉 500봉 기준입니다.<br>
        ⚠ 한 종목의 한 구간일 뿐입니다. 표본이 수십 개 미만인 줄은 우연으로 뒤집힙니다.
-       조건을 고칠지 말지는 위의 <b>«관심 ${WL.length}종목 합산»</b>을 보고 정하십시오.</p>`;
+       조건을 고칠지 말지는 위의 <b>«관심 ${WL.length}종목 합산»</b>을 보고 정하십시오.</p>`
+    +dirHistHtml(dirHist(VROWS.rows,DATA?DATA.dl:null),NAMES[CODE]||CODE);
   wire();}
 
 // ═══════════ 60분봉매매법검증 탭 (2026-09-19 대표 「검수를 따로 분리」) — 종전 검증 탭의 60분 사이클 검증을 옮겨 왔다 ═══════════
