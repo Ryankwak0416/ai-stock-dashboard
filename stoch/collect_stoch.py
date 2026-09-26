@@ -82,8 +82,37 @@ def month_rule():
         return "M"
 
 
+NAVER_MV = "https://m.stock.naver.com/api/stocks/marketValue/{}?page={}&pageSize=100"
+
+
 def naver_top(sosok, need):
-    """네이버 시가총액 순위에서 (코드, 이름) 수집. sosok 0=코스피 1=코스닥"""
+    """네이버 시가총액 순위에서 (코드, 이름) 수집. sosok 0=코스피 1=코스닥.
+    2026-09-26 — finance.naver.com/sise/sise_market_sum 이 새 구조(Next.js)로 바뀌어 아래 옛 정규식이 0건이 됐고,
+    9/25 수집에서 코스피·코스닥 497종목이 목록에서 빠졌다(점검 A1). 모바일 시가총액 JSON 을 먼저 쓰고 옛 방식은 뒤에 둔다.
+    ETF 는 따로 모으므로(naver_etf) 여기서는 stockEndType == 'stock' 만 — 옛 목록도 ETF 0개였다."""
+    out, page = [], 1
+    mk = "KOSPI" if sosok == 0 else "KOSDAQ"
+    while len(out) < need and page <= 30:
+        try:
+            req = urllib.request.Request(NAVER_MV.format(mk, page), headers=UA)
+            d = json.loads(urllib.request.urlopen(req, timeout=15).read())
+        except Exception as e:
+            print(f"  [경고] 시총 JSON {mk}/{page} 실패: {e}")
+            break
+        st = d.get("stocks") or []
+        if not st:
+            break
+        for x in st:
+            if x.get("stockEndType") != "stock":
+                continue
+            code = str(x.get("itemCode", ""))
+            if re.fullmatch(r"\d{6}", code) and not any(c == code for c, _ in out):
+                out.append((code, str(x.get("stockName", "")).strip()))
+        page += 1
+        time.sleep(0.2)
+    if len(out) >= min(need, 20):
+        return out[:need]
+    print(f"  [경고] 시총 JSON {mk} {len(out)}건 — 옛 페이지 방식으로 재시도")
     out, page = [], 1
     while len(out) < need and page <= 40:
         url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
@@ -176,7 +205,14 @@ def tf_block(bars, keep):
 
 
 def process(code, name, market, start, mrule):
-    df = fdr.DataReader(code, start)
+    df = None
+    if market == "INDEX":
+        try:
+            df = naver_index_daily(code, start)
+        except Exception as e:
+            LOG.append(f"- ⚠ {code} 네이버 지수 실패 → FDR: {str(e)[:60]}")
+    if df is None:
+        df = fdr.DataReader(code, start)
     if df is None or len(df) < 60:
         raise ValueError(f"데이터 부족 ({0 if df is None else len(df)}행)")
     df = df.dropna(subset=["Close"])
@@ -242,11 +278,101 @@ def process(code, name, market, start, mrule):
     return out
 
 
+# ── 변경 기록·보호 (2026-09-26 대표 「변경 시 항상 로그를 기록, 스토리·히스토리·데이터 저장을 명심」) ──
+LOG = []
+CHANGE_LOG_NAME = "_변경로그.md"
+
+
+def load_prev_index():
+    try:
+        with open(os.path.join(OUT_DIR, "index.json"), encoding="utf-8") as f:
+            return json.load(f).get("tickers") or []
+    except Exception:
+        return []
+
+
+def shrink_reason(path, new):
+    """옛 파일보다 일봉 수가 줄거나 마지막 날짜가 뒤로 가면 그 까닭을 돌려준다(덮어쓰기 거부)."""
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = json.load(f)
+    except Exception:
+        return None
+    od, nd = old.get("dates") or [], new.get("dates") or []
+    if od and nd and nd[-1] < od[-1]:
+        return f"마지막 날짜 {od[-1]} → {nd[-1]}"
+    if len(nd) < len(od) * 0.97:
+        return f"일봉 {len(od)} → {len(nd)}"
+    return None
+
+
+def write_change_log(prev, index, fail, built):
+    """실행마다 한 묶음 — 시장별 종목 수, 목록에 새로 든·빠진 종목, 실패, 보호 조치. 저장소에 함께 커밋된다."""
+    pc = {t["code"]: t for t in prev}
+    nc = {t["code"]: t for t in index}
+
+    def cnt(L):
+        ms = sorted({str(t.get("market")) for t in L})
+        return ", ".join(f"{m} {sum(1 for t in L if str(t.get('market')) == m)}" for m in ms)
+    added = [c for c in nc if c not in pc]
+    removed = [c for c in pc if c not in nc]
+    lines = [f"## {built} — 종목 {len(index)} ({cnt(index)}) · 이전 {len(prev)} ({cnt(prev)})"]
+    if added:
+        lines.append(f"- 목록에 새로 듦 {len(added)}: " + ", ".join(f"{c} {nc[c]['name']}" for c in added[:40]) + (" …" if len(added) > 40 else ""))
+    if removed:
+        lines.append(f"- 목록에서 빠짐 {len(removed)} (자료 파일은 남음): " + ", ".join(f"{c} {pc[c]['name']}" for c in removed[:40]) + (" …" if len(removed) > 40 else ""))
+    if fail:
+        lines.append(f"- 실패 {len(fail)}: " + " / ".join(fail[:15]))
+    lines += LOG
+    if len(lines) == 1:
+        lines.append("- 변화 없음")
+    path = os.path.join(OUT_DIR, CHANGE_LOG_NAME)
+    head = "" if os.path.exists(path) else "# 일봉 수집 변경 로그 (collect_stoch.py 가 실행마다 덧붙인다 · 지우지 말 것)\n\n"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(head + "\n".join(lines) + "\n\n")
+
+
+NAVER_IDX = "https://api.stock.naver.com/chart/domestic/index/{}/day?startDateTime={}&endDateTime={}"
+
+
+def naver_index_daily(code, start):
+    """지수 일봉 — 네이버. 2026-09-26: FDR 의 KS11·KQ11 이 9/17 에서 멈춰(점검 A2) 네이버를 먼저 쓴다."""
+    sym = {"KS11": "KOSPI", "KQ11": "KOSDAQ"}.get(code)
+    if not sym:
+        return None
+    s_ = start.replace("-", "") + "0000"
+    e_ = pd.Timestamp.today().strftime("%Y%m%d") + "2359"
+    req = urllib.request.Request(NAVER_IDX.format(sym, s_, e_), headers=UA)
+    rows = json.loads(urllib.request.urlopen(req, timeout=30).read())
+    if not rows:
+        return None
+    df = pd.DataFrame({
+        "Open": [r.get("openPrice") for r in rows], "High": [r.get("highPrice") for r in rows],
+        "Low": [r.get("lowPrice") for r in rows], "Close": [r.get("closePrice") for r in rows],
+        "Volume": [r.get("accumulatedTradingVolume") for r in rows]},
+        index=pd.to_datetime([r["localDate"] for r in rows], format="%Y%m%d"))
+    return df.astype(float).sort_index()
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     start = (pd.Timestamp.today() - pd.DateOffset(years=YEARS)).strftime("%Y-%m-%d")
     mrule = month_rule()
-    targets = [(c, n, m) for c, n, m in INDICES] + build_universe() + naver_etf(ETF_N)
+    prev = load_prev_index()
+    uni = build_universe()
+    prev_st = [(t["code"], t["name"], t["market"]) for t in prev if t.get("market") in ("KOSPI", "KOSDAQ")]
+    if prev_st and len(uni) < len(prev_st) * 0.8:
+        # 목록 원천이 무너져도 종목을 빼지 않는다 — 이전 목록을 그대로 쓴다 (2026-09-26, 점검 A1 재발 방지)
+        LOG.append(f"- ⚠ 종목 목록 원천 {len(uni)}종목 < 이전 {len(prev_st)}종목의 80% → 이전 목록 유지")
+        uni = prev_st
+    etf = naver_etf(ETF_N)
+    prev_etf = [(t["code"], t["name"], "ETF") for t in prev if t.get("market") == "ETF"]
+    if prev_etf and len(etf) < len(prev_etf) * 0.8:
+        LOG.append(f"- ⚠ ETF 목록 원천 {len(etf)}종목 < 이전 {len(prev_etf)}종목의 80% → 이전 목록 유지")
+        etf = prev_etf
+    targets = [(c, n, m) for c, n, m in INDICES] + uni + etf
     seen, uniq = set(), []
     for c, n, m in targets:
         if c in seen:
@@ -258,8 +384,16 @@ def main():
     for i, (code, name, market) in enumerate(targets, 1):
         try:
             data = process(code, name, market, start, mrule)
-            with open(os.path.join(OUT_DIR, f"{code}.json"), "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+            fpath = os.path.join(OUT_DIR, f"{code}.json")
+            why = shrink_reason(fpath, data)
+            if why:
+                # 자료가 줄거나 날짜가 뒤로 가는 덮어쓰기는 하지 않는다 — 옛 파일을 그대로 둔다 (2026-09-26)
+                LOG.append(f"- ⛔ {code} {name} 덮어쓰기 거부 — {why}")
+                with open(fpath, encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
             row = {"code": code, "name": name, "market": market}
             # 스크리너용 최신 106지표 요약 (index.json 하나만 읽어도 전 종목 순위가 나오게)
             ix = data.get("ind")
@@ -307,6 +441,7 @@ def main():
     }
     with open(os.path.join(OUT_DIR, "index.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
+    write_change_log(prev, index, fail, meta["built"])
 
     print(f"\n[완료] 성공 {ok} / 실패 {len(fail)}")
     for m in fail[:15]:

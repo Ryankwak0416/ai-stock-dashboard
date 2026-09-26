@@ -248,12 +248,14 @@ def main():
             pass
 
     ok = 0
+    LOG = []   # 변경 로그 — 2026-09-26 대표 「변경 시 항상 로그를 기록, 스토리·히스토리·데이터 저장을 명심」
     for i, code in enumerate(wl, 1):
         nm, mk = names.get(code, (code, None))
         suffix = ".KQ" if mk == "KOSDAQ" else ".KS"
         ticker = code + suffix
         path = os.path.join(OUT, f"{code}.json")
         raw = load_raw(code)
+        before = {tf: len(d) for tf, d in raw.items()}
 
         nv = fetch_naver_1m(code)
         got = []
@@ -278,6 +280,7 @@ def main():
 
         if not raw:
             print(f"[{i}/{len(wl)}] {code} {nm} — 데이터 없음")
+            LOG.append(f"- ⚠ {code} {nm} — 데이터 없음(파일 손대지 않음)")
             continue
 
         # 파생 시간축
@@ -296,6 +299,10 @@ def main():
                 if b:
                     sig[label] = b
 
+        after = {tf: len(d) for tf, d in raw.items() if tf in ACC}
+        diff = " ".join(f"{tf} {before.get(tf, 0)}→{after[tf]}" for tf in ACC if tf in after)
+        down = [tf for tf in after if after[tf] < before.get(tf, 0) and after[tf] < KEEP[tf]]
+        LOG.append(f"- {code} {nm} — {diff}" + (f" ⚠ 줄어듦 {','.join(down)}" if down else ""))
         save_raw(code, raw)
         doc = {
             "code": code, "name": nm, "market": mk,
@@ -308,6 +315,10 @@ def main():
         print(f"[{i}/{len(wl)}] {code} {nm} — {' '.join(got)} ({os.path.getsize(path)//1024}KB)")
 
     print(f"완료: {ok}/{len(wl)}종목")
+    path = os.path.join(OUT, "_변경로그.md")
+    head = "" if os.path.exists(path) else "# 분봉 수집 변경 로그 (collect_min.py 가 실행마다 덧붙인다 · 누적원본 봉 수 이전→이후 · 지우지 말 것)\n\n"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(head + f"## {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC — {ok}/{len(wl)}종목\n" + "\n".join(LOG) + "\n\n")
 
 
 if __name__ == "__main__":
