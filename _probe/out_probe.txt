@@ -1,48 +1,93 @@
-=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016&startIdx=0&pageSize=3
-status=200 len=574
-[{"thistime":"20261016153200","nowVal":"5668.05","openVal":"5668.04","highVal":"5668.05","lowVal":"5668.04","changeVal":"113.83","changeRate":"2.0","quant":"298850","amount":"20945426000000"},{"thistime":"20261016153100","nowVal":"5668.04","openVal":"5668.04","highVal":"5668.04","lowVal":"5668.04","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"},{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
-
-=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016153000&startIdx=0&pageSize=3
-status=200 len=192
-[{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
-
-=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=202610161530&startIdx=0&pageSize=3
-status=200 len=192
-[{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
-
-=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=2026-10-16&startIdx=0&pageSize=3
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20260918&startIdx=0&pageSize=1
 status=200 len=2
 []
 
-=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017235959&startIdx=0&pageSize=3
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20260925&startIdx=0&pageSize=1
 status=200 len=2
 []
 
-=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261016
-status=200 len=101
-{"bizdate":"20261016","personalValue":"-5,126","foreignValue":"+3,637","institutionalValue":"-6,815"}
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261001&startIdx=0&pageSize=1
+status=200 len=2
+[]
 
-=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261015
-status=200 len=104
-{"bizdate":"20261015","personalValue":"+13,967","foreignValue":"-37,637","institutionalValue":"+17,176"}
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261008&startIdx=0&pageSize=1
+status=200 len=195
+[{"thistime":"20261008153200","nowVal":"6625.93","openVal":"6644.27","highVal":"6645.22","lowVal":"6625.93","changeVal":"-177.97","changeRate":"-2.69","quant":"302539","amount":"24376305000000"}]
 
-=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20260917
-status=200 len=102
-{"bizdate":"20260917","personalValue":"+3,020","foreignValue":"-22,546","institutionalValue":"+2,480"}
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261013&startIdx=0&pageSize=1
+status=200 len=195
+[{"thistime":"20261013153200","nowVal":"6035.35","openVal":"6035.34","highVal":"6035.35","lowVal":"6035.34","changeVal":"-348.89","changeRate":"-5.79","quant":"423092","amount":"28452295000000"}]
 
-=== https://m.stock.naver.com/api/index/KOSDAQ/trend?bizdate=20260917
-status=200 len=95
-{"bizdate":"20260917","personalValue":"-250","foreignValue":"-329","institutionalValue":"+455"}
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20260918153000&startIdx=0&pageSize=1
+status=200 len=2
+[]
 
-=== https://m.stock.naver.com/api/index/KOSPI/basic
-status=200 len=3200
-{"stockEndType":"index","itemCode":"KOSPI","reutersCode":"KOSPI","symbolCode":"KOSPI","stockName":"코스피","itemLogoUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/index/IndexKOSPI.svg","itemLogoPngUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/png/index/IndexKOSPI.png","closePrice":"5,668.05","compareToPreviousClosePrice":"113.83","compareToPreviousPrice":{"code":"2","text":"상승","name":"RISING"},"fluctuationsRatio":"2.05","marketStatus":"CLOSE","localTradedAt":"2026-10-16T20:15:00+09:00","stockExchangeType":{"code":"KS","zoneId":"Asia/Seoul","nationType":"KOR","delayTime":0,"startTime":"0900","endTime":"1530","closePriceSendTime":"1630","nameKor":"코스피","nameEng":"KOSPI","stockType":"domestic","nationCode":"KOR","nationName":"대한민국","name":"KOSPI"},"imageCharts":{"transparent":"https://financial-vn.pstatic.net/chart/mobile/mini/KOSPI_transparent.png","day":"https://financial-vn.psta
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=week
+status=200 len=30823
+{"code":"KOSPI","infoType":"index","periodType":"week","newlyListed":false,"stockExchangeType":"KRX","hasVolume":true,"decimalUnit":2,"marketStatus":"CLOSE","tradeStop":false,"lastClosePrice":6625.93,"tradeBaseAt":"20261016","lastTradeBaseAt":"20261008","localDateTimeNow":"20261017093100","marketTim
 
-=== https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=marketSum&startIdx=0&pageSize=100
-status=200 len=171504
-[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500"
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=month
+status=200 len=3263 priceInfos=19 keys=['localDate', 'closePrice', 'openPrice', 'highPrice', 'lowPrice', 'accumulatedTradingVolume', 'foreignRetentionRate']
+ first={'localDate': '20260916', 'closePrice': 6717.97, 'openPrice': 6611.24, 'highPrice': 6717.97, 'lowPrice': 6598.87, 'accumulatedTradingVolume': 209130, 'foreignRetentionRate': 0}
+ last={'localDate': '20261016', 'closePrice': 5668.05, 'openPrice': 5653.99, 'highPrice': 5809.94, 'lowPrice': 5590.33, 'accumulatedTradingVolume': 298850, 'foreignRetentionRate': 0}
+{"code":"KOSPI","infoType":"index","periodType":"month","newlyListed":false,"stockExchangeType":"KRX","hasVolume":true,"decimalUnit":2,"priceInfos":[{"localDate":"20260916","closePrice":6717.97,"openPrice":6611.24,"highPrice":6717.97,"lowPrice":6598.87,"accumulatedTradingVolume":209130,"foreignReten
 
-=== https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=foreignPureBuy&startIdx=0&pageSize=40
-status=200 len=66214
-[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500"
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=year
+status=200 len=8864 priceInfos=53 keys=['localDate', 'closePrice', 'openPrice', 'highPrice', 'lowPrice', 'accumulatedTradingVolume', 'foreignRetentionRate']
+ first={'localDate': '20251017', 'closePrice': 3748.89, 'openPrice': 3550.08, 'highPrice': 3794.87, 'lowPrice': 3522.54, 'accumulatedTradingVolume': 2602286, 'foreignRetentionRate': 0}
+ last={'localDate': '20261016', 'closePrice': 5668.05, 'openPrice': 6578.17, 'highPrice': 6589.69, 'lowPrice': 5450.81, 'accumulatedTradingVolume': 1821136, 'foreignRetentionRate': 0}
+{"code":"KOSPI","infoType":"index","periodType":"year","newlyListed":false,"stockExchangeType":"KRX","hasVolume":true,"decimalUnit":2,"priceInfos":[{"localDate":"20251017","closePrice":3748.89,"openPrice":3550.08,"highPrice":3794.87,"lowPrice":3522.54,"accumulatedTradingVolume":2602286,"foreignReten
 
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=threeMonth
+status=400 len=270
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"periodType\":[\"Invalid enum value. Expected 'day' | 'week' | 'month' | 'year' | 'dayCandle' | 'weekCandle' | 'monthCandle' | 'quarterCandle' | 'yearCandle', received 'threeMonth'\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=dayCandle
+status=200 len=18147 priceInfos=110 keys=['localDate', 'closePrice', 'openPrice', 'highPrice', 'lowPrice', 'accumulatedTradingVolume', 'foreignRetentionRate']
+ first={'localDate': '20260506', 'closePrice': 7384.56, 'openPrice': 7093.01, 'highPrice': 7426.6, 'lowPrice': 7093.01, 'accumulatedTradingVolume': 995692, 'foreignRetentionRate': 0}
+ last={'localDate': '20261016', 'closePrice': 5668.05, 'openPrice': 5653.99, 'highPrice': 5809.94, 'lowPrice': 5590.33, 'accumulatedTradingVolume': 298850, 'foreignRetentionRate': 0}
+{"code":"KOSPI","infoType":"index","periodType":"dayCandle","newlyListed":false,"stockExchangeType":"KRX","hasVolume":true,"decimalUnit":2,"priceInfos":[{"localDate":"20260506","closePrice":7384.56,"openPrice":7093.01,"highPrice":7426.6,"lowPrice":7093.01,"accumulatedTradingVolume":995692,"foreignRe
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=candle
+status=400 len=266
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"periodType\":[\"Invalid enum value. Expected 'day' | 'week' | 'month' | 'year' | 'dayCandle' | 'weekCandle' | 'monthCandle' | 'quarterCandle' | 'yearCandle', received 'candle'\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=day&range=3M
+status=400 len=125
+{"detailCode":"invalid_type","message":"{\"formErrors\":[],\"fieldErrors\":{\"range\":[\"Expected number, received nan\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=day&range=month3
+status=400 len=125
+{"detailCode":"invalid_type","message":"{\"formErrors\":[],\"fieldErrors\":{\"range\":[\"Expected number, received nan\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=day&range=threeMonths
+status=400 len=125
+{"detailCode":"invalid_type","message":"{\"formErrors\":[],\"fieldErrors\":{\"range\":[\"Expected number, received nan\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=day&range=1Y
+status=400 len=125
+{"detailCode":"invalid_type","message":"{\"formErrors\":[],\"fieldErrors\":{\"range\":[\"Expected number, received nan\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI/candle?periodType=day
+status=404 len=140
+{"message":"Route GET:/api/securityService/chart/domestic/index/KOSPI/candle?periodType=day not found","error":"Not Found","statusCode":404}
+
+=== contexts
+--- [periodType] ...e,referer:document.referrer||window.location.href}:null,[s]);return{data:s||null,isLoading:i,error:u instanceof Error?u.message:u?String(u):null,chartIqEventDetail:d}},i=e=>{let{marketType:t,category:r,chartInfoType:n,reutersCode:c,scriptChartType:a,periodType:s,range:i,enabled:u}=e,[d,p]=(0,o.useState)(null),[h,f]=(0,o.useState)(!1),[m,y]=(0,o.useState)(null);(0,o.useEffect)(()=>{u&&r&&n&&c&&a&&t&&(async()=>{f(!0),y(null);try{let e=await (0,l.n)(t,n,c,s,i);p(e)}catch(e){y(e instanceof Error?e.message:"ch...
+--- [periodType] ...:"auto"})}},80749:(e,t,r)=>{"use strict";r.d(t,{n:()=>a,u:()=>l});var n=r(79780),o=r.n(n),c=r(65164);async function a(e,t,r){let n=arguments.length>3&&void 0!==arguments[3]?arguments[3]:"day",a=arguments.length>4?arguments[4]:void 0,l=o().stringify({periodType:n,range:a},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(r))+(l?"?".concat(l):"");return(0,c.f)(s)}async function l(e,t,r,n,a){let l=o().stringify({startDateTime:r,endDateTime:n,utc:!...
+--- [periodType] ...groupBy),e.sortBy&&t.append("sortBy",e.sortBy);let i="/api/myasset/resources/invest/stock-investor-rank?".concat(t.toString());return(0,n.f)(i)}async function o(e){let{itemcode:t,stockType:i}=e,l=new URLSearchParams;e.menu&&l.append("menu",e.menu),e.periodType&&l.append("periodType",e.periodType),void 0!==e.range&&l.append("range",String(e.range)),e.stockExchangeType&&l.append("stockExchangeType",e.stockExchangeType);let s=l.toString(),o="/api/securityService/home/v3/whatIf/".concat(i,"/").concat(t).conca...
+--- [periodType] ...ppend("sortBy",e.sortBy);let i="/api/myasset/resources/invest/stock-investor-rank?".concat(t.toString());return(0,n.f)(i)}async function o(e){let{itemcode:t,stockType:i}=e,l=new URLSearchParams;e.menu&&l.append("menu",e.menu),e.periodType&&l.append("periodType",e.periodType),void 0!==e.range&&l.append("range",String(e.range)),e.stockExchangeType&&l.append("stockExchangeType",e.stockExchangeType);let s=l.toString(),o="/api/securityService/home/v3/whatIf/".concat(i,"/").concat(t).concat(s?"?".concat(s):"");...
+--- [range:] ...case"keypress":case"mousedown":case"focusout":return!0;default:return!1}}function ti(e){return"object"==typeof(e=e.detail)&&"data"in e?e.data:null}var ts=!1,tc={color:!0,date:!0,datetime:!0,"datetime-local":!0,email:!0,month:!0,number:!0,password:!0,range:!0,search:!0,tel:!0,text:!0,time:!0,url:!0,week:!0};function tf(e){var n=e&&e.nodeName&&e.nodeName.toLowerCase();return"input"===n?!!tc[e.type]:"textarea"===n}function td(e,n,t,r){nw?nS?nS.push(r):nS=[r]:nw=r,0<(n=sr(n,"onChange")).length&&(t=new nQ(...
+--- [range:] ...ument.referrer||window.location.href}:null,[s]);return{data:s||null,isLoading:i,error:u instanceof Error?u.message:u?String(u):null,chartIqEventDetail:d}},i=e=>{let{marketType:t,category:r,chartInfoType:n,reutersCode:c,scriptChartType:a,periodType:s,range:i,enabled:u}=e,[d,p]=(0,o.useState)(null),[h,f]=(0,o.useState)(!1),[m,y]=(0,o.useState)(null);(0,o.useEffect)(()=>{u&&r&&n&&c&&a&&t&&(async()=>{f(!0),y(null);try{let e=await (0,l.n)(t,n,c,s,i);p(e)}catch(e){y(e instanceof Error?e.message:"chartIq ë°...
+--- [range:] ...0749:(e,t,r)=>{"use strict";r.d(t,{n:()=>a,u:()=>l});var n=r(79780),o=r.n(n),c=r(65164);async function a(e,t,r){let n=arguments.length>3&&void 0!==arguments[3]?arguments[3]:"day",a=arguments.length>4?arguments[4]:void 0,l=o().stringify({periodType:n,range:a},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(r))+(l?"?".concat(l):"");return(0,c.f)(s)}async function l(e,t,r,n,a){let l=o().stringify({startDateTime:r,endDateTime:n,utc:!1},{skipN...
+--- [range:] ...LICKING:'This module is not attached to the Flicking instance. "init()" should be called first.',WRONG_OPTION:function(e,n){return'Option "'+e+'" is not in correct format, given: '+n},INDEX_OUT_OF_RANGE:function(e,n,t){return'Index "'+e+'" is out of range: should be between '+n+" and "+t+"."},POSITION_NOT_REACHABLE:function(e){return'Position "'+e+'" is not reachable.'},TRANSFORM_NOT_SUPPORTED:"Browser does not support CSS transform.",STOP_CALLED_BY_USER:"Event stop() is called by user.",ANIMATION_INT...
+--- [indexSise] ...NewsOnly=").concat(a,"&pageSize=").concat(r))}async function S(e,t,n,i){return(0,l.f)("/api/domestic/detail/stock/".concat(e,"/").concat(t,"/etf?startIdx=").concat(n,"&pageSize=").concat(i))}async function C(e,t,n,l){let i=await fetch("/api/domestic/indexSise/time?koreaIndexType=".concat(e,"&thistime=").concat(t,"&startIdx=").concat(n,"&pageSize=").concat(l));if(!i.ok)throw Error("êµ­ë´ì§ì > ì¼ë³ìì¸ ì¡°í ì¤í¨");return i.json()}}}]);...
+--- [accumulatedTradingValue] ...geType.toLowerCase(),currentPrice:e.tradePrice,prevDayChange:e.changeValue,prevDayChangeRate:Number(e.changeRate).toFixed(2),prevChangeStatus:p(e.change),accQuant:null!=(n=null==(a=e.accumulatedTradingVolume)?void 0:a.toFixed(3))?n:"-",accAmount:v(e.accumulatedTradingValue),marketSum:v(e.marketCap),favorite:!1}})},getNextPageParam:(e,t)=>{if(!(e.length<s))return t.length+1},initialPageParam:1,enabled:!!e&&(null==(l=null==t?void 0:t.enabled)||l),retry:!1});return{tableData:null!=(i=null==(a=c.data)?void 0:a.pages.flat(...
+--- [accumulatedTradingValue] ...l!=(n=c.tradePrice)?n:0,prevDayChange:null!=(r=c.changeValue)?r:0,prevDayChangeRate:Number(c.changeRate).toFixed(2),prevChangeStatus:p(c.change),accQuant:null!=(l=null==(a=c.accumulatedTradingVolume)?void 0:a.toFixed(3))?l:"-",accAmount:v(null!=(i=c.accumulatedTradingValue)?i:0),marketSum:v(null!=(s=c.marketCap)?s:0),favorite:!1}})}))?i:[],isLoading:c.isLoading,error:c.error,loadMore:c.fetchNextPage,hasMore:c.hasNextPage}}function j(e,t){var a;let r=(0,n.I)({queryKey:["cryptoRanking",e,t],queryFn:()=>(0,o.EO)(e,{...t,...
+--- [accumulatedTradingValue] ...a)?a:[],loading:r.isLoading,error:r.error}}function k(e,t){var a;let r=(0,n.I)({queryKey:["cryptoEndPrice",e,t],enabled:!!t,queryFn:async()=>{var a,n,r,l,s,o,u,d,g,m,f,p,x,y,N,P,j,k;let T=await (0,c.PA)(e,t),L=null!=(g=null==(a=T.totalInfos.find(e=>"accumulatedTradingValue"===e.code))?void 0:a.value)?g:0;return{fqnfTicker:T.fqnfTicker,itemCode:T.exchangeTicker,stockName:T.krName,stockEngName:T.enName,industry:"ê°ìíí",stockExchangeType:null!=(m=T.exchangeName)?m:"",stockExchangeCode:null!=(f=T.exchangeType)?f:""...
+--- [accumulatedTradingValue] ...ull!=(j=null==(u=T.totalInfos.find(e=>"highest52weekPrice"===e.code))?void 0:u.value.toLocaleString())?j:"0",accumulatedTradingVolume:null!=(k=null==(d=T.totalInfos.find(e=>"accumulatedTradingVolume"===e.code))?void 0:d.value.toLocaleString())?k:"0",accumulatedTradingValue:v(L,0),marketCap:v(T.profileInfo.marketCap,0),globalPrice:T.globalPrice,globalPriceChangeRate:T.globalPriceChangeRate,profileInfo:T.profileInfo,exchangeTicker:T.exchangeTicker,cryptoInvestmentCaution:T.investmentWarning,cryptoDelistingInfo:T.isDelis...
+--- [day-prices] ...ew URLSearchParams({tradedDate:t.tradedDate});null!=t.size&&n.set("size",String(t.size)),null!=t.index&&n.set("index",String(t.index)),t.baseTradedAt&&n.set("baseTradedAt",t.baseTradedAt);let i="/api/stockSecurity/items/v2/domestic/".concat(e,"/intraday-prices/paged?").concat(n.toString());return(0,l.f)(i)}},42603:(e,t,n)=>{n.d(t,{O:()=>a,j:()=>r});var l=n(65164);let i=e=>{let t=new URLSearchParams({exchangeType:e.exchangeType,size:String(e.size)});return e.cursor&&t.set("cursor",e.cursor),void 0!==e.inde...
+--- [/prices] ...unction o(e,t){return(0,r.f)("".concat("/api/securityService/marketindex/bond","/nation/").concat(e).concat(t?"?sortType=".concat(t):""))}async function l(e,t,n,o){let l="/api/securityService/marketindex/".concat(e,"/").concat(encodeURIComponent(t),"/prices")+"?page=".concat(n,"&pageSize=").concat(o);return(0,r.f)(l)}},42061:e=>{e.exports={"search-container":"Search_search-container__f4m6q","search-input-container":"Search_search-input-container__2up8O","gnb-search":"Search_gnb-search__7jmer","search-i...
+--- [/prices] ...et s="/api/coin/etf/".concat(t,"?").concat(i.toString()),c=await fetch(s);if(!c.ok)throw Error("".concat(s," API í¸ì¶ ì¤í¨"));return c.json()}async function v(e){let t=new URLSearchParams;e.forEach(e=>{t.append("fqnfTickers",e)});let a="/api/coin/prices?".concat(t.toString()),n=await fetch(a);if(!n.ok)throw Error("".concat(a," API í¸ì¶ ì¤í¨"));return n.json()}async function y(e,t){return(0,n.f)("/api/coin/priceChange/".concat(e,"/").concat(t))}}}]);...
+--- [/prices] ...at(e,"/chart-price-panel"))}async function c(e){return(0,l.f)("/api/fund/funds/".concat(e,"/fund-performance"))}async function d(e,t,n){let i=new URLSearchParams;t&&i.set("date",t),n&&i.set("size",n);let r=i.toString(),a="/api/fund/funds/".concat(e,"/prices/daily").concat(r?"?".concat(r):"");return(0,l.f)(a)}async function m(e){return(0,l.f)("/api/fund/funds/".concat(e,"/fund-allocation"))}async function f(e){return(0,l.f)("/api/fund/funds/".concat(e,"/classes/fees"))}async function p(e,t,n){let i="/ap...
+--- [/prices] ...nction _(e,t){let n="/api/fund/funds/".concat(e,"/base-price/chart?term=").concat(t);return(0,l.f)(n)}async function x(e,t){let n="/api/fund/funds/".concat(e,"/return/chart?term=").concat(t);return(0,l.f)(n)}async function h(e){let t="/api/fund/funds/prices?fundCodes=".concat(encodeURIComponent(e));return(0,l.f)(t)}},9496:(e,t,n)=>{"use strict";n.d(t,{A:()=>d});var l=n(78848),i=n(84124),r=n.n(i),a=n(25740),s=n(94142),o=n(99581),u=n.n(o);let c=r().bind(u()),d=function(e){let{text:t,description:n,variant...
