@@ -1,15 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-수급흐름 대시보드 — 데이터 수집기 v2 (네이버 증권 기반)
+수급흐름 대시보드 — 데이터 수집기 v3 (네이버 증권 새 API)
 GitHub Actions(해외 IP)에서 KRX가 차단되어 네이버 공개 데이터를 사용한다.
-  1) 지수 일별 시세+거래대금  : finance.naver.com/sise/sise_index_day.naver   (이력 제공)
-  2) 투자자별 일별 순매수     : finance.naver.com/sise/investorDealTrendDay.naver (이력 제공)
-  3) 업종 목록/구성종목       : m.stock.naver.com/api/stocks/industry          (당일 스냅샷)
-  4) 외국인 매매 상위         : finance.naver.com/sise/sise_deal_rank.naver    (당일)
+2026-10-17: 네이버가 finance.naver.com 옛 시세 페이지(지수·투자자·환율 일별)를 폐지(HTTP 410)해
+            9/17 이후 수집이 멈춰 있던 것을 아래 새 주소로 옮김.
+  1) 지수 일별 종가           : m.stock.naver.com/api/index/{KOSPI|KOSDAQ}/price             (이력 제공)
+  2) 지수 일별 거래대금       : stock.naver.com/api/domestic/indexSise/time?thistime=날짜   (날짜별 — 그날 마지막 누적값)
+  3) 투자자별 일별 순매수     : m.stock.naver.com/api/index/{KOSPI|KOSDAQ}/trend?bizdate=날짜 (날짜별)
+  4) 업종 목록/구성종목       : m.stock.naver.com/api/stocks/industry                       (당일 스냅샷)
+  5) 원/달러 환율             : api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices   (이력 제공)
+  6) 외국인 매매 상위         : stock.naver.com/api/domestic/market/stock/default 순위 목록
+                                + stock.naver.com/api/stockSecurity/investor-trend 종목별 외국인 순매매 수량
+2)·3)은 날짜마다 따로 불러야 하므로 data.json 에 이미 있는 날짜는 그 값을 다시 쓰고,
+없는 날짜와 최근 2일(장중 값 갱신)만 새로 받는다.
 업종 이력은 제공되지 않으므로 data.json 안의 sectorHist 에 매일 누적한다.
 부분 실패해도 가능한 데이터만으로 JSON을 생성한다.
 """
-import json, os, re, time, datetime, traceback
+import json, os, time, datetime, traceback
 import requests
 
 KST = datetime.timezone(datetime.timedelta(hours=9))
@@ -43,44 +50,48 @@ def num(s):
     try: return float(s)
     except: return None
 
-def table_rows(html):
-    rows = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
-        cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
-                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
-        cells = [c for c in cells if c != ""]
-        if cells: rows.append(cells)
-    return rows
+def by_date(dates, arr):
+    """날짜 순서 배열 → {날짜: 값} (값이 None 인 날은 뺀다)."""
+    return {d: v for d, v in zip(dates or [], arr or []) if v is not None}
 
-def fetch_index_history(code, max_pages=12):
-    out = {}
-    for p in range(1, max_pages + 1):
-        html = get(f"https://finance.naver.com/sise/sise_index_day.naver?code={code}&page={p}").text
-        got = 0
-        for r in table_rows(html):
-            if len(r) >= 6 and re.match(r"\d{4}\.\d{2}\.\d{2}", r[0]):
-                d = r[0].replace(".", "-")
-                close, val = num(r[1]), num(r[5])
-                if close and val is not None:
-                    out[d] = (close, round(val / 1e6, 3)); got += 1
-        if got == 0: break
+def per_day(dates, cache, fetch, label, refresh=()):
+    """날짜마다 부르는 원천 — 캐시에 없는 날짜, 최근 2일, refresh(직전 실행의 최근 2일 — 장중 값이었을 수 있음)만
+    새로 받는다. {날짜: 값}."""
+    recent = set(dates[-2:]) | set(refresh)
+    out, fresh, fail = {}, 0, 0
+    for d in dates:
+        if d in cache and d not in recent:
+            out[d] = cache[d]; continue
+        try:
+            v = fetch(d)
+        except Exception as e:
+            v = None; fail += 1
+            if fail <= 3: ERRORS.append(f"{label} {d}: {e}")
+        fresh += 1
+        if v is None: v = cache.get(d)
+        if v is not None: out[d] = v
+    log(f"{label}: {len(out)}/{len(dates)}일 (새로 받은 날 {fresh}, 실패 {fail})")
     return out
 
-def fetch_investor_history(sosok, bizdate, max_pages=8):
-    out = {}
-    for p in range(1, max_pages + 1):
-        u = (f"https://finance.naver.com/sise/investorDealTrendDay.naver"
-             f"?bizdate={bizdate}&sosok={sosok}&page={p}")
-        html = get(u).text
-        got = 0
-        for r in table_rows(html):
-            if len(r) >= 4 and re.match(r"\d{2}\.\d{2}\.\d{2}", r[0]):
-                d = "20" + r[0].replace(".", "-")
-                ind, frn, ins = num(r[1]), num(r[2]), num(r[3])
-                if ind is not None:
-                    out[d] = (ind, frn, ins); got += 1
-        if got == 0: break
-    return out
+def fetch_index_closes(code):
+    """지수 일별 종가 {날짜: 종가} — 최근 DAYS 거래일."""
+    rows = get(f"https://m.stock.naver.com/api/index/{code}/price?pageSize={DAYS}&page=1").json()
+    return {r["localTradedAt"]: num(r.get("closePrice")) for r in rows if num(r.get("closePrice"))}
+
+def fetch_index_value(code, d):
+    """그날 지수 거래대금(조원) — 분 시세 목록에서 가장 늦은 시각의 누적 거래대금."""
+    rows = get(f"https://stock.naver.com/api/domestic/indexSise/time"
+               f"?koreaIndexType={code}&thistime={d.replace('-', '')}&startIdx=0&pageSize=3").json()
+    if not rows: return None
+    v = num(max(rows, key=lambda r: r.get("thistime", "")).get("amount"))
+    return round(v / 1e12, 3) if v else None
+
+def fetch_investor_day(code, d):
+    """그날 개인·외국인·기관 순매수(억원)."""
+    j = get(f"https://m.stock.naver.com/api/index/{code}/trend?bizdate={d.replace('-', '')}").json()
+    if j.get("bizdate") != d.replace("-", ""): return None
+    v = (num(j.get("personalValue")), num(j.get("foreignValue")), num(j.get("institutionalValue")))
+    return None if v[0] is None else v
 
 def fetch_industries():
     groups, seen = [], set()
@@ -105,165 +116,107 @@ def fetch_industry_stocks(no):
         if len(ss) < 60: break
     return stocks
 
-def fetch_fx(max_pages=8):
-    """원/달러 매매기준율 일별 이력 (네이버 마켓인덱스). {date: rate}."""
+def fetch_fx(pages=2):
+    """원/달러 매매기준율 일별 이력 {날짜: 환율}."""
     out = {}
-    for p in range(1, max_pages + 1):
+    for p in range(1, pages + 1):
         try:
-            html = get(f"https://finance.naver.com/marketindex/exchangeDailyQuote.naver"
-                       f"?marketindexCd=FX_USDKRW&page={p}").text
+            rows = get(f"https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?page={p}&pageSize=60").json()
         except Exception as e:
             ERRORS.append(f"fx p{p}: {e}"); break
-        got = 0
-        for r in table_rows(html):
-            if len(r) >= 2 and re.match(r"\d{4}\.\d{2}\.\d{2}", r[0]):
-                rate = num(r[1])
-                if rate:
-                    out[r[0].replace(".", "-")] = rate; got += 1
-        if got == 0: break
+        for r in rows:
+            rate = num(r.get("closePrice"))
+            if rate: out[r["localTradedAt"]] = rate
+        if len(rows) < 60: break
     return out
 
-def _iter_labeled_tables(html):
-    """본문에서 (라벨, table내부HTML) 쌍을 순서대로 산출.
-    <caption>이 있으면 그것만 라벨로 쓴다(주변 텍스트 혼입 방지).
-    caption이 전혀 없을 때만 표 바로 앞 텍스트를 라벨 후보로 사용."""
-    for m in re.finditer(r"<table[^>]*>(.*?)</table>", html, re.S):
-        tb = m.group(1)
-        cap_m = re.search(r"<caption[^>]*>(.*?)</caption>", tb, re.S)
-        if cap_m:
-            label = re.sub(r"<[^>]+>", " ", cap_m.group(1))
-        else:
-            pre = html[max(0, m.start() - 120):m.start()]
-            cut = pre.rfind("</table>")
-            if cut != -1:
-                pre = pre[cut + 8:]
-            label = re.sub(r"<[^>]+>", " ", pre)
-        yield re.sub(r"\s+", " ", label).strip(), tb
-
-def fetch_foreign_rank():
-    """외국인 순매수/순매도 상위.
-    deal_rank 페이지는 표의 caption(예: '외국인 순매수 상위')으로 종류를 구분한다.
-    URL 파라미터가 환경에 따라 다를 수 있으므로 여러 후보 URL을 받아
-    본문+iframe의 모든 표를 모으고, 라벨에 '외국인'+'순매수/순매도'가 있는 표만 채택한다.
-    (그래서 기관/인기검색어 표를 외국인으로 오인하지 않는다.)
-    외국인 표를 못 찾으면 잘못된 데이터를 넣지 않고 빈 리스트를 반환한다."""
-    base = "https://finance.naver.com/sise/sise_deal_rank.naver"
-    candidates = [
-        base,
-        base + "?investor_gubun=9000&type=buy",
-        base + "?investor_gubun=9000&type=sell",
-        base + "?investor=9000",
-        base + "?type=foreigner",
-    ]
-    pages, seen_url = [], set()
-    for u in candidates:
-        if u in seen_url: continue
-        seen_url.add(u)
+def fetch_foreign_rank(n_buy=30, n_cap=100):
+    """외국인 순매수/순매도 상위 (금액 = 외국인 순매매 수량 × 종가, 백만원).
+    순매수 순위는 foreignPureBuy 목록에서, 순매도 순위 목록은 따로 없어 시가총액 상위 종목 중에서 고른다.
+    종목별 투자자 동향의 가장 최근 날짜(KRX)만 쓰고, 날짜가 다른 종목은 뺀다."""
+    base = "https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL"
+    cand = {}
+    for order, n in [("foreignPureBuy", n_buy), ("marketSum", n_cap)]:
         try:
-            pages.append(get(u).text)
+            for s in get(f"{base}&orderType={order}&startIdx=0&pageSize={n}").json():
+                cand.setdefault(s["itemcode"], s["itemname"])
         except Exception as e:
-            ERRORS.append(f"rank url {u}: {e}")
-    # iframe 추적
-    extra = []
-    for h in list(pages):
-        for src in re.findall(r'<iframe[^>]*src=["\']([^"\']+)["\']', h)[:6]:
-            if src.startswith("/"):
-                src = "https://finance.naver.com" + src
-            if "naver.com" not in src:
-                continue
-            try:
-                extra.append(get(src).text)
-            except Exception as e:
-                ERRORS.append(f"rank iframe: {e}")
-    pages += extra
-
-    res = []
-    labels_seen = []
-    for h in pages:
-        for label, tb in _iter_labeled_tables(h):
-            if "외국인" not in label:
-                continue
-            if "순매수" in label:
-                side = "buy"
-            elif "순매도" in label:
-                side = "sell"
-            else:
-                continue
-            labels_seen.append(label[:30])
-            rows = []
-            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
-                cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
-                         for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)]
-                rows.append(cells)
-            hdr = next((r for r in rows if any("종목" in c for c in r)), None)
-            if not hdr:
-                continue
-            name_i = next(i for i, c in enumerate(hdr) if "종목" in c)
-            amt_i = next((i for i, c in enumerate(hdr) if ("금액" in c or "대금" in c)), None)
-            for r in rows:
-                if r == hdr or len(r) <= name_i:
-                    continue
-                nm = r[name_i].strip()
-                if not nm or re.match(r"^[\d,.\-+%\s]*$", nm):
-                    continue
-                amt = num(r[amt_i]) if (amt_i is not None and len(r) > amt_i) else None
-                res.append({"name": nm, "amt": amt, "side": side})
-
-    seen, dedup = set(), []
-    for r in res:
-        k = (r["name"], r["side"])
-        if k not in seen:
-            seen.add(k); dedup.append(r)
-    if not dedup:
-        ERRORS.append("foreign rank: 외국인 표를 찾지 못함(파라미터/렌더링 변경 가능)")
-    else:
-        log(f"외국인 표 라벨: {labels_seen[:4]}")
-    return dedup[:40]
+            ERRORS.append(f"rank list {order}: {e}")
+    res, fail = [], 0
+    for code, name in cand.items():
+        try:
+            j = get(f"https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/{code}/paged"
+                    f"?exchangeType=krx&size=1").json()
+            it = (j.get("items") or [{}])[0]
+            k = it.get("krx") or {}
+            vol, px = num(k.get("foreignNetVolume")), num(k.get("closingPrice"))
+        except Exception as e:
+            fail += 1
+            if fail <= 3: ERRORS.append(f"rank {name}: {e}")
+            continue
+        if vol is not None and px:
+            res.append({"name": name, "amt": round(vol * px / 1e6), "date": it.get("localTradedAt")})
+    if not res:
+        ERRORS.append("foreign rank: 종목별 외국인 순매매를 받지 못함")
+        return []
+    last = max(r["date"] or "" for r in res)
+    res = [r for r in res if r["date"] == last]
+    buys = sorted((r for r in res if r["amt"] > 0), key=lambda r: -r["amt"])[:20]
+    sells = sorted((r for r in res if r["amt"] < 0), key=lambda r: r["amt"])[:20]
+    for r in buys: r["side"] = "buy"
+    for r in sells: r["side"] = "sell"
+    log(f"외국인 순매매 {len(res)}종목 ({last})")
+    return buys + sells
 
 def main():
-    out = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "errors": ERRORS, "version": 2}
+    out = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "errors": ERRORS, "version": 3}
+
+    prev = {}
+    try:
+        if os.path.exists(OUT):
+            with open(OUT, encoding="utf-8") as f:
+                prev = json.load(f) or {}
+    except Exception as e:
+        ERRORS.append(f"prev data: {e}")
+    pdates = prev.get("dates") or []
 
     try:
-        kospi = fetch_index_history("KOSPI")
+        kospi = fetch_index_closes("KOSPI")
     except Exception as e:
         traceback.print_exc(); raise SystemExit(f"KOSPI 지수 수집 실패: {e}")
+    if not kospi:
+        raise SystemExit("KOSPI 지수 수집 실패: 빈 응답")
     try:
-        kosdaq = fetch_index_history("KOSDAQ")
+        kosdaq = fetch_index_closes("KOSDAQ")
     except Exception as e:
         ERRORS.append(f"KOSDAQ index: {e}"); kosdaq = {}
 
     dates = sorted(kospi.keys())[-DAYS:]
     out["dates"] = dates
-    def series(src, i):
-        return [src.get(d, (None, None))[i] if src.get(d) else None for d in dates]
-    out["market"] = {
-        "kospi": {"close": series(kospi, 0), "value": series(kospi, 1)},
-        "kosdaq": {"close": series(kosdaq, 0), "value": series(kosdaq, 1)},
-    }
+    out["market"] = {}
+    for key, code, closes in [("kospi", "KOSPI", kospi), ("kosdaq", "KOSDAQ", kosdaq)]:
+        pm = (prev.get("market") or {}).get(key) or {}
+        val = per_day(dates, by_date(pdates, pm.get("value")),
+                      lambda d, c=code: fetch_index_value(c, d), f"거래대금 {key}", pdates[-2:])
+        out["market"][key] = {"close": [closes.get(d) for d in dates], "value": [val.get(d) for d in dates]}
     log(f"지수 {len(dates)}일 (마지막 {dates[-1]})")
 
-    biz = dates[-1].replace("-", "")
     inv_out = {}
-    for key, sosok in [("kospi", "01"), ("kosdaq", "02")]:
-        try:
-            h = fetch_investor_history(sosok, biz)
-            inv_out[key] = {
-                "individual": [h.get(d, (None,) * 3)[0] for d in dates],
-                "foreign":    [h.get(d, (None,) * 3)[1] for d in dates],
-                "institution":[h.get(d, (None,) * 3)[2] for d in dates],
-            }
-            log(f"투자자 {key}: {sum(1 for d in dates if d in h)}일")
-        except Exception as e:
-            ERRORS.append(f"investor {key}: {e}")
+    for key, code in [("kospi", "KOSPI"), ("kosdaq", "KOSDAQ")]:
+        pi = (prev.get("investor") or {}).get(key) or {}
+        rows = list(zip(pi.get("individual") or [], pi.get("foreign") or [], pi.get("institution") or []))
+        cache = {d: r for d, r in by_date(pdates, rows).items() if r[0] is not None}
+        h = per_day(dates, cache, lambda d, c=code: fetch_investor_day(c, d), f"투자자 {key}", pdates[-2:])
+        if not h:
+            ERRORS.append(f"investor {key}: 받은 날 없음"); continue
+        inv_out[key] = {
+            "individual": [h.get(d, (None,) * 3)[0] for d in dates],
+            "foreign":    [h.get(d, (None,) * 3)[1] for d in dates],
+            "institution":[h.get(d, (None,) * 3)[2] for d in dates],
+        }
     out["investor"] = inv_out
 
-    prev_hist = {}
-    try:
-        if os.path.exists(OUT):
-            with open(OUT, encoding="utf-8") as f:
-                prev_hist = json.load(f).get("sectorHist", {}) or {}
-    except Exception as e:
-        ERRORS.append(f"prev hist: {e}")
+    prev_hist = prev.get("sectorHist") or {}
 
     snap, code2sec, sec_stocks = {}, {}, {}
     try:
