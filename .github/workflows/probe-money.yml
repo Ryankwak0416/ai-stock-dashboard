@@ -19,10 +19,11 @@ jobs:
       - name: Run collector
         run: |
           cp money/data.json /tmp/data_backup.json
-          python money/collect_money.py > _probe/out_collect.txt 2>&1; echo "exit=$?" >> _probe/out_collect.txt
+          rc=0; python money/collect_money.py > _probe/out_collect.txt 2>&1 || rc=$?; echo "exit=$rc" >> _probe/out_collect.txt
           python -c "import json;d=json.load(open('money/data.json'));print('updated',d.get('updated'),'dates',len(d.get('dates',[])),'last',(d.get('dates') or ['-'])[-1],'sectors',len(d.get('sectors',[])),'errors',d.get('errors'))" >> _probe/out_collect.txt 2>&1 || true
           cp /tmp/data_backup.json money/data.json
       - name: Save results to branch
+        if: always()
         run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
