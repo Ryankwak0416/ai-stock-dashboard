@@ -1,30 +1,25 @@
-# 진단용 5차 — 새 API 형식 맞추기 (수정 후 삭제)
-import re, requests, json
+# 진단용 6차 — 지수 일별시세·투자자 일자 조회 (수정 후 삭제)
+import re, requests
 H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
      "Accept": "application/json, */*", "Referer": "https://stock.naver.com/"}
-B = "https://stock.naver.com"
-def show(u, n=1500):
+def show(u, n=1200):
     try:
-        r = requests.get(B + u, headers=H, timeout=20)
-        t = r.text
-        try:
-            j = r.json()
-            items = j if isinstance(j, list) else next((v for v in (j.values() if isinstance(j, dict) else []) if isinstance(v, list)), None)
-            extra = f" listlen={len(items)} keys0={list(items[0].keys()) if items and isinstance(items[0], dict) else None}" if items is not None else f" topkeys={list(j.keys()) if isinstance(j, dict) else type(j)}"
-        except Exception:
-            extra = ""
-        print(f"=== {u}\nstatus={r.status_code} len={len(r.content)}{extra}\n{re.sub(chr(10)+'|  +', ' ', t[:n])}\n")
+        r = requests.get(u, headers=H, timeout=20)
+        print(f"=== {u}\nstatus={r.status_code} len={len(r.content)}\n{re.sub(chr(10)+'|  +', ' ', r.text[:n])}\n")
     except Exception as e:
         print(f"=== {u} ERROR {e!r}\n")
+B = "https://stock.naver.com"
 for u in [
- "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017&startIdx=0&pageSize=3",
- "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=202610171600&startIdx=0&pageSize=3",
- "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017160000&startIdx=0&pageSize=3",
- "/api/domestic/indexSise/time?koreaIndexType=KOSDAQ&thistime=20261017&startIdx=0&pageSize=80",
- "/api/stockSecurity/investor-trend/v2/domestic/KOSPI?exchangeType=krx&size=3",
- "/api/stockSecurity/investor-trend/v2/domestic/KOSPI/paged?exchangeType=krx&size=3",
- "/api/stockSecurity/investor-trend/v2/domestic/KOSDAQ/paged?exchangeType=krx&size=3",
- "/api/stockSecurity/investor-trend/v2/domestic/005930/paged?exchangeType=krx&size=2",
- "/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=foreignPureBuy&startIdx=0&pageSize=3",
- "/api/domestic/market/stock/default?tradeType=KRX&marketType=KOSPI&orderType=foreignPureBuy&startIdx=0&pageSize=3",
-]: show(u)
+ B + "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016&startIdx=0&pageSize=3",
+ B + "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016153000&startIdx=0&pageSize=3",
+ B + "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=202610161530&startIdx=0&pageSize=3",
+ B + "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=2026-10-16&startIdx=0&pageSize=3",
+ B + "/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017235959&startIdx=0&pageSize=3",
+ "https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261016",
+ "https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261015",
+ "https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20260917",
+ "https://m.stock.naver.com/api/index/KOSDAQ/trend?bizdate=20260917",
+ "https://m.stock.naver.com/api/index/KOSPI/basic",
+ B + "/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=marketSum&startIdx=0&pageSize=100",
+ B + "/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=foreignPureBuy&startIdx=0&pageSize=40",
+]: show(u, 900)
