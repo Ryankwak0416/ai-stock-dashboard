@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/runner/work/ai-stock-dashboard/ai-stock-dashboard/money/collect_money.py", line 227, in main
+    kospi = fetch_index_history("KOSPI")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/ai-stock-dashboard/ai-stock-dashboard/money/collect_money.py", line 58, in fetch_index_history
+    html = get(f"https://finance.naver.com/sise/sise_index_day.naver?code={code}&page={p}").text
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/ai-stock-dashboard/ai-stock-dashboard/money/collect_money.py", line 39, in get
+    raise RuntimeError(f"{last} {url}")
+RuntimeError: HTTP 410 https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI&page=1
+KOSPI 지수 수집 실패: HTTP 410 https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI&page=1
+exit=1
+updated 2026-09-17 17:06 KST dates 60 last 2026-09-17 sectors 78 errors ['foreign rank: 외국인 표를 찾지 못함(파라미터/렌더링 변경 가능)']
