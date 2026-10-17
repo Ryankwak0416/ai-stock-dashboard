@@ -1,60 +1,97 @@
-=== index_day  https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI&page=1
-status=410 len=2223 ctype=text/html;charset=EUC-KR enc=EUC-KR loc=None
-tr=7 date_like=0 first_dates=[]
-head: <html lang="ko"> <head> <meta http-equiv="Content-Type" content="text/html; charset=euc-kr"> <title>Npay 증권</title> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/newstock.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/common.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/layout.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/main.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/newstock2.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/newstock3.css"> <link rel="stylesheet" type="text/css" href="https://ssl.p
+=== m_idx_price n=60 keys=['localTradedAt', 'closePrice', 'compareToPreviousClosePrice', 'compareToPreviousPrice', 'fluctuationsRatio', 'openPrice', 'highPrice', 'lowPrice']
+ first={'localTradedAt': '2026-10-16', 'closePrice': '5,668.05', 'compareToPreviousClosePrice': '113.83', 'compareToPreviousPrice': {'code': '2', 'text': '상승', 'name': 'RISING'}, 'fluctuationsRatio': '2.05', 'openPrice': '5,653.99', 'highPrice': '5,809.94', 'lowPrice': '5,590.33'}
+ last={'localTradedAt': '2026-07-20', 'closePrice': '6,516.27', 'compareToPreviousClosePrice': '-304.33', 'compareToPreviousPrice': {'code': '5', 'text': '하락', 'name': 'FALLING'}, 'fluctuationsRatio': '-4.46', 'openPrice': '6,643.58', 'highPrice': '6,814.86', 'lowPrice': '6,472.80'}
 
-=== investor_day  https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20261017&sosok=01&page=1
-status=410 len=1590 ctype=text/html;charset=EUC-KR enc=EUC-KR loc=None
-tr=4 date_like=0 first_dates=[]
-head: <html lang="ko"> <head> <meta http-equiv="Content-Type" content="text/html; charset=euc-kr"> <title>Npay 증권</title> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/newstock.css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/common.css"> </head> <body> <h4 class="top_tlt2"><span class="head">일자별 순매수</span> <span class="top_tlt_guide">(단위:억원)</span></h4> <table summary="일자별 순매수에 관한 표 입니다." cellpadding="0" cellspacing="0" class="type_1"> <caption>일자별 순매수</caption> <col width="53px"> <col width="53px"> <col width="53px"> <col width="53px"> <col width="53px"> <col width="53px"> <col width="53px"> <col width="53px"> <col width="55px"> <col width="53px"> <col width="*"> <tr class="udline"> <th rowspan="2" class="noln">날짜</th> <th rowspan="2">개인</th> <th rowspan="2">외국인</th> <
+=== api_idx_chart n=80 keys=['localDate', 'closePrice', 'openPrice', 'highPrice', 'lowPrice', 'accumulatedTradingVolume', 'foreignRetentionRate']
+ first={'localDate': '20260619', 'closePrice': 9052.42, 'openPrice': 9288.89, 'highPrice': 9385.59, 'lowPrice': 8831.72, 'accumulatedTradingVolume': 517248, 'foreignRetentionRate': 0.0}
+ last={'localDate': '20261016', 'closePrice': 5668.05, 'openPrice': 5653.99, 'highPrice': 5809.94, 'lowPrice': 5590.33, 'accumulatedTradingVolume': 298850, 'foreignRetentionRate': 0.0}
 
-=== industry_api  https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=20
-status=200 len=2535 ctype=application/json;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: {"stockListSortType":"INDUSTRY","groups":[{"no":288,"name":"건강관리기술","totalCount":13,"changeRate":"8.52","riseCount":13,"fallCount":0,"steadyCount":0},{"no":308,"name":"인터넷과카탈로그소매","totalCount":6,"changeRate":"8.16","riseCount":6,"fallCount":0,"steadyCount":0},{"no":286,"name":"생물공학","totalCount":59,"changeRate":"8.02","riseCount":51,"fallCount":2,"steadyCount":6},{"no":293,"name":"컴퓨터와주변기기","totalCount":21,"changeRate":"7.92","riseCount":13,"fallCount":4,"steadyCount":4},{"no":262,"name":"생명과학도구및서비스","totalCount":41,"changeRate":"7.81","riseCount":31,"fallCount":3,"steadyCount":7},{"no":284,"name":"우주항공과국방","totalCount":35,"changeRate":"7.13","riseCount":33,"fallCount":1,"steadyCount":1},{"no":281,"name":"건강관리장비와용품","totalCount":104,"changeRate":"6.55","riseCount":77,"fallCount":11,"steadyCount":16},{"no":266,"name":"화장품","totalCount":64,"changeRate":"6.04","riseCount":57,"fallCount":5,"
+=== trend_bizdate  https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261010
+status=200 len=86 loc=None
+head: {"bizdate":"20261010","personalValue":"0","foreignValue":"0","institutionalValue":"0"}
 
-=== fx  https://finance.naver.com/marketindex/exchangeDailyQuote.naver?marketindexCd=FX_USDKRW&page=1
-status=410 len=1575 ctype=text/html;charset=EUC-KR enc=EUC-KR loc=None
-tr=3 date_like=0 first_dates=[]
-head: <html lang='ko'> <head> <title>Npay 증권</title> <meta http-equiv='Content-Type' content='text/html; charset=euc-kr'> <meta http-equiv="Content-Script-Type" content="text/javascript"> <meta http-equiv="Content-Style-Type" content="text/css"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20261001211942/css/finance.css"> </head> <body> <div class="section_exchange section_today"> <h3 class="h_today"><span>일별 환율</span></h3> <table border="1" class="tbl_exchange today" summary="일별 환율 리스트"> <caption>일별 환율</caption> <colgroup> <col width="100" /> <col width="90" /> <col width="90" /> <col width="105" /> <col width="105" /> <col width="105" /> <col width="78" /> </colgroup> <thead> <tr> <th rowspan="2" class="th_today1"><span>날짜</span></th> <th rowspan="2" class="th_today2"><span>매매기준율</span></th> <th rowspan="2" class="th_today3"><span>전일대비</span></th> <
-
-=== deal_rank  https://finance.naver.com/sise/sise_deal_rank.naver
-status=302 len=0 ctype=None enc=None loc=https://stock.naver.com/market/stock/kr
-tr=0 date_like=0 first_dates=[]
-head: 
-
-=== api_idx_chart  https://api.stock.naver.com/chart/domestic/index/KOSPI/day?startDateTime=202606190000&endDateTime=202610172359
-status=200 len=13251 ctype=application/json;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: [{"localDate":"20260619","closePrice":9052.42,"openPrice":9288.89,"highPrice":9385.59,"lowPrice":8831.72,"accumulatedTradingVolume":517248,"foreignRetentionRate":0.0},{"localDate":"20260622","closePrice":9114.55,"openPrice":8954.43,"highPrice":9253.0,"lowPrice":8900.68,"accumulatedTradingVolume":381081,"foreignRetentionRate":0.0},{"localDate":"20260623","closePrice":8203.84,"openPrice":9083.54,"highPrice":9175.45,"lowPrice":8203.84,"accumulatedTradingVolume":488742,"foreignRetentionRate":0.0},{"localDate":"20260624","closePrice":8471.02,"openPrice":8356.79,"highPrice":8577.52,"lowPrice":8080.99,"accumulatedTradingVolume":418169,"foreignRetentionRate":0.0},{"localDate":"20260625","closePrice":8930.3,"openPrice":8703.42,"highPrice":9044.04,"lowPrice":8693.62,"accumulatedTradingVolume":456880,"foreignRetentionRate":0.0},{"localDate":"20260626","closePrice":8411.21,"openPrice":8813.18,"highP
-
-=== m_idx_price  https://m.stock.naver.com/api/index/KOSPI/price?pageSize=5&page=1
-status=200 len=1307 ctype=application/json;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: [{"localTradedAt":"2026-10-16","closePrice":"5,668.05","compareToPreviousClosePrice":"113.83","compareToPreviousPrice":{"code":"2","text":"상승","name":"RISING"},"fluctuationsRatio":"2.05","openPrice":"5,653.99","highPrice":"5,809.94","lowPrice":"5,590.33"},{"localTradedAt":"2026-10-15","closePrice":"5,554.22","compareToPreviousClosePrice":"-454.59","compareToPreviousPrice":{"code":"5","text":"하락","name":"FALLING"},"fluctuationsRatio":"-7.57","openPrice":"5,673.01","highPrice":"5,751.45","lowPrice":"5,450.81"},{"localTradedAt":"2026-10-14","closePrice":"6,008.81","compareToPreviousClosePrice":"-26.54","compareToPreviousPrice":{"code":"5","text":"하락","name":"FALLING"},"fluctuationsRatio":"-0.44","openPrice":"6,062.08","highPrice":"6,190.65","lowPrice":"5,944.65"},{"localTradedAt":"2026-10-13","closePrice":"6,035.35","compareToPreviousClosePrice":"-348.89","compareToPreviousPrice":{"code":"5
-
-=== m_idx_basic  https://m.stock.naver.com/api/index/KOSPI/basic
-status=200 len=3200 ctype=application/json;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: {"stockEndType":"index","itemCode":"KOSPI","reutersCode":"KOSPI","symbolCode":"KOSPI","stockName":"코스피","itemLogoUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/index/IndexKOSPI.svg","itemLogoPngUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/png/index/IndexKOSPI.png","closePrice":"5,668.05","compareToPreviousClosePrice":"113.83","compareToPreviousPrice":{"code":"2","text":"상승","name":"RISING"},"fluctuationsRatio":"2.05","marketStatus":"CLOSE","localTradedAt":"2026-10-16T20:15:00+09:00","stockExchangeType":{"code":"KS","zoneId":"Asia/Seoul","nationType":"KOR","delayTime":0,"startTime":"0900","endTime":"1530","closePriceSendTime":"1630","nameKor":"코스피","nameEng":"KOSPI","stockType":"domestic","nationCode":"KOR","nationName":"대한민국","name":"KOSPI"},"imageCharts":{"day_up":"https://financial-vn.pstatic.net/chart/mobile/mini/KOSPI_end_up.png","candleWeek":"https://financial-vn.pstatic
-
-=== m_idx_trend  https://m.stock.naver.com/api/index/KOSPI/trend
-status=200 len=101 ctype=application/json;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
+=== trend_page  https://m.stock.naver.com/api/index/KOSPI/trend?pageSize=10&page=1
+status=200 len=101 loc=None
 head: {"bizdate":"20261016","personalValue":"-5,126","foreignValue":"+3,637","institutionalValue":"-6,815"}
 
-=== m_idx_investor  https://m.stock.naver.com/api/index/KOSPI/investor?pageSize=5&page=1
-status=404 len=4209 ctype=text/html;charset=UTF-8 enc=UTF-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: <!doctype html> <html lang="ko"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no"> <title>Npay 증권</title> <link rel="shortcut icon" href="https://ssl.pstatic.net/imgstock/favicon.ico"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.mobile/css/finance/min/20261015134234/mstock_error.css"> </head> <body> <!-- header --> <header id="header"> <div class="header"> <h1> <a href="/" class="button"> <span class="logo"> <svg width="106" height="22" viewBox="0 0 106 22" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M22 11C22 13.1756 21.3549 15.3023 20.1462 17.1113C18.9375 18.9202 17.2195 20.3301 15.2095 21.1627C13.1995 21.9952 10.9878 22.2131 8.85401 21.7886C6.72022 21.3642 4.76021 20.3166 3.22183 18.7782C1.68345 17.2398 0.635805 15.2798 0.211368 1
+=== trend_day  https://m.stock.naver.com/api/index/KOSPI/trend/day?pageSize=10&page=1
+status=404 len=4209 loc=None
+head: <!doctype html> <html lang="ko"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no"> <title>Npay 증권</title> <link rel="shortcut icon" href="https://ssl.pstatic.net/imgstock/favicon.ico"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.mobile/css/finance/min/20261015134234/mstock_error.css"> </head> <body> <!-- header --> <header id="header"> <div class="header
 
-=== m_fx  https://m.stock.naver.com/front-api/marketIndex/prices?category=exchange&reutersCode=FX_USDKRW&page=1&pageSize=5
-status=400 len=133 ctype=application/json; charset=utf-8 enc=utf-8 loc=None
-tr=0 date_like=0 first_dates=[]
-head: {"detailCode":"too_small","message":"{\"formErrors\":[],\"fieldErrors\":{\"pageSize\":[\"Too small: expected number to be >=10\"]}}"}
+=== trend_list  https://m.stock.naver.com/api/index/KOSPI/trendList?pageSize=10&page=1
+status=404 len=4209 loc=None
+head: <!doctype html> <html lang="ko"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no"> <title>Npay 증권</title> <link rel="shortcut icon" href="https://ssl.pstatic.net/imgstock/favicon.ico"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.mobile/css/finance/min/20261015134234/mstock_error.css"> </head> <body> <!-- header --> <header id="header"> <div class="header
 
-=== m_deal_rank  https://m.stock.naver.com/api/stocks/foreignBuy/KOSPI?page=1&pageSize=5
-status=404 len=0 ctype=None enc=None loc=None
-tr=0 date_like=0 first_dates=[]
-head: 
+=== investorTrend  https://m.stock.naver.com/api/index/KOSPI/investorTrend?pageSize=10&page=1
+status=404 len=4209 loc=None
+head: <!doctype html> <html lang="ko"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no"> <title>Npay 증권</title> <link rel="shortcut icon" href="https://ssl.pstatic.net/imgstock/favicon.ico"> <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.mobile/css/finance/min/20261015134234/mstock_error.css"> </head> <body> <!-- header --> <header id="header"> <div class="header
+
+=== api_trend  https://api.stock.naver.com/index/KOSPI/trend?pageSize=10
+status=404 len=138 loc=None
+head: {"timestamp":"2026-10-17T00:18:02.073+0000","status":404,"error":"Not Found","message":"No message available","path":"/index/KOSPI/trend"}
+
+=== kosdaq_trend  https://m.stock.naver.com/api/index/KOSDAQ/trend
+status=200 len=97 loc=None
+head: {"bizdate":"20261016","personalValue":"-908","foreignValue":"-945","institutionalValue":"+1,689"}
+
+=== m_fx60  https://m.stock.naver.com/front-api/marketIndex/prices?category=exchange&reutersCode=FX_USDKRW&page=1&pageSize=60
+status=200 len=16239 loc=None
+head: {"isSuccess":true,"detailCode":"","message":"","result":[{"localTradedAt":"2026-10-16","closePrice":"1,337.50","fluctuations":"-5.00","fluctuationsRatio":"-0.37","fluctuationsType":{"code":"5","text":"하락","name":"FALLING"},"cashBuyValue":"1,360.9","cashSellValue":"1,314.1","sendValue":"1,350.6","receiveValue":"1,324.4"},{"localTradedAt":"2026-10-15","closePrice":"1,342.50","fluctuations":"-0.50","fluctuationsRatio":"-0.04","fluctuationsType":{"code":"5","text":"하락","name":"FALLING"},"cashBuyValue":"1,365.99","cashSellValue":"1,319.01","sendValue":"1,355.6","receiveValue":"1,329.4"},{"localTrad
+
+=== api_fx  https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?page=1&pageSize=60
+status=200 len=16182 loc=None
+head: [{"localTradedAt":"2026-10-16","closePrice":"1,337.50","fluctuations":"-5.00","fluctuationsRatio":"-0.37","fluctuationsType":{"code":"5","text":"하락","name":"FALLING"},"cashBuyValue":"1,360.9","cashSellValue":"1,314.1","sendValue":"1,350.6","receiveValue":"1,324.4"},{"localTradedAt":"2026-10-15","closePrice":"1,342.50","fluctuations":"-0.50","fluctuationsRatio":"-0.04","fluctuationsType":{"code":"5","text":"하락","name":"FALLING"},"cashBuyValue":"1,365.99","cashSellValue":"1,319.01","sendValue":"1,355.6","receiveValue":"1,329.4"},{"localTradedAt":"2026-10-14","closePrice":"1,343.00","fluctuations
+
+=== discover https://stock.naver.com/market/stock/kr
+scripts=66 api_paths=131
+   /api/coin/categories/ranking?
+   /api/coin/globalMarketTrend
+   /api/coin/rank/
+   /api/foreign/
+   /api/foreign/operatingTime/exchange/
+   /api/personal/users/favorite/ranking?
+   /api/personal/users/notification-settings/investment
+   /api/personal/users/notification-settings/investment/codes?categoryType=
+   /api/personal/users/notification-settings/investment/crypto/
+   /api/personal/users/notification-settings/investment/ipo/
+   /api/personal/users/notification-settings/investment/stock/
+   /api/personal/users/notifications/investment/messages/
+   /api/personal/users/notifications/investment/unread/count
+   /api/personal/users/notifications/investment?
+   /api/realtime/marketindex/
+   /api/securityService/chart/foreign/INDEX/
+   /api/securityService/marketindex/
+   /api/securityService/marketindex/bond
+   /api/securityService/marketindex/standardInterest
+   /api/securityService/marketindex/standardInterest/
+   /api/stockDomestic/exchangeRates/list?
+   /api/stockDomestic/exchangeRates/list?currencies=
+   /api/stockDomestic/notification-settings/investment/crypto/check-registrable?fqnfTicker=
+   /api/stockDomestic/notification-settings/investment/ipo/check-registrable?ipoCode=
+   /api/stockDomestic/notification-settings/investment/stock/check-registrable?itemCode=
+   /api/stockSecurity/aggregate/foreignPopularEtf?size=
+   /api/stockSecurity/aggregate/foreignPopularStock?size=
+   /api/stockSecurity/crypto/coin/rank/
+   /api/stockSecurity/exchanges
+   /api/stockSecurity/investor-trend/v2/domestic/
+   /api/stockSecurity/rankings/v2/domestic/popular-etf?
+   /api/stockSecurity/rankings/v2/foreign/popular-etf?
+
+=== discover https://m.stock.naver.com/domestic/index/KOSPI/total
+scripts=41 api_paths=15
+   /api/realtime/marketindex/agricultural/{codes}
+   /api/realtime/marketindex/energy/{codes}
+   /api/realtime/marketindex/exchange/.DXY
+   /api/realtime/marketindex/exchangeWorld/{codes}
+   /api/realtime/marketindex/metals/{codes}
+   /api/realtime/marketindex/transport/{codes}
+
+=== discover https://m.stock.naver.com/
+scripts=37 api_paths=15
+   /api/realtime/marketindex/agricultural/{codes}
+   /api/realtime/marketindex/energy/{codes}
+   /api/realtime/marketindex/exchange/.DXY
+   /api/realtime/marketindex/exchangeWorld/{codes}
+   /api/realtime/marketindex/metals/{codes}
+   /api/realtime/marketindex/transport/{codes}
 
