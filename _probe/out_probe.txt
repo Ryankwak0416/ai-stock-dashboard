@@ -1,180 +1,63 @@
-page https://stock.naver.com/market/stock/kr status=200 len=130305
-page https://stock.naver.com/domestic/index/KOSPI status=200 len=128970
-page https://stock.naver.com/domestic/index/KOSPI/total status=200 len=128970
-page https://stock.naver.com/market/stock/kr/investor status=404 len=79432
+=== https://stock.naver.com/api/domestic/indexSise/day?koreaIndexType=KOSPI
+status=404 len=119 ct=application/json; charset=utf-8
+{"message":"Route GET:/api/domestic/indexSise/day?koreaIndexType=KOSPI not found","error":"Not Found","statusCode":404}
 
-=== all api paths (153)
-   /api/auth/user/agree/third
-   /api/auth/userInfo
-   /api/autocomplete/opentalk/channelInfo?code=
-   /api/autocomplete/search/autoComplete?
-   /api/autocomplete/search/recent?
-   /api/autocomplete/search?
-   /api/coin/
-   /api/coin/candle/
-   /api/coin/categories/
-   /api/coin/categories/ranking?
-   /api/coin/etf/
-   /api/coin/expertContents
-   /api/coin/expertContents/
-   /api/coin/globalCommunity/cmc/
-   /api/coin/globalMarketTrend
-   /api/coin/marketUpdates
-   /api/coin/marketUpdates/
-   /api/coin/marketUpdates/detail/
-   /api/coin/price/
-   /api/coin/priceChange/
-   /api/coin/prices?
-   /api/coin/profile/
-   /api/coin/rank/
-   /api/community/discussion/items/posts/latest
-   /api/community/discussion/posts/
-   /api/community/discussion/posts/by-item-codes?
-   /api/community/discussion/posts/by-item?
-   /api/community/discussion/posts/comment-counts?
-   /api/community/discussion/posts/hot/home?
-   /api/community/discussion/posts/hot?
-   /api/community/discussion/posts/market?
-   /api/community/discussion/posts/popular/hot
-   /api/community/discussion/posts/popular/hot?viewerProfileId=
-   /api/community/discussion/posts/reactions?postIds=
-   /api/community/discussion/posts/related/hot?
-   /api/community/discussion/posts?itemCode=
-   /api/community/discussion/topics
-   /api/community/discussion/topics/posts/recommended?
-   /api/community/discussion/topics/posts?
-   /api/community/profile/users
-   /api/community/profile/users/
-   /api/community/profile/users/form
-   /api/community/profile/users/image
-   /api/community/profile/users/introduction/validate
-   /api/community/profile/users/nickname/recommend
-   /api/community/profile/users/nickname/validate
-   /api/community/profile/users/status
-   /api/community/profileAggregate/item-news/profiles/aggregate
-   /api/community/profileAggregate/users/
-   /api/domestic/detail/
-   /api/domestic/detail/stock/
-   /api/domestic/indexSise/time?koreaIndexType=
-   /api/domestic/market/
-   /api/domestic/market/ipo/progress
-   /api/domestic/market/stock/default?
-   /api/domestic/market/stock/dividend?
-   /api/foreign/
-   /api/foreign/operatingTime/exchange/
-   /api/fund/funds/
-   /api/fund/funds/prices?fundCodes=
-   /api/fund/funds/themes/
-   /api/fund/funds?sort=
-   /api/inhouseNtalk/categories/
-   /api/inhouseNtalk/channels
-   /api/marketCalendars/v1
-   /api/myasset/resources/invest/stock-floor?
-   /api/myasset/resources/invest/stock-invest-rate?
-   /api/myasset/resources/invest/stock-investor-age?
-   /api/myasset/resources/invest/stock-investor-rank?
-   /api/myasset/resources/invest/stock-trade?
-   /api/personal/guest/recent/products
-   /api/personal/users/favorite/groups
-   /api/personal/users/favorite/groups/
-   /api/personal/users/favorite/groups/bulk-items
-   /api/personal/users/favorite/groups/order
-   /api/personal/users/favorite/items
-   /api/personal/users/favorite/ranking?
-   /api/personal/users/favoriteGrouplist
-   /api/personal/users/holding/refresh/session-io
-   /api/personal/users/holding/stocks/item-codes?
-   /api/personal/users/holding/stocks/list?
-   /api/personal/users/holding/stocks/refresh
-   /api/personal/users/holding/stocks/status
-   /api/personal/users/notification-settings/investment
-   /api/personal/users/notification-settings/investment/codes?categoryType=
-   /api/personal/users/notification-settings/investment/crypto/
-   /api/personal/users/notification-settings/investment/ipo/
-   /api/personal/users/notification-settings/investment/stock/
-   /api/personal/users/notifications/investment/messages/
-   /api/personal/users/notifications/investment/unread/count
-   /api/personal/users/notifications/investment?
-   /api/personal/users/recent/products
-   /api/personal/users/stocks/groups/
-   /api/personal/users/v2/holding/stocks/
-   /api/realtime/coin/price?
-   /api/realtime/domestic/NXT/stock/
-   /api/realtime/domestic/index/
-   /api/realtime/domestic/stock/
-   /api/realtime/domestic/v2/stock?
-   /api/realtime/marketindex/
-   /api/realtime/worldstock/
-   /api/securityFe/api/etf/themes/
-   /api/securityFe/api/fchart/
-   /api/securityFe/api/futures/
-   /api/securityFe/api/index/
-   /api/securityFe/api/index/majors
-   /api/securityFe/api/search/recent/
-   /api/securityService/chart/
-   /api/securityService/chart/foreign/INDEX/
-   /api/securityService/economic
-   /api/securityService/etf/
-   /api/securityService/home/v3/briefing
-   /api/securityService/home/v3/mystock/ranking/
-   /api/securityService/home/v3/stock/
-   /api/securityService/home/v3/whatIf/
-   /api/securityService/index/
-   /api/securityService/integration/indicators?
-   /api/securityService/integration/price?
-   /api/securityService/integration/v1/indicators?
-   /api/securityService/marketindex/
-   /api/securityService/marketindex/bond
-   /api/securityService/marketindex/standardInterest
-   /api/securityService/marketindex/standardInterest/
-   /api/securityService/stock/
-   /api/securityService/stock/prices
-   /api/stockDomestic/exchangeRates/list?
-   /api/stockDomestic/exchangeRates/list?currencies=
-   /api/stockDomestic/invest-info/poll/
-   /api/stockDomestic/invest-info/poll/statistics/
-   /api/stockDomestic/notification-settings/investment/crypto/check-registrable?fqnfTicker=
-   /api/stockDomestic/notification-settings/investment/ipo/check-registrable?ipoCode=
-   /api/stockDomestic/notification-settings/investment/stock/check-registrable?itemCode=
-   /api/stockSecurity/aggregate/domesticPopularEtf?size=
-   /api/stockSecurity/aggregate/foreignPopularEtf?size=
-   /api/stockSecurity/aggregate/foreignPopularStock?size=
-   /api/stockSecurity/crypto/coin/rank/
-   /api/stockSecurity/etfs/v1/domestic/leverage-types
-   /api/stockSecurity/etfs/v2/domestic
-   /api/stockSecurity/etfs/v2/domestic/components?
-   /api/stockSecurity/etfs/v2/domestic/themes
-   /api/stockSecurity/etfs/v3/domestic
-   /api/stockSecurity/exchanges
-   /api/stockSecurity/holdings/v3/users/stocks?
-   /api/stockSecurity/individual-stocks/v2/domestic?
-   /api/stockSecurity/individual-stocks/v3/domestic?
-   /api/stockSecurity/investor-trend/v2/domestic/
-   /api/stockSecurity/items/v2/domestic/
-   /api/stockSecurity/notices/v2
-   /api/stockSecurity/notices/v2/
-   /api/stockSecurity/notices/v2/banners?size=2&type=PC_TOP
-   /api/stockSecurity/notices/v2?
-   /api/stockSecurity/rankings/v2/domestic/popular-etf?
-   /api/stockSecurity/rankings/v2/foreign/popular-etf?
+=== https://stock.naver.com/api/domestic/indexSise/day?koreaIndexType=KOSPI&page=1&pageSize=10
+status=404 len=138 ct=application/json; charset=utf-8
+{"message":"Route GET:/api/domestic/indexSise/day?koreaIndexType=KOSPI&page=1&pageSize=10 not found","error":"Not Found","statusCode":404}
+
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI
+status=400 len=107 ct=application/json; charset=utf-8
+{"detailCode":"invalid_type","message":"{\"formErrors\":[],\"fieldErrors\":{\"thistime\":[\"Required\"]}}"}
+
+=== https://stock.naver.com/api/securityService/chart/domestic/index/KOSPI?periodType=day
+status=200 len=93726 ct=application/json; charset=utf-8
+{"code":"KOSPI","infoType":"index","periodType":"day","newlyListed":false,"stockExchangeType":"KRX","hasVolume":true,"decimalUnit":2,"marketStatus":"CLOSE","tradeStop":false,"openPrice":5653.99,"lastClosePrice":5554.22,"tradeBaseAt":"20261016","lastTradeBaseAt":"20261015","localDateTimeNow":"20261017092000","openTime":"20261016090000","closeTime":"20261016153000","priceInfos":[{"localDateTime":"20261016090000","currentPrice":5656.04,"openPrice":5653.99,"highPrice":5656.51,"lowPrice":5653.99,"accumulatedTradingVolume":7045},{"localDateTime":"20261016090100","currentPrice":5642.25,"openPrice":56
+
+=== https://stock.naver.com/api/securityService/index/KOSPI
+status=404 len=103 ct=application/json; charset=utf-8
+{"message":"Route GET:/api/securityService/index/KOSPI not found","error":"Not Found","statusCode":404}
+
+=== https://stock.naver.com/api/securityService/index/KOSPI/price?page=1&pageSize=5
+status=409 len=121 ct=application/json; charset=utf-8
+{"detailCode":"HttpError","message":"Conflict","result":"{\"code\":\"StockConflict\",\"message\":\"Not Found - KOSPI\"}"}
+
+=== https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/KOSPI?exchangeType=KRX&size=5
+status=400 len=175 ct=application/json; charset=utf-8
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"exchangeType\":[\"Invalid enum value. Expected 'all' | 'krx' | 'nxt', received 'KRX'\"]}}"}
+
+=== https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/KOSPI/paged?exchangeType=KRX&size=5
+status=400 len=175 ct=application/json; charset=utf-8
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"exchangeType\":[\"Invalid enum value. Expected 'all' | 'krx' | 'nxt', received 'KRX'\"]}}"}
+
+=== https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/005930?exchangeType=KRX&size=3
+status=400 len=175 ct=application/json; charset=utf-8
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"exchangeType\":[\"Invalid enum value. Expected 'all' | 'krx' | 'nxt', received 'KRX'\"]}}"}
+
+=== https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=tradingValueDesc&page=1&pageSize=3
+status=400 len=505 ct=application/json; charset=utf-8
+{"detailCode":"invalid_enum_value","message":"{\"formErrors\":[],\"fieldErrors\":{\"orderType\":[\"Invalid enum value. Expected 'marketSum' | 'quantTop' | 'priceTop' | 'up' | 'flat' | 'down' | 'upperLimit' | 'lowerLimit' | 'upperQuantTop' | 'lowerQuantTop' | 'high52week' | 'low52week' | 'frgnRate' | 'tradeStopYn' | 'marketAlertType' | 'statusTag' | 'newStock' | 'searchTop' | 'domesticDiscussionHit' | 'foreignDiscussionHit' | 'foreignPureBuy' | 'organizationPureBuy', received 'tradingValueDesc'\"]}}"}
 
 === contexts
---- [investor-trend] ...y-prices/paged?").concat(n.toString());return(0,l.f)(i)}},42603:(e,t,n)=>{n.d(t,{O:()=>a,j:()=>r});var l=n(65164);let i=e=>{let t=new URLSearchParams({exchangeType:e.exchangeType,size:String(e.size)});return e.cursor&&t.set("cursor",e.cursor),void 0!==e.index&&t.set("index",String(e.index)),t};async function a(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"?").concat(n.toString());return(0,l.f)(a)}async function r(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"/paged?").concat(n.toString());return(0,l.f)(a)}},83211:(e,t,n)=>{n.d(t,{K_:()=>Y,_s:()=>Z,dL:()=>R,ax:()=>z,ws:()=>q,xV:()=>J,HI:()=>K,Tz:()=>_,Xp:()=>w,bT:()=>B,zY:()=>Q,UH:()=>E,jG:()=>M...
---- [investor-trend] ...LSearchParams({exchangeType:e.exchangeType,size:String(e.size)});return e.cursor&&t.set("cursor",e.cursor),void 0!==e.index&&t.set("index",String(e.index)),t};async function a(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"?").concat(n.toString());return(0,l.f)(a)}async function r(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"/paged?").concat(n.toString());return(0,l.f)(a)}},83211:(e,t,n)=>{n.d(t,{K_:()=>Y,_s:()=>Z,dL:()=>R,ax:()=>z,ws:()=>q,xV:()=>J,HI:()=>K,Tz:()=>_,Xp:()=>w,bT:()=>B,zY:()=>Q,UH:()=>E,jG:()=>M,rf:()=>X,HO:()=>W});var l=n(84825),i=n(58186),a=n(91e3),r=n(60326),o=n(52104),u=n(25740),c=n(2100);n(20015);var s=n(7751),d=n(201),m=n(...
---- [rankings/v2/domestic] ...>n,Xt:()=>s,fn:()=>a,mP:()=>r,oE:()=>i})},87238:(e,t,l)=>{"use strict";l.d(t,{Wu:()=>s,Xt:()=>i,p_:()=>r,rw:()=>a,tn:()=>o});var n=l(65164);async function i(){var e;let t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{},l=new URLSearchParams({size:String(null!=(e=t.size)?e:10)});t.cursor&&l.set("cursor",t.cursor);let i="/api/stockSecurity/rankings/v2/domestic/popular-etf?".concat(l.toString());return(0,n.f)(i)}async function a(e){var t;let l=new URLSearchParams({nationType:e.nationType,size:String(null!=(t=e.size)?t:10)});e.cursor&&l.set("cursor",e.cursor);let i="/api/stockSecurity/rankings/v2/foreign/popular-etf?".concat(l.toString());return(0,n.f)(i)}async function o(){let e=arguments.length>0&&void ...
---- [securityService/chart] ...g-fade-in":"AdvertisementArea_rolling-fade-in__5fSfN"}},80749:(e,t,l)=>{"use strict";l.d(t,{n:()=>r,u:()=>s});var a=l(79780),n=l.n(a),i=l(65164);async function r(e,t,l){let a=arguments.length>3&&void 0!==arguments[3]?arguments[3]:"day",r=arguments.length>4?arguments[4]:void 0,s=n().stringify({periodType:a,range:r},{skipNulls:!0,encode:!0}),c="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(l))+(s?"?".concat(s):"");return(0,i.f)(c)}async function s(e,t,l,a,r){let s=n().stringify({startDateTime:l,endDateTime:a,utc:!1},{skipNulls:!0,encode:!0}),c="/api/securityService/chart/foreign/INDEX/".concat(encodeURIComponent(e),"/").concat(encodeURIComponent(t),"/interval/").concat(r)+"?".c...
---- [securityService/chart] ...uments.length>4?arguments[4]:void 0,s=n().stringify({periodType:a,range:r},{skipNulls:!0,encode:!0}),c="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(l))+(s?"?".concat(s):"");return(0,i.f)(c)}async function s(e,t,l,a,r){let s=n().stringify({startDateTime:l,endDateTime:a,utc:!1},{skipNulls:!0,encode:!0}),c="/api/securityService/chart/foreign/INDEX/".concat(encodeURIComponent(e),"/").concat(encodeURIComponent(t),"/interval/").concat(r)+"?".concat(s);return(0,i.f)(c)}},83983:(e,t,l)=>{"use strict";l.d(t,{A:()=>u});var a=l(78848),n=l(84124),i=l.n(n),r=l(90954),s=l(66074),c=l.n(s);let o=i().bind(c()),u=function(e){let{contents:t,children:l}=e;return(0,a.jsx)(r.A,{contents:(0,a.jsx...
---- [securityService/chart] ...window.scrollTo(e)},i=()=>{s({top:0,behavior:"auto"})}},80749:(e,t,r)=>{"use strict";r.d(t,{n:()=>a,u:()=>l});var n=r(79780),o=r.n(n),c=r(65164);async function a(e,t,r){let n=arguments.length>3&&void 0!==arguments[3]?arguments[3]:"day",a=arguments.length>4?arguments[4]:void 0,l=o().stringify({periodType:n,range:a},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(r))+(l?"?".concat(l):"");return(0,c.f)(s)}async function l(e,t,r,n,a){let l=o().stringify({startDateTime:r,endDateTime:n,utc:!1},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/foreign/INDEX/".concat(encodeURIComponent(e),"/").concat(encodeURIComponent(t),"/interval/").concat(a)+"?".c...
---- [securityService/chart] ...uments.length>4?arguments[4]:void 0,l=o().stringify({periodType:n,range:a},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/".concat(e,"/").concat(t,"/").concat(encodeURIComponent(r))+(l?"?".concat(l):"");return(0,c.f)(s)}async function l(e,t,r,n,a){let l=o().stringify({startDateTime:r,endDateTime:n,utc:!1},{skipNulls:!0,encode:!0}),s="/api/securityService/chart/foreign/INDEX/".concat(encodeURIComponent(e),"/").concat(encodeURIComponent(t),"/interval/").concat(a)+"?".concat(l);return(0,c.f)(s)}},92975:(e,t,r)=>{"use strict";r.d(t,{A:()=>T});var n=r(78848),o=r(31815),c=r(25740);let a={jsUrl:"https://npaydev-cdn-dev.pay.naver.com/client-chart/pc/dev/4.4.28/js/chartiq.js",cssUrl:"https://npaydev-cdn-dev.pay....
---- [tradingValue] ...ceMovement?l.priceMovement:"",status:a,size:"medium",showUnit:!0,unit:"",isRealtimeUpdate:!0})},size:u.l.W180,align:"right",isSticky:!0}),p.J.accessor("tradingVolume",{thRender:()=>"ê±°ëë",tdRender:e=>t?(0,n.jsx)(g.A,{text:"-"}):(0,n.jsx)(d.A,{price:null!=e?e:"",size:"medium",showUnit:!0,unit:"ì£¼"}),size:u.l.W150,align:"right"}),p.J.accessor("tradingValue",{thRender:()=>"ê±°ëëê¸",tdRender:e=>{if(t||""===e)return(0,n.jsx)(g.A,{text:"-"});let l=Math.round(Number(e)/1e6);return(0,n.jsx)(d.A,{price:l,size:"medium",showUnit:!0,unit:"ë°±ë§"})},size:u.l.W120,align:"right"}),p.J.accessor("totalNetAssets",{thRender:()=>"ì´ì©ìì°",tdRender:e=>{let t=(0,h.di)(Number(e));return(0,n.jsx)(g.A,{text:t,s...
---- [tradingValue] ...(l=d.data)?void 0:l.map(e=>{var t,l,n,i,a;let o=e.itemCode?p.get(e.itemCode):void 0;return o?{...e,currentPrice:Number(o.closePriceRaw),priceMovement:o.compareToPreviousPrice.name.toLowerCase(),changeRate:Number(o.fluctuationsRatioRaw),changePrice:Number(o.compareToPreviousClosePriceRaw),tradingVolume:null!=(t=o.accumulatedTradingVolumeRaw)?t:null,tradingValue:null!=(l=o.accumulatedTradingValueRaw)?l:null,tradableStatus:null!=(n=o.tradableStatus)?n:null,tradableStatusCode:null!=(i=o.tradableStatusCode)?i:null,tradableStatusUpdatedAt:null!=(a=o.tradableStatusUpdatedAt)?a:null}:e}))?s:[],isLoading:d.isLoading,isFetching:d.isFetching,error:d.error}}},23779:(e,t,l)=>{"use strict";l.d(t,{A:()=>c});var n=l(78...
---- [tradingValue] ...186),d=l(80454),m=l(85403);function g(e){return void 0===(0,d.Ro)(e)?void 0:String(e)}function p(e,t){return(0,d.fn)(e,t,v,e=>e.itemCode)}function v(e){var t;return(0,d.oE)({currentPrice:(0,d.Ro)(e.closePrice),changePrice:(0,d.Ro)(e.compareToPreviousClosePrice),changeRate:(0,d.Ro)(e.fluctuationsRatio),tradingVolume:g(e.accumulatedTradingVolumeRaw),tradingValue:g(e.accumulatedTradingValueRaw),priceMovement:function(e){switch(e){case"1":return"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{l...
---- [tradingValue] ...ulatedTradingVolumeRaw),tradingValue:g(e.accumulatedTradingValueRaw),priceMovement:function(e){switch(e){case"1":return"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{listingType:"aumDesc"},upper:{listingType:"changeRateDescUpAll"},lower:{listingType:"changeRateDescDownAll"},trading:{listingType:"tradingVolumeDesc"},quantHigh:{listingType:"tradingVolumeIncreaseRateDesc"},quantLow:{listingType:"tradingVolumeIncreaseRateAsc"},return1m:{listingType:"returnRate1mDesc"},return3m:{listingType:"r...
---- [TradingValue] ...,n,i,a;let o=e.itemCode?p.get(e.itemCode):void 0;return o?{...e,currentPrice:Number(o.closePriceRaw),priceMovement:o.compareToPreviousPrice.name.toLowerCase(),changeRate:Number(o.fluctuationsRatioRaw),changePrice:Number(o.compareToPreviousClosePriceRaw),tradingVolume:null!=(t=o.accumulatedTradingVolumeRaw)?t:null,tradingValue:null!=(l=o.accumulatedTradingValueRaw)?l:null,tradableStatus:null!=(n=o.tradableStatus)?n:null,tradableStatusCode:null!=(i=o.tradableStatusCode)?i:null,tradableStatusUpdatedAt:null!=(a=o.tradableStatusUpdatedAt)?a:null}:e}))?s:[],isLoading:d.isLoading,isFetching:d.isFetching,error:d.error}}},23779:(e,t,l)=>{"use strict";l.d(t,{A:()=>c});var n=l(78848),i=l(84124),a=l.n(i),o=l(98026)...
---- [TradingValue] ...unction g(e){return void 0===(0,d.Ro)(e)?void 0:String(e)}function p(e,t){return(0,d.fn)(e,t,v,e=>e.itemCode)}function v(e){var t;return(0,d.oE)({currentPrice:(0,d.Ro)(e.closePrice),changePrice:(0,d.Ro)(e.compareToPreviousClosePrice),changeRate:(0,d.Ro)(e.fluctuationsRatio),tradingVolume:g(e.accumulatedTradingVolumeRaw),tradingValue:g(e.accumulatedTradingValueRaw),priceMovement:function(e){switch(e){case"1":return"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{listingType:"aumDesc"},upper:...
---- [TradingValue] ...id 0:V.lowPrice)?m:null==M?void 0:M.lowPrice))?g:0,tradeVolume:null!=(h=n(null!=(f=null!=(v=null!=(p=null==V?void 0:V.accumulatedTradingVolumeRaw)?p:null==V?void 0:V.accumulatedTradingVolume)?v:null==M?void 0:M.accumulatedTradingVolumeRaw)?f:null==M?void 0:M.accumulatedTradingVolume))?h:0,tradeAmount:null!=(b=n(null!=(_=null==V?void 0:V.accumulatedTradingValueRaw)?_:null==M?void 0:M.accumulatedTradingValueRaw))?b:0}):i({itemcode:e.itemCode,itemname:e.stockName,isNxtListed:o(e),nowPrice:n(null!=(T=e.closePriceRaw)?T:e.closePrice),prevChangePrice:n(null!=(P=e.compareToPreviousClosePriceRaw)?P:e.compareToPreviousClosePrice),prevChangeRate:n(null!=(k=e.fluctuationsRatioRaw)?k:e.fluctuationsRatio),upDownGb:n...
---- [TradingValue] ...g:0,tradeVolume:null!=(h=n(null!=(f=null!=(v=null!=(p=null==V?void 0:V.accumulatedTradingVolumeRaw)?p:null==V?void 0:V.accumulatedTradingVolume)?v:null==M?void 0:M.accumulatedTradingVolumeRaw)?f:null==M?void 0:M.accumulatedTradingVolume))?h:0,tradeAmount:null!=(b=n(null!=(_=null==V?void 0:V.accumulatedTradingValueRaw)?_:null==M?void 0:M.accumulatedTradingValueRaw))?b:0}):i({itemcode:e.itemCode,itemname:e.stockName,isNxtListed:o(e),nowPrice:n(null!=(T=e.closePriceRaw)?T:e.closePrice),prevChangePrice:n(null!=(P=e.compareToPreviousClosePriceRaw)?P:e.compareToPreviousClosePrice),prevChangeRate:n(null!=(k=e.fluctuationsRatioRaw)?k:e.fluctuationsRatio),upDownGb:null==(t=e.compareToPreviousPrice)?void 0:t.code...
---- [dealTrend] ...null!=(y=e.nationCode)?y:"",alt:e.nationName+" êµ­ê¸°"},status:{variant:G,label:M},rate:{amount:O,rate:b,variant:null!=(C=e.rateStatus)?C:"flat",hiddenText:j},miniChart:{data:[],basePrice:F,marketStartTime:"KOR"===e.nationCode?"09:00":"",marketEndTime:"KOR"===e.nationCode?"15:30":"",currentTime:K,isPreMarket:D},localTradedAt:L,...e.additionalInfo?{dealTrend:{personalValue:t,foreignValue:n,institutionalValue:r},upDownStock:{upperCount:N,riseCount:S,steadyCount:w,fallCount:H,lowerCount:W}}:{}};a.push(X)}else{let t=e.highPriceOf52Weeks?(0,i.HO)(e.highPriceOf52Weeks,2):void 0,a={code:e.itemCode,url:e.linkUrl||"#none",stockName:e.name||"-",stockPrice:A,status:{variant:G,label:M},rate:{amount:O,rate:b,vari...
---- [dealTrend] ...A,FX_USDKRW:b.H.HOME.NIXUSD,".DXY":b.H.HOME.NIXDXY,GCcv1:b.H.HOME.NIXWGOLD,CLcv1:b.H.HOME.NIXWTI,".DJI":b.H.HOME.NIXDJI,".IXIC":b.H.HOME.NIXIXIC,".INX":b.H.HOME.NIXSPI500,".VIX":b.H.HOME.NIXVIX})[e]||"",c=[];for(let e=0;e<a.length;e+=4)c.push(a.slice(e,e+4));let _=[...t.slice(0,2).map((e,t)=>{var a,n,i,o,s,c,d,m,_,b,f,N;let v=j(null!=(s=null==(a=e.dealTrend)?void 0:a.personalValue)?s:"-"),S=j(null!=(c=null==(n=e.dealTrend)?void 0:n.foreignValue)?c:"-"),y=j(null!=(d=null==(i=e.dealTrend)?void 0:i.institutionalValue)?d:"-");return(0,l.jsx)("div",{className:T("indicators-panel"),children:(0,l.jsxs)(p.A,{href:e.url,className:T("large-item"),"data-nlogs":r(e.code||""),children:[(0,l.jsxs)("div",{className...
---- [dealTrend] ...NIXWGOLD,CLcv1:b.H.HOME.NIXWTI,".DJI":b.H.HOME.NIXDJI,".IXIC":b.H.HOME.NIXIXIC,".INX":b.H.HOME.NIXSPI500,".VIX":b.H.HOME.NIXVIX})[e]||"",c=[];for(let e=0;e<a.length;e+=4)c.push(a.slice(e,e+4));let _=[...t.slice(0,2).map((e,t)=>{var a,n,i,o,s,c,d,m,_,b,f,N;let v=j(null!=(s=null==(a=e.dealTrend)?void 0:a.personalValue)?s:"-"),S=j(null!=(c=null==(n=e.dealTrend)?void 0:n.foreignValue)?c:"-"),y=j(null!=(d=null==(i=e.dealTrend)?void 0:i.institutionalValue)?d:"-");return(0,l.jsx)("div",{className:T("indicators-panel"),children:(0,l.jsxs)(p.A,{href:e.url,className:T("large-item"),"data-nlogs":r(e.code||""),children:[(0,l.jsxs)("div",{className:T("header-box"),children:[(0,l.jsx)("span",{className:T("market-i...
---- [dealTrend] ....HOME.NIXIXIC,".INX":b.H.HOME.NIXSPI500,".VIX":b.H.HOME.NIXVIX})[e]||"",c=[];for(let e=0;e<a.length;e+=4)c.push(a.slice(e,e+4));let _=[...t.slice(0,2).map((e,t)=>{var a,n,i,o,s,c,d,m,_,b,f,N;let v=j(null!=(s=null==(a=e.dealTrend)?void 0:a.personalValue)?s:"-"),S=j(null!=(c=null==(n=e.dealTrend)?void 0:n.foreignValue)?c:"-"),y=j(null!=(d=null==(i=e.dealTrend)?void 0:i.institutionalValue)?d:"-");return(0,l.jsx)("div",{className:T("indicators-panel"),children:(0,l.jsxs)(p.A,{href:e.url,className:T("large-item"),"data-nlogs":r(e.code||""),children:[(0,l.jsxs)("div",{className:T("header-box"),children:[(0,l.jsx)("span",{className:T("market-icon"),children:e.nationFlag&&(0,l.jsx)(x.A,{category:"flag",itemC...
+--- [indexSise] ...).concat(n,"&excludesItemNews=").concat(i,"&isItemNewsOnly=").concat(a,"&pageSize=").concat(r))}async function S(e,t,n,i){return(0,l.f)("/api/domestic/detail/stock/".concat(e,"/").concat(t,"/etf?startIdx=").concat(n,"&pageSize=").concat(i))}async function C(e,t,n,l){let i=await fetch("/api/domestic/indexSise/time?koreaIndexType=".concat(e,"&thistime=").concat(t,"&startIdx=").concat(n,"&pageSize=").concat(l));if(!i.ok)throw Error("êµ­ë´ì§ì > ì¼ë³ìì¸ ì¡°í ì¤í¨");return i.json()}}}]);...
+--- [/api/domestic/market/] ...dx:o,pageSize:s}=e,{orderType:r,alertType:c,marketType:d}=n(t);if(!r)return[];let u=new URLSearchParams({tradeType:0===a?"KRX":"NXT",marketType:null!=d?d:"all"===i[0]?"ALL":"kospi"===i[0]?"KOSPI":"KOSDAQ",orderType:r,startIdx:String(o),pageSize:String(s)});return c&&u.append("alertType",c),(0,l.f)("/api/domestic/market/stock/default?".concat(u.toString()))}async function o(e){let{orderType:t,startIdx:a,pageSize:l}=e,n=new URLSearchParams({tradeType:"KRX",marketType:"ALL",orderType:t,startIdx:String(a),pageSize:String(l)}),i=await fetch("/api/domestic/market/stock/default?".concat(n.toString()));if(!i.ok)throw Erro...
+--- [/api/domestic/market/] ...e:String(s)});return c&&u.append("alertType",c),(0,l.f)("/api/domestic/market/stock/default?".concat(u.toString()))}async function o(e){let{orderType:t,startIdx:a,pageSize:l}=e,n=new URLSearchParams({tradeType:"KRX",marketType:"ALL",orderType:t,startIdx:String(a),pageSize:String(l)}),i=await fetch("/api/domestic/market/stock/default?".concat(n.toString()));if(!i.ok)throw Error("default API í¸ì¶ ì¤í¨");return i.json()}async function s(e){let{chip:t,selectedValues:a,startIdx:i,pageSize:o}=e,{marketType:s}=n("dividend"),r=new URLSearchParams({tradeType:"KRX",marketType:null!=s?s:"all"===a[0]?"ALL":"kospi"===a[0]?...
+--- [/api/domestic/market/] ...e){let{chip:t,selectedValues:a,startIdx:i,pageSize:o}=e,{marketType:s}=n("dividend"),r=new URLSearchParams({tradeType:"KRX",marketType:null!=s?s:"all"===a[0]?"ALL":"kospi"===a[0]?"KOSPI":"KOSDAQ",dividend:"revenue"===t?"dividendRate":"dividend",startIdx:String(i),pageSize:String(o)});return(0,l.f)("/api/domestic/market/stock/dividend?".concat(r.toString()))}}},e=>{e.O(0,[67313,2577,98528,59468,32422,24007,36497,71134,56560,86621,94995,18955,17790,96741,73360,79456,71453,92032,79112,70949,50500,62979,70288,24481,79780,38533,1956,8424,21263,7919,60170,45861,96704,64201,81706,32335,57830,68189,41727,95412,77358],()=>...
+--- [investor-trend/v2/domestic] ...f)(i)}},42603:(e,t,n)=>{n.d(t,{O:()=>a,j:()=>r});var l=n(65164);let i=e=>{let t=new URLSearchParams({exchangeType:e.exchangeType,size:String(e.size)});return e.cursor&&t.set("cursor",e.cursor),void 0!==e.index&&t.set("index",String(e.index)),t};async function a(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"?").concat(n.toString());return(0,l.f)(a)}async function r(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"/paged?").concat(n.toString());return(0,l.f)(a)}},83211:(e,t,n)=>{n.d(t,{K_:()=>Y,_s:()=>Z,dL:()=>R,ax:()=>z,ws:()=>q,xV:()=>J,HI:()=>K,Tz:()=>_,Xp:()=...
+--- [investor-trend/v2/domestic] ...ring(e.size)});return e.cursor&&t.set("cursor",e.cursor),void 0!==e.index&&t.set("index",String(e.index)),t};async function a(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"?").concat(n.toString());return(0,l.f)(a)}async function r(e,t){let n=i(t),a="/api/stockSecurity/investor-trend/v2/domestic/".concat(e,"/paged?").concat(n.toString());return(0,l.f)(a)}},83211:(e,t,n)=>{n.d(t,{K_:()=>Y,_s:()=>Z,dL:()=>R,ax:()=>z,ws:()=>q,xV:()=>J,HI:()=>K,Tz:()=>_,Xp:()=>w,bT:()=>B,zY:()=>Q,UH:()=>E,jG:()=>M,rf:()=>X,HO:()=>W});var l=n(84825),i=n(58186),a=n(91e3),r=n(60326),o=n(52104),u=n(25740),c=n(2100...
+--- [securityService/index/] ...urityFe/api/futures/".concat(e,"/basic"))}function s(e,t,n){let r=e.replace(".","");return(0,a.f)("/api/securityFe/api/futures/".concat(r,"/price?page=").concat(t,"&pageSize=").concat(n))}},86415:(e,t,n)=>{n.d(t,{He:()=>r,_F:()=>i,t:()=>l});var a=n(65164);async function r(e){let t=await fetch("/api/securityService/index/".concat(e,"/basic"));if(!t.ok)throw Error("ì§ì ê¸°ë³¸ì ë³´ API í¸ì¶ ì¤í¨");return await t.json()}async function i(e,t,n){let a=await fetch("/api/securityService/index/".concat(e,"/price?page=").concat(t,"&pageSize=").concat(n));if(!a.ok)throw Error("ì§ì ì¼ë³ ìì¸ í¸ì¶ ì¤í¨");retu...
+--- [securityService/index/] ....concat(n))}},86415:(e,t,n)=>{n.d(t,{He:()=>r,_F:()=>i,t:()=>l});var a=n(65164);async function r(e){let t=await fetch("/api/securityService/index/".concat(e,"/basic"));if(!t.ok)throw Error("ì§ì ê¸°ë³¸ì ë³´ API í¸ì¶ ì¤í¨");return await t.json()}async function i(e,t,n){let a=await fetch("/api/securityService/index/".concat(e,"/price?page=").concat(t,"&pageSize=").concat(n));if(!a.ok)throw Error("ì§ì ì¼ë³ ìì¸ í¸ì¶ ì¤í¨");return await a.json()}async function l(e,t,n){let r="/api/securityService/index/".concat(e,"/enrollStocks?page=").concat(t,"&pageSize=").concat(n);return(0,a.f)(r)}}}]);...
+--- [securityService/index/] ...ë³¸ì ë³´ API í¸ì¶ ì¤í¨");return await t.json()}async function i(e,t,n){let a=await fetch("/api/securityService/index/".concat(e,"/price?page=").concat(t,"&pageSize=").concat(n));if(!a.ok)throw Error("ì§ì ì¼ë³ ìì¸ í¸ì¶ ì¤í¨");return await a.json()}async function l(e,t,n){let r="/api/securityService/index/".concat(e,"/enrollStocks?page=").concat(t,"&pageSize=").concat(n);return(0,a.f)(r)}}}]);...
+--- [listingType:"] ...g(e.accumulatedTradingValueRaw),priceMovement:function(e){switch(e){case"1":return"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{listingType:"aumDesc"},upper:{listingType:"changeRateDescUpAll"},lower:{listingType:"changeRateDescDownAll"},trading:{listingType:"tradingVolumeDesc"},quantHigh:{listingType:"tradingVolumeIncreaseRateDesc"},quantLow:{listingType:"tradingVolumeIncreaseRateAsc"},retu...
+--- [listingType:"] ...nction(e){switch(e){case"1":return"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{listingType:"aumDesc"},upper:{listingType:"changeRateDescUpAll"},lower:{listingType:"changeRateDescDownAll"},trading:{listingType:"tradingVolumeDesc"},quantHigh:{listingType:"tradingVolumeIncreaseRateDesc"},quantLow:{listingType:"tradingVolumeIncreaseRateAsc"},return1m:{listingType:"returnRate1mDesc"},return3m:{...
+--- [listingType:"] ...turn"upperLimit";case"2":return"rising";case"3":return"unchanged";case"4":return"lowerLimit";case"5":return"falling";default:return}}(null==(t=e.compareToPreviousPrice)?void 0:t.code)})}var f=l(73573);let h=e=>({priceTop:{listingType:"tradingValueDesc"},capitalization:{listingType:"aumDesc"},upper:{listingType:"changeRateDescUpAll"},lower:{listingType:"changeRateDescDownAll"},trading:{listingType:"tradingVolumeDesc"},quantHigh:{listingType:"tradingVolumeIncreaseRateDesc"},quantLow:{listingType:"tradingVolumeIncreaseRateAsc"},return1m:{listingType:"returnRate1mDesc"},return3m:{listingType:"returnRate3mDesc"...
+--- [NetBuy] ...,"ë¶ ì§ì°"):"ì¤ìê°",D="PREOPEN"===e.marketStatus;"exchange"===e.marketIndexCategoryType&&(e.nationCode="USA");let H="metals"===e.marketIndexCategoryType?"gold":"energy"===e.marketIndexCategoryType?"crudeoil":void 0;if(r<t){let t=(0,i.GZ)(null!=(k=null==(o=e.additionalInfo)?void 0:o.individualNetBuyAmount)?k:"0"),n=(0,i.GZ)(null!=(h=null==(l=e.additionalInfo)?void 0:l.foreignerNetBuyAmount)?h:"0"),r=(0,i.GZ)(null!=(p=null==(c=e.additionalInfo)?void 0:c.organizationNetBuyAmount)?p:"0"),N=(0,i.GZ)(null!=(g=null==(s=e.additionalInfo)?void 0:s.upperCount)?g:"0"),S=(0,i.GZ)(null!=(_=null==(u=e.addi...
+--- [NetBuy] ...goryType&&(e.nationCode="USA");let H="metals"===e.marketIndexCategoryType?"gold":"energy"===e.marketIndexCategoryType?"crudeoil":void 0;if(r<t){let t=(0,i.GZ)(null!=(k=null==(o=e.additionalInfo)?void 0:o.individualNetBuyAmount)?k:"0"),n=(0,i.GZ)(null!=(h=null==(l=e.additionalInfo)?void 0:l.foreignerNetBuyAmount)?h:"0"),r=(0,i.GZ)(null!=(p=null==(c=e.additionalInfo)?void 0:c.organizationNetBuyAmount)?p:"0"),N=(0,i.GZ)(null!=(g=null==(s=e.additionalInfo)?void 0:s.upperCount)?g:"0"),S=(0,i.GZ)(null!=(_=null==(u=e.additionalInfo)?void 0:u.risingCount)?_:"0"),w=(0,i.GZ)(null!=(v=null==(d=e.additionalInfo...
+--- [NetBuy] ...===e.marketIndexCategoryType?"crudeoil":void 0;if(r<t){let t=(0,i.GZ)(null!=(k=null==(o=e.additionalInfo)?void 0:o.individualNetBuyAmount)?k:"0"),n=(0,i.GZ)(null!=(h=null==(l=e.additionalInfo)?void 0:l.foreignerNetBuyAmount)?h:"0"),r=(0,i.GZ)(null!=(p=null==(c=e.additionalInfo)?void 0:c.organizationNetBuyAmount)?p:"0"),N=(0,i.GZ)(null!=(g=null==(s=e.additionalInfo)?void 0:s.upperCount)?g:"0"),S=(0,i.GZ)(null!=(_=null==(u=e.additionalInfo)?void 0:u.risingCount)?_:"0"),w=(0,i.GZ)(null!=(v=null==(d=e.additionalInfo)?void 0:d.unchangedCount)?v:"0"),H=(0,i.GZ)(null!=(x=null==(m=e.additionalInfo)?void 0:m...
+--- [foreignBuy] ...>e+A(t),0)},G=function(){for(var e=arguments.length,t=Array(e),n=0;n<e;n++)t[n]=arguments[n];let l=j(...t);return null==l?null:String(l)},H=(e,t)=>{var n;if("krx"===t)return e.krx;if("nxt"===t)return e.nxt;let{krx:l,nxt:i}=e;return l||i?l?i?{foreignNetVolume:G(l.foreignNetVolume,i.foreignNetVolume),foreignBuyVolume:G(l.foreignBuyVolume,i.foreignBuyVolume),foreignSellVolume:G(l.foreignSellVolume,i.foreignSellVolume),organizationNetVolume:G(l.organizationNetVolume,i.organizationNetVolume),organizationBuyVolume:G(l.organizationBuyVolume,i.organizationBuyVolume),organizationSellVolume:G(l.organizationSellVo...
+--- [foreignBuy] ...n(){for(var e=arguments.length,t=Array(e),n=0;n<e;n++)t[n]=arguments[n];let l=j(...t);return null==l?null:String(l)},H=(e,t)=>{var n;if("krx"===t)return e.krx;if("nxt"===t)return e.nxt;let{krx:l,nxt:i}=e;return l||i?l?i?{foreignNetVolume:G(l.foreignNetVolume,i.foreignNetVolume),foreignBuyVolume:G(l.foreignBuyVolume,i.foreignBuyVolume),foreignSellVolume:G(l.foreignSellVolume,i.foreignSellVolume),organizationNetVolume:G(l.organizationNetVolume,i.organizationNetVolume),organizationBuyVolume:G(l.organizationBuyVolume,i.organizationBuyVolume),organizationSellVolume:G(l.organizationSellVolume,i.organizationSe...
+--- [foreignBuy] ...ents.length,t=Array(e),n=0;n<e;n++)t[n]=arguments[n];let l=j(...t);return null==l?null:String(l)},H=(e,t)=>{var n;if("krx"===t)return e.krx;if("nxt"===t)return e.nxt;let{krx:l,nxt:i}=e;return l||i?l?i?{foreignNetVolume:G(l.foreignNetVolume,i.foreignNetVolume),foreignBuyVolume:G(l.foreignBuyVolume,i.foreignBuyVolume),foreignSellVolume:G(l.foreignSellVolume,i.foreignSellVolume),organizationNetVolume:G(l.organizationNetVolume,i.organizationNetVolume),organizationBuyVolume:G(l.organizationBuyVolume,i.organizationBuyVolume),organizationSellVolume:G(l.organizationSellVolume,i.organizationSellVolume),individua...
+--- [frgn] ...tSum"},dividend:{orderType:"dividend"},upper:{orderType:"up"},flat:{orderType:"flat"},lower:{orderType:"down"},trading:{orderType:"quantTop"},quantHigh:{orderType:"upperQuantTop"},quantLow:{orderType:"lowerQuantTop"},priceTop:{orderType:"priceTop"},new:{orderType:"newStock"},foreignHold:{orderType:"frgnRate"},high52week:{orderType:"high52week"},low52week:{orderType:"low52week"},top:{orderType:"searchTop"},konex:{orderType:"quantTop",marketType:"KONEX"},management:{orderType:"statusTag"},tradingHalt:{orderType:"tradeStopYn"},investmentAlert:{orderType:"marketAlertType",alertType:"01"},investmentWar...
+--- [personalValue] ...s:{variant:G,label:M},rate:{amount:O,rate:b,variant:null!=(C=e.rateStatus)?C:"flat",hiddenText:j},miniChart:{data:[],basePrice:F,marketStartTime:"KOR"===e.nationCode?"09:00":"",marketEndTime:"KOR"===e.nationCode?"15:30":"",currentTime:K,isPreMarket:D},localTradedAt:L,...e.additionalInfo?{dealTrend:{personalValue:t,foreignValue:n,institutionalValue:r},upDownStock:{upperCount:N,riseCount:S,steadyCount:w,fallCount:H,lowerCount:W}}:{}};a.push(X)}else{let t=e.highPriceOf52Weeks?(0,i.HO)(e.highPriceOf52Weeks,2):void 0,a={code:e.itemCode,url:e.linkUrl||"#none",stockName:e.name||"-",stockPrice:A,status:{variant:G,...
+--- [personalValue] ...GOLD,CLcv1:b.H.HOME.NIXWTI,".DJI":b.H.HOME.NIXDJI,".IXIC":b.H.HOME.NIXIXIC,".INX":b.H.HOME.NIXSPI500,".VIX":b.H.HOME.NIXVIX})[e]||"",c=[];for(let e=0;e<a.length;e+=4)c.push(a.slice(e,e+4));let _=[...t.slice(0,2).map((e,t)=>{var a,n,i,o,s,c,d,m,_,b,f,N;let v=j(null!=(s=null==(a=e.dealTrend)?void 0:a.personalValue)?s:"-"),S=j(null!=(c=null==(n=e.dealTrend)?void 0:n.foreignValue)?c:"-"),y=j(null!=(d=null==(i=e.dealTrend)?void 0:i.institutionalValue)?d:"-");return(0,l.jsx)("div",{className:T("indicators-panel"),children:(0,l.jsxs)(p.A,{href:e.url,className:T("large-item"),"data-nlogs":r(e.code||""),children:[(...
+--- [personalValue] ...-":void 0}}))?eI:[]})]}),(0,i.jsxs)("div",{className:g("stock-section","stock-section-investment"),children:[(0,i.jsx)(p.A,{title:"í¬ìì ë³´",size:"small",className:g("sub-title")}),(0,i.jsx)(c.A,{className:g("investment-info-list"),items:[...(null==ej?void 0:ej.dealTrendInfo)&&(ej.dealTrendInfo.personalValue||ej.dealTrendInfo.foreignValue||ej.dealTrendInfo.institutionalValue)?[{title:"í¬ììë³",value:(0,i.jsxs)("ul",{className:g("value-row-list"),children:[(0,i.jsxs)("li",{children:[(0,i.jsx)("span",{className:g("item-title"),children:"ê°ì¸"}),(0,i.jsx)("span",{className:g("item-value",(null==ej|...
