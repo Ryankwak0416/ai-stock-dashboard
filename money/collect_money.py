@@ -5,13 +5,14 @@ GitHub Actions(해외 IP)에서 KRX가 차단되어 네이버 공개 데이터�
 2026-10-17: 네이버가 finance.naver.com 옛 시세 페이지(지수·투자자·환율 일별)를 폐지(HTTP 410)해
             9/17 이후 수집이 멈춰 있던 것을 아래 새 주소로 옮김.
   1) 지수 일별 종가           : m.stock.naver.com/api/index/{KOSPI|KOSDAQ}/price             (이력 제공)
-  2) 지수 일별 거래대금       : stock.naver.com/api/domestic/indexSise/time?thistime=날짜   (날짜별 — 그날 마지막 누적값)
+  2) 지수 일별 거래대금       : finance.daum.net/api/market_index/days                      (이력 제공 — 네이버엔 없음)
+                                + stock.naver.com/api/domestic/indexSise/time?thistime=날짜   (최근 약 7거래일만 — 보조)
   3) 투자자별 일별 순매수     : m.stock.naver.com/api/index/{KOSPI|KOSDAQ}/trend?bizdate=날짜 (날짜별)
   4) 업종 목록/구성종목       : m.stock.naver.com/api/stocks/industry                       (당일 스냅샷)
   5) 원/달러 환율             : api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices   (이력 제공)
   6) 외국인 매매 상위         : stock.naver.com/api/domestic/market/stock/default 순위 목록
                                 + stock.naver.com/api/stockSecurity/investor-trend 종목별 외국인 순매매 수량
-2)·3)은 날짜마다 따로 불러야 하므로 data.json 에 이미 있는 날짜는 그 값을 다시 쓰고,
+2)의 보조 원천과 3)은 날짜마다 따로 불러야 하므로 data.json 에 이미 있는 날짜는 그 값을 다시 쓰고,
 없는 날짜와 최근 2일(장중 값 갱신)만 새로 받는다.
 업종 이력은 제공되지 않으므로 data.json 안의 sectorHist 에 매일 누적한다.
 부분 실패해도 가능한 데이터만으로 JSON을 생성한다.
@@ -31,11 +32,11 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 def log(m): print(f"[collect] {m}", flush=True)
 
-def get(url, retries=2):
+def get(url, retries=2, headers=None):
     last = None
     for i in range(retries + 1):
         try:
-            r = requests.get(url, headers=H, timeout=15)
+            r = requests.get(url, headers=headers or H, timeout=15)
             if r.status_code == 200:
                 time.sleep(SLEEP)
                 return r
@@ -77,6 +78,19 @@ def fetch_index_closes(code):
     """지수 일별 종가 {날짜: 종가} — 최근 DAYS 거래일."""
     rows = get(f"https://m.stock.naver.com/api/index/{code}/price?pageSize={DAYS}&page=1").json()
     return {r["localTradedAt"]: num(r.get("closePrice")) for r in rows if num(r.get("closePrice"))}
+
+def fetch_index_values_daum(code, need=DAYS):
+    """지수 일별 거래대금 이력 {날짜: 조원} — 다음 금융 (accTradePrice 단위 백만원)."""
+    hd = dict(H, Referer=f"https://finance.daum.net/domestic/{code.lower()}")
+    out = {}
+    for p in range(1, 6):
+        rows = get(f"https://finance.daum.net/api/market_index/days?page={p}&perPage=20&market={code}&pagination=true",
+                   headers=hd).json().get("data") or []
+        for r in rows:
+            v = num(r.get("accTradePrice"))
+            if v: out[r["date"][:10]] = round(v / 1e6, 3)
+        if len(rows) < 20 or len(out) >= need: break
+    return out
 
 def fetch_index_value(code, d):
     """그날 지수 거래대금(조원) — 분 시세 목록에서 가장 늦은 시각의 누적 거래대금."""
@@ -196,8 +210,14 @@ def main():
     out["market"] = {}
     for key, code, closes in [("kospi", "KOSPI", kospi), ("kosdaq", "KOSDAQ", kosdaq)]:
         pm = (prev.get("market") or {}).get(key) or {}
-        val = per_day(dates, by_date(pdates, pm.get("value")),
-                      lambda d, c=code: fetch_index_value(c, d), f"거래대금 {key}", pdates[-2:])
+        cache = by_date(pdates, pm.get("value"))
+        try:
+            daum = fetch_index_values_daum(code)
+        except Exception as e:
+            ERRORS.append(f"거래대금 {key} (다음): {e}"); daum = {}
+        cache.update(daum)
+        val = per_day(dates, cache, lambda d, c=code: fetch_index_value(c, d), f"거래대금 {key}",
+                      [d for d in pdates[-2:] if d not in daum])
         out["market"][key] = {"close": [closes.get(d) for d in dates], "value": [val.get(d) for d in dates]}
     log(f"지수 {len(dates)}일 (마지막 {dates[-1]})")
 
