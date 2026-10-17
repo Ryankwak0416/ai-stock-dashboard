@@ -1,40 +1,48 @@
-=== /api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017&startIdx=0&pageSize=3
-status=200 len=2 listlen=0 keys0=None
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016&startIdx=0&pageSize=3
+status=200 len=574
+[{"thistime":"20261016153200","nowVal":"5668.05","openVal":"5668.04","highVal":"5668.05","lowVal":"5668.04","changeVal":"113.83","changeRate":"2.0","quant":"298850","amount":"20945426000000"},{"thistime":"20261016153100","nowVal":"5668.04","openVal":"5668.04","highVal":"5668.04","lowVal":"5668.04","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"},{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
+
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261016153000&startIdx=0&pageSize=3
+status=200 len=192
+[{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
+
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=202610161530&startIdx=0&pageSize=3
+status=200 len=192
+[{"thistime":"20261016153000","nowVal":"5668.04","openVal":"5655.34","highVal":"5668.04","lowVal":"5655.34","changeVal":"113.82","changeRate":"2.0","quant":"286447","amount":"20021249000000"}]
+
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=2026-10-16&startIdx=0&pageSize=3
+status=200 len=2
 []
 
-=== /api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=202610171600&startIdx=0&pageSize=3
-status=200 len=2 listlen=0 keys0=None
+=== https://stock.naver.com/api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017235959&startIdx=0&pageSize=3
+status=200 len=2
 []
 
-=== /api/domestic/indexSise/time?koreaIndexType=KOSPI&thistime=20261017160000&startIdx=0&pageSize=3
-status=200 len=2 listlen=0 keys0=None
-[]
+=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261016
+status=200 len=101
+{"bizdate":"20261016","personalValue":"-5,126","foreignValue":"+3,637","institutionalValue":"-6,815"}
 
-=== /api/domestic/indexSise/time?koreaIndexType=KOSDAQ&thistime=20261017&startIdx=0&pageSize=80
-status=200 len=2 listlen=0 keys0=None
-[]
+=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20261015
+status=200 len=104
+{"bizdate":"20261015","personalValue":"+13,967","foreignValue":"-37,637","institutionalValue":"+17,176"}
 
-=== /api/stockSecurity/investor-trend/v2/domestic/KOSPI?exchangeType=krx&size=3
-status=200 len=42 listlen=0 keys0=None
-{"hasNext":false,"items":[],"cursor":null}
+=== https://m.stock.naver.com/api/index/KOSPI/trend?bizdate=20260917
+status=200 len=102
+{"bizdate":"20260917","personalValue":"+3,020","foreignValue":"-22,546","institutionalValue":"+2,480"}
 
-=== /api/stockSecurity/investor-trend/v2/domestic/KOSPI/paged?exchangeType=krx&size=3
-status=200 len=68 listlen=0 keys0=None
-{"hasNext":false,"totalCount":"0","items":[],"size":"3","index":"0"}
+=== https://m.stock.naver.com/api/index/KOSDAQ/trend?bizdate=20260917
+status=200 len=95
+{"bizdate":"20260917","personalValue":"-250","foreignValue":"-329","institutionalValue":"+455"}
 
-=== /api/stockSecurity/investor-trend/v2/domestic/KOSDAQ/paged?exchangeType=krx&size=3
-status=200 len=68 listlen=0 keys0=None
-{"hasNext":false,"totalCount":"0","items":[],"size":"3","index":"0"}
+=== https://m.stock.naver.com/api/index/KOSPI/basic
+status=200 len=3200
+{"stockEndType":"index","itemCode":"KOSPI","reutersCode":"KOSPI","symbolCode":"KOSPI","stockName":"코스피","itemLogoUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/index/IndexKOSPI.svg","itemLogoPngUrl":"https://ssl.pstatic.net/imgstock/fn/real/logo/png/index/IndexKOSPI.png","closePrice":"5,668.05","compareToPreviousClosePrice":"113.83","compareToPreviousPrice":{"code":"2","text":"상승","name":"RISING"},"fluctuationsRatio":"2.05","marketStatus":"CLOSE","localTradedAt":"2026-10-16T20:15:00+09:00","stockExchangeType":{"code":"KS","zoneId":"Asia/Seoul","nationType":"KOR","delayTime":0,"startTime":"0900","endTime":"1530","closePriceSendTime":"1630","nameKor":"코스피","nameEng":"KOSPI","stockType":"domestic","nationCode":"KOR","nationName":"대한민국","name":"KOSPI"},"imageCharts":{"areaMonthThree":"https://financial-vn.pstatic.net/chart/mobile/area/month3/KOSPI_end.png","candleMonth":"https://financi
 
-=== /api/stockSecurity/investor-trend/v2/domestic/005930/paged?exchangeType=krx&size=2
-status=200 len=1134 listlen=2 keys0=['localTradedAt', 'foreignHoldingStockQuantity', 'foreignHoldingRatio', 'krx', 'nxt']
-{"hasNext":true,"totalCount":"5374","items":[{"localTradedAt":"2026-10-16","foreignHoldingStockQuantity":"2689121541","foreignHoldingRatio":"46.00","krx":{"foreignNetVolume":"906438","foreignBuyVolume":"8252110","foreignSellVolume":"7345672","organizationNetVolume":"-1447523","organizationBuyVolume":"5679678","organizationSellVolume":"7127201","individualNetVolume":"-40774","individualBuyVolume":"4318431","individualSellVolume":"4359205","closingPrice":"217000","changePrice":"7000","priceMovement":"rising","changeRate":"3.33","tradingVolume":"18332314"},"nxt":null},{"localTradedAt":"2026-10-15","foreignHoldingStockQuantity":"2688215103","foreignHoldingRatio":"45.98","krx":{"foreignNetVolume":"-7280040","foreignBuyVolume":"11149424","foreignSellVolume":"18429464","organizationNetVolume":"2391459","organizationBuyVolume":"11509158","organizationSellVolume":"9117699","individualNetVolume":"4658533","individualBuyVolume":"11356156","individualSellVolume":"6697623","closingPrice":"207500","changePrice":"-24500","priceMovement":"falling","changeRate":"-10.56","tradingVolume":"34330565"},"nxt":null}],"size":"2","index":"0"}
+=== https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=marketSum&startIdx=0&pageSize=100
+status=200 len=171504
+[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500"
 
-=== /api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=foreignPureBuy&startIdx=0&pageSize=3
-status=200 len=4946 listlen=3 keys0=['itemname', 'itemcode', 'sosok', 'upDownGb', 'type', 'upperLimitPrice', 'lowerLimitPrice', 'manageStatusGb', 'tradeStopYn', 'tradableStatus', 'tradableStatusCode', 'managementDate', 'managementReasonCode', 'tradingHaltDate', 'tradingHaltReasonCode', 'marketAlertType', 'tradeVolume', 'marketStatus', 'tradingSessionType', 'nowPrice', 'openPrice', 'highPrice', 'lowPrice', 'askBuy', 'askSell', 'totalBuyVolume', 'totalSellVolume', 'prevChangePrice', 'prevChangeRate', 'tradeAmount', 'frgnHoldRate', 'frgnHoldCnt', 'listedStockCnt', 'marketSum', 'eps', 'per', 'dividendRate', 'week52HighPrice', 'week52LowPrice', 'quantDiff', 'quantDiffRate', 'prevQuant', 'propertyTotal', 'debtTotal', 'sales', 'salesIncreasingRate', 'operatingProfit', 'operatingProfitIncreasingRate', 'netIncome', 'listedDate', 'dividend', 'continualUpperLimit', 'continualUpperLower', 'accumUpper', 'accumLower', 'roe', 'roa', 'pbr', 'reserveRatio', 'itemInfo', 'etfChseErnrtDblSmbl', 'etfChseErnrtDbl', 'refNidxLvgTpCd', 'etfType', 'oneMonthEarnRate', 'threeMonthEarnRate', 'sixMonthEarnRate', 'oneYearEarnRate', 'nav', 'deviationSign', 'deviationRate', 'totalNetAssets', 'totalFee', 'issuerNameKo', 'tradableStatusUpdatedAt', 'inav']
-[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500","quantDiff":null,"quantDiffRate":null,"prevQuant":null,"propertyTotal":null,"debtTotal":null,"sales":null,"salesIncreasingRate":null,"operatingProfit":null,"operatingProfitIncreasingRate":null,"netIncome":null,"listedDate":null,"dividend":null,"continualUpperLimit":null,"continualUpperLower":null,"accumUpper":null,"accumLower":null,"roe":null,"roa":null,"pbr":null,"reserveRatio":null,"itemInfo":null,"etfChseErnrtDblSmbl":null,"etfChseErnrtDbl":null,"refNidxLvgTpCd":null,"etfType":null,"oneMonthEarnRate":null,"threeMonthEarnRate":null,"sixMonthEarnRate":null,"oneYearEarnRate":null,"nav":null,"
-
-=== /api/domestic/market/stock/default?tradeType=KRX&marketType=KOSPI&orderType=foreignPureBuy&startIdx=0&pageSize=3
-status=200 len=4946 listlen=3 keys0=['itemname', 'itemcode', 'sosok', 'upDownGb', 'type', 'upperLimitPrice', 'lowerLimitPrice', 'manageStatusGb', 'tradeStopYn', 'tradableStatus', 'tradableStatusCode', 'managementDate', 'managementReasonCode', 'tradingHaltDate', 'tradingHaltReasonCode', 'marketAlertType', 'tradeVolume', 'marketStatus', 'tradingSessionType', 'nowPrice', 'openPrice', 'highPrice', 'lowPrice', 'askBuy', 'askSell', 'totalBuyVolume', 'totalSellVolume', 'prevChangePrice', 'prevChangeRate', 'tradeAmount', 'frgnHoldRate', 'frgnHoldCnt', 'listedStockCnt', 'marketSum', 'eps', 'per', 'dividendRate', 'week52HighPrice', 'week52LowPrice', 'quantDiff', 'quantDiffRate', 'prevQuant', 'propertyTotal', 'debtTotal', 'sales', 'salesIncreasingRate', 'operatingProfit', 'operatingProfitIncreasingRate', 'netIncome', 'listedDate', 'dividend', 'continualUpperLimit', 'continualUpperLower', 'accumUpper', 'accumLower', 'roe', 'roa', 'pbr', 'reserveRatio', 'itemInfo', 'etfChseErnrtDblSmbl', 'etfChseErnrtDbl', 'refNidxLvgTpCd', 'etfType', 'oneMonthEarnRate', 'threeMonthEarnRate', 'sixMonthEarnRate', 'oneYearEarnRate', 'nav', 'deviationSign', 'deviationRate', 'totalNetAssets', 'totalFee', 'issuerNameKo', 'inav', 'tradableStatusUpdatedAt']
-[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500","quantDiff":null,"quantDiffRate":null,"prevQuant":null,"propertyTotal":null,"debtTotal":null,"sales":null,"salesIncreasingRate":null,"operatingProfit":null,"operatingProfitIncreasingRate":null,"netIncome":null,"listedDate":null,"dividend":null,"continualUpperLimit":null,"continualUpperLower":null,"accumUpper":null,"accumLower":null,"roe":null,"roa":null,"pbr":null,"reserveRatio":null,"itemInfo":null,"etfChseErnrtDblSmbl":null,"etfChseErnrtDbl":null,"refNidxLvgTpCd":null,"etfType":null,"oneMonthEarnRate":null,"threeMonthEarnRate":null,"sixMonthEarnRate":null,"oneYearEarnRate":null,"nav":null,"
+=== https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=foreignPureBuy&startIdx=0&pageSize=40
+status=200 len=66214
+[{"itemname":"삼성전자","itemcode":"005930","sosok":"0","upDownGb":"2","type":"ST","upperLimitPrice":"273000","lowerLimitPrice":"147000","manageStatusGb":"0","tradeStopYn":"N","tradableStatus":"tradable","tradableStatusCode":"ok","managementDate":null,"managementReasonCode":null,"tradingHaltDate":null,"tradingHaltReasonCode":null,"marketAlertType":"00","tradeVolume":"18332314","marketStatus":"CLOSE","tradingSessionType":"AFTER_MARKET","nowPrice":"217000","openPrice":"215000","highPrice":"222500","lowPrice":"210500","askBuy":"216500","askSell":"217000","totalBuyVolume":"201401","totalSellVolume":"217265","prevChangePrice":"7000","prevChangeRate":"3.33","tradeAmount":"3963469000000","frgnHoldRate":"45.98","frgnHoldCnt":"2688215103","listedStockCnt":"5846278608","marketSum":"1268642457000000","eps":"22292.0","per":"9.73","dividendRate":"0.769","week52HighPrice":"374500","week52LowPrice":"94500"
 
