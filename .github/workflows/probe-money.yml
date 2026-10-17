@@ -1,0 +1,31 @@
+name: probe-money
+on:
+  push:
+    branches: [claude/fix-money-flow]
+    paths: [_probe/**, .github/workflows/probe-money.yml, money/collect_money.py]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pykrx pandas requests
+      - name: Probe sources
+        run: python _probe/probe_money.py > _probe/out_probe.txt 2>&1 || true
+      - name: Run collector
+        run: |
+          cp money/data.json /tmp/data_backup.json
+          python money/collect_money.py > _probe/out_collect.txt 2>&1; echo "exit=$?" >> _probe/out_collect.txt
+          python -c "import json;d=json.load(open('money/data.json'));print('updated',d.get('updated'),'dates',len(d.get('dates',[])),'last',(d.get('dates') or ['-'])[-1],'sectors',len(d.get('sectors',[])),'errors',d.get('errors'))" >> _probe/out_collect.txt 2>&1 || true
+          cp /tmp/data_backup.json money/data.json
+      - name: Save results to branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add _probe/out_*.txt
+          git commit -m "probe: money-flow source results [skip ci]" || exit 0
+          git push
