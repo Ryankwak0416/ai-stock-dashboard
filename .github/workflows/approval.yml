@@ -1,0 +1,38 @@
+name: update-approval-kospi
+
+on:
+  schedule:
+    - cron: '10 7 * * 1-5'   # 평일 16:10 KST — 코스피 종가 (+ 갤럽 뉴스 확인)
+    - cron: '30 4 * * 5'     # 금요일 13:30 KST — 갤럽 발표(보통 금요일 오전) 직후
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: main-content
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install requests finance-datareader
+      - name: Collect data
+        run: python approval/collect_approval.py
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add approval/data.json
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "approval-kospi data $(date -u +'%Y-%m-%d')"
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push && break
+            echo "push retry $i"; sleep 5
+          done
