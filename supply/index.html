@@ -60,6 +60,7 @@ td a{text-decoration:none;border-bottom:1px dotted var(--tx2)}
 </head>
 <body>
 <h1>🧭 시장 수급 체크</h1>
+<div style="font-size:12px;margin:2px 0 4px"><a href="../money/" style="color:var(--acc)">📊 수급흐름 대시보드(거래대금·업종 로테이션) →</a></div>
 <div class="updated" id="updated">불러오는 중…</div>
 <div class="err" id="err"></div>
 
@@ -331,6 +332,15 @@ function opt(o={}){
 }
 function draw(id,cfg){if(charts[id])charts[id].destroy();const el=$(id);if(el)charts[id]=new Chart(el,cfg)}
 
+/* 마지막 수집일 다음날부터 오늘까지의 평일 수(공휴일은 따로 보지 않는다) */
+function staleDays(u){
+  if(!u)return 0;
+  const d=new Date(u.slice(0,10)+'T00:00:00+09:00'),now=new Date();
+  let n=0;
+  for(d.setDate(d.getDate()+1);d<=now;d.setDate(d.getDate()+1)){const w=d.getDay();if(w&&w<6)n++}
+  return n;
+}
+
 function kwStatus(){
   const k=S&&S.kiwoom;
   if(!k||(!k.ok&&!(k.errors||[]).length))return '<span class="flat">미연결 — 키 미등록, 공개 원천으로 표시</span>';
@@ -347,6 +357,8 @@ function renderHeader(){
   $('updated').innerHTML=(u.join(' · ')||'데이터 없음')+
     `<br>키움 연결: ${kwStatus()}`;
   const errs=[...((S&&S.errors)||[]),...((M&&M.errors)||[])];
+  const lag=staleDays(S&&S.updated);
+  if(lag>=2)errs.unshift(`수급 앱 수집이 ${lag}거래일째 멈춰 있다 (마지막 ${S.updated}) — Actions 의 update-supply 실행 기록을 확인`);
   if(errs.length){$('err').style.display='block';$('err').innerHTML='⚠ 수집 오류 '+errs.length+'건<br>'+errs.slice(0,6).join('<br>')}
   const src=(S&&S.src)||{};
   $('srcNote').innerHTML='원천: '+(Object.keys(src).length?Object.entries(src).map(([k,v])=>`${k}=${SRC[v]||v}`).join(' · '):'수급흐름 앱(money/data.json, 네이버 공개 API)')+
