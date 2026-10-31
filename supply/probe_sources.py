@@ -109,7 +109,41 @@ def bundles():
             print("   ", p)
 
 
+def round2():
+    sec("5) naver 2차 — 이력·종목별 기관·순위 목록")
+    nv = {"Referer": "https://m.stock.naver.com/"}
+    for name, url in [
+        ("fut-trend-1029", "https://m.stock.naver.com/api/index/FUT/trend?bizdate=20261029"),
+        ("fut-trend-1001", "https://m.stock.naver.com/api/index/FUT/trend?bizdate=20261001"),
+        ("kosdaq-integ", "https://m.stock.naver.com/api/index/KOSDAQ/integration"),
+        ("fut-integ", "https://m.stock.naver.com/api/index/FUT/integration"),
+        ("kospi-integ-1029", "https://m.stock.naver.com/api/index/KOSPI/integration?bizdate=20261029"),
+        ("prog-trend", "https://m.stock.naver.com/api/index/KOSPI/programTrend?bizdate=20261029"),
+        ("prog-trend2", "https://m.stock.naver.com/api/index/KOSPI/program/trend?bizdate=20261029"),
+        ("stk-invtrend", "https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/005930/paged?exchangeType=krx&size=2"),
+        ("stk-integ", "https://m.stock.naver.com/api/stock/005930/integration"),
+    ]:
+        r = show(name, url, headers=nv, n=2500)
+        if name in ("kosdaq-integ", "fut-integ") and r is not None and r.status_code == 200:
+            try:
+                j = r.json()
+                print("   keys:", list(j.keys()))
+                print("   deal:", j.get("dealTrendInfo"), "prog:", j.get("programTrendInfo"))
+            except Exception:
+                pass
+        if name == "stk-integ" and r is not None and r.status_code == 200:
+            try:
+                j = r.json()
+                print("   keys:", list(j.keys()))
+                print("   dealTrendInfos:", json.dumps(j.get("dealTrendInfos"), ensure_ascii=False)[:1200])
+            except Exception:
+                pass
+    base = "https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&startIdx=0&pageSize=3"
+    for o in ["foreignPureBuy", "foreignPureSell", "organPureBuy", "organPureSell", "institutionPureBuy",
+              "institutionalPureBuy", "orgPureBuy", "personalPureBuy", "individualPureBuy"]:
+        show(f"rank-{o}", f"{base}&orderType={o}", n=700)
+
+
 if __name__ == "__main__":
     kiwoom()
-    public()
-    bundles()
+    round2()
