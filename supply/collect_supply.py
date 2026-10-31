@@ -208,11 +208,17 @@ class Kiwoom:
         for _ in range(max(1, pages)):
             hd = {"Content-Type": "application/json;charset=UTF-8", "authorization": f"Bearer {self.tok}",
                   "api-id": api_id, "cont-yn": cont, "next-key": nkey}
-            r = requests.post(f"{self.host}{path}", headers=hd, json=body, timeout=15)
-            j = r.json()
-            if j.get("return_code") not in (0, "0", None):
-                raise RuntimeError(f"{api_id} [{j.get('return_code')}] {j.get('return_msg')}")
-            time.sleep(0.3)
+            for attempt in range(2):
+                r = requests.post(f"{self.host}{path}", headers=hd, json=body, timeout=15)
+                j = r.json() if r.content else {}
+                rc = str(j.get("return_code", ""))
+                # 유량 초과(HTTP 429, 1700~1702, 5)면 1초 쉬고 한 번 더 — 공식 오류코드표 기준
+                if attempt == 0 and (r.status_code == 429 or rc in ("5", "1700", "1701", "1702")):
+                    time.sleep(1.0); continue
+                break
+            if rc not in ("0", ""):
+                raise RuntimeError(f"{api_id} [{rc}] {j.get('return_msg')}")
+            time.sleep(0.35)
             if not list_key: return j
             out += j.get(list_key) or []
             cont, nkey = r.headers.get("cont-yn", "N"), r.headers.get("next-key", "")
@@ -220,15 +226,154 @@ class Kiwoom:
         return out
 
 
-def kiwoom_collect():
-    """키움에서 받을 수 있는 항목을 모아 dict 로 돌려준다. 키가 없으면 None.
-    TR 명세(api-id·body·응답 키)는 KIWOOM_TR 에 모아 두고, 명세 확인 전 항목은 비워 둔다."""
+def knum(s):
+    """키움 숫자 문자열("+601", "-0", "--30000") → float."""
+    if s is None: return None
+    s = str(s).replace(",", "").strip()
+    neg = s.startswith("-")
+    s = s.lstrip("+-")
+    try: v = float(s)
+    except ValueError: return None
+    return -v if neg else v
+
+
+# ka10051 응답 필드 → data.json 투자자 키 (단위 억원, amt_qty_tp=0).
+# sc/jnsinkm/endw 를 금융투자/기타금융/연기금으로 대응시킨 것은 2차 실측(합계 일치) 근거 — 명세 원문은 증권/종신금/기금.
+INV_FIELDS = {"ind": "ind_netprps", "frg": "frgnr_netprps", "inst": "orgn_netprps", "fininv": "sc_netprps",
+              "ins": "insrnc_netprps", "trust": "invtrt_netprps", "bank": "bank_netprps",
+              "etcfin": "jnsinkm_netprps", "pension": "endw_netprps", "pef": "samo_fund_netprps",
+              "nation": "natn_netprps", "etccorp": "etc_corp_netprps", "frgetc": "native_trmt_frgnr_netprps"}
+MK_CODE = {"kospi": ("0", "001", "KOSPI"), "kosdaq": ("1", "101", "KOSDAQ")}
+NOT_SECTOR = ("종합", "대형", "중형", "소형", "KOSPI", "KOSDAQ", "코스피", "코스닥", "200", "150")
+
+
+def kw_sect_day(kw, mk, d):
+    """ka10051 업종별투자자순매수 — 그날 시장 종합 행과 전체 행(업종 포함)."""
+    mt, code, tag = MK_CODE[mk]
+    rows = kw.call("ka10051", "/api/dostk/sect",
+                   {"mrkt_tp": mt, "amt_qty_tp": "0", "base_dt": ymd(d), "stex_tp": "1"}, "inds_netprps")
+    nm = lambda r: r.get("inds_nm") or ""
+    tot = (next((r for r in rows if "종합" in nm(r) and tag in nm(r)), None)
+           or next((r for r in rows if (r.get("inds_cd") or "").split("_")[0] == code), None))
+    return tot, rows
+
+
+def kw_investor(kw, ctx):
+    """시장 종합 주체별 순매수 60일 — 받은 날은 캐시, 최근 2일만 새로."""
+    dates, cache = ctx["dates"], ctx["inv_hist"]
+    hist, fail = {}, 0
+    for d in dates:
+        if d in cache and d not in dates[-2:]:
+            hist[d] = cache[d]; continue
+        day = {}
+        for mk in ("kospi", "kosdaq"):
+            try:
+                tot, rows = kw_sect_day(kw, mk, d)
+            except Exception as e:
+                fail += 1
+                if fail >= 3 and not hist: raise   # 처음부터 연속 실패 = 인증·IP 문제로 보고 중단
+                ctx["errors"].append(f"ka10051 {mk} {d}: {e}"); continue
+            if tot: day[mk] = {k: knum(tot.get(f)) for k, f in INV_FIELDS.items()}
+            if d == dates[-1]: ctx["sector_rows"][mk] = rows
+        if day: hist[d] = day
+        elif d in cache: hist[d] = cache[d]
+    ctx["inv_hist_out"] = hist
+    return {mk: {k: [((hist.get(d) or {}).get(mk) or {}).get(k) for d in dates] for k in INV_FIELDS}
+            for mk in ("kospi", "kosdaq")}
+
+
+def kw_sector(kw, ctx):
+    """오늘 업종별 외국인·기관 순매수(억원) — ka10051 업종 행."""
+    out = {}
+    for mk in ("kospi", "kosdaq"):
+        rows = ctx["sector_rows"].get(mk)
+        if rows is None:
+            rows = kw_sect_day(kw, mk, ctx["dates"][-1])[1]
+        out[mk] = [{"name": r.get("inds_nm"), "frg": knum(r.get("frgnr_netprps")), "inst": knum(r.get("orgn_netprps"))}
+                   for r in rows if r.get("inds_nm") and not any(t in r["inds_nm"] for t in NOT_SECTOR)]
+    return out
+
+
+def kw_program(kw, ctx):
+    """ka90007 프로그램매매 누적추이 — 일별 당일 차익·비차익·합계(백만원 → 억원)."""
+    hist = {}
+    for mk, mt in (("kospi", "0"), ("kosdaq", "1")):
+        rows = kw.call("ka90007", "/api/dostk/mrkcond",
+                       {"date": NOW.strftime("%Y%m%d"), "amt_qty_tp": "1", "mrkt_tp": mt, "stex_tp": "1"},
+                       "prm_trde_acc_trnsn", pages=2)
+        for r in rows:
+            d = dash(r.get("dt") or "")
+            if not d: continue
+            hist.setdefault(d, {})[mk] = [round(knum(r.get(k)) / 100, 1) if knum(r.get(k)) is not None else None
+                                          for k in ("dfrt_trde_tdy", "ndiffpro_trde_tdy", "all_tdy")]
+    hd = sorted(hist)[-DAYS:]
+    if not hd: return None
+    return {"dates": hd, **{mk: {k: [(hist[d].get(mk) or [None] * 3)[i] for d in hd]
+                                 for i, k in enumerate(("arb", "nonarb", "total"))} for mk in ("kospi", "kosdaq")}}
+
+
+def kw_rank(kw, ctx):
+    """ka90009 외국인·기관 매매 상위(천만원 → 억원) + ka10131 연속 순매수."""
+    rows = kw.call("ka90009", "/api/dostk/rkinfo",
+                   {"mrkt_tp": "000", "amt_qty_tp": "1", "qry_dt_tp": "0", "stex_tp": "1"}, "frgnr_orgn_trde_upper")
+    sec_of = ctx["sec_of"]
+
+    def side(prefix, sign):
+        out = []
+        for r in rows:
+            code, name, amt = r.get(f"{prefix}_stk_cd"), r.get(f"{prefix}_stk_nm"), knum(r.get(f"{prefix}_amt"))
+            if code and amt is not None:
+                out.append({"code": code.split("_")[0], "name": name, "amt": round(sign * abs(amt) / 10, 1),
+                            "sector": sec_of.get(name, "")})
+        return out[:20]
+    rank = {"date": ctx["dates"][-1], "frgBuy": side("for_netprps", 1), "frgSell": side("for_netslmt", -1),
+            "instBuy": side("orgn_netprps", 1), "instSell": side("orgn_netslmt", -1)}
+    ib = {x["code"]: x["amt"] for x in rank["instBuy"]}
+    rank["both"] = sorted(({"code": x["code"], "name": x["name"], "frg": x["amt"], "inst": ib[x["code"]]}
+                           for x in rank["frgBuy"] if x["code"] in ib), key=lambda x: -(x["frg"] + x["inst"]))
+    st = []
+    for mt in ("001", "101"):
+        try:
+            for r in kw.call("ka10131", "/api/dostk/frgnistt",
+                             {"dt": "1", "mrkt_tp": mt, "netslmt_tp": "2", "stk_inds_tp": "0",
+                              "amt_qty_tp": "0", "stex_tp": "1"}, "orgn_frgnr_cont_trde_prst"):
+                fd, od = knum(r.get("frgnr_cont_netprps_dys")) or 0, knum(r.get("orgn_cont_netprps_dys")) or 0
+                amt = knum(r.get("tot_cont_netprps_amt"))
+                st.append({"code": (r.get("stk_cd") or "").split("_")[0], "name": r.get("stk_nm"),
+                           "frgDays": int(fd), "instDays": int(od),
+                           "amt": round(amt / 100, 1) if amt is not None else None})
+        except Exception as e:
+            ctx["errors"].append(f"ka10131 {mt}: {e}")
+    if st:
+        rank["streak"] = sorted(st, key=lambda x: (-max(x["frgDays"], x["instDays"]), -(x["amt"] or 0)))[:20]
+        rank["streakNote"] = "키움 연속일수(기간 합계)"
+    return rank
+
+
+def kw_aux(kw, ctx):
+    """ka10068 대차거래추이(시장 전체) — 잔고금액(백만원 → 조원)."""
+    d = ctx["dates"]
+    rows = kw.call("ka10068", "/api/dostk/slb", {"strt_dt": ymd(d[0]), "end_dt": ymd(d[-1]), "all_tp": "1"},
+                   "dbrt_trde_trnsn", pages=3)
+    m = {dash(r.get("dt") or ""): knum(r.get("remn_amt")) for r in rows if r.get("dt")}
+    hd = [x for x in d if m.get(x) is not None]
+    if not hd: return None
+    return {"dates": hd, "loan": [round(m[x] / 1e6, 2) for x in hd], "unit": "조원"}
+
+
+# 항목 이름 → 함수(kw, ctx). 반환 형식은 data.json 의 같은 항목과 맞춘다. 순서 중요(investor 가 업종 행을 남긴다).
+KIWOOM_TR = {"investor": kw_investor, "sectorInv": kw_sector, "program": kw_program,
+             "rank": kw_rank, "aux": kw_aux}
+
+
+def kiwoom_collect(dates, inv_hist, sec_of):
+    """키움에서 받을 수 있는 항목을 모아 dict 로 돌려준다. 키가 없으면 None."""
     ak, sk = os.environ.get("KIWOOM_APPKEY", ""), os.environ.get("KIWOOM_SECRETKEY", "")
     if not (ak and sk):
         log("키움 키 없음 — 공개 원천만 사용")
         return None
     kw = Kiwoom(ak, sk, os.environ.get("KIWOOM_HOST"))
-    res = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "ok": False, "errors": []}
+    res = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "ok": False, "errors": [], "dates": dates}
     try:
         kw.token()
         res["ok"] = True
@@ -237,36 +382,40 @@ def kiwoom_collect():
         res["errors"].append(str(e))
         log(f"키움 토큰 실패: {e}")
         return res
+    ctx = {"dates": dates, "inv_hist": inv_hist, "sec_of": sec_of, "sector_rows": {}, "errors": res["errors"]}
     for name, fn in KIWOOM_TR.items():
         try:
-            v = fn(kw)
+            v = fn(kw, ctx)
             if v: res[name] = v; log(f"키움 {name} 수신")
         except Exception as e:
             res["errors"].append(f"{name}: {e}")
             log(f"키움 {name} 실패: {e}")
+    hist = ctx.get("inv_hist_out") or inv_hist
+    res["kwInvHist"] = {d: hist[d] for d in sorted(hist)[-DAYS:]}
     return res
-
-
-# 항목 이름 → 함수(kw) — 키움 명세 확인 후 채운다. 반환 형식은 data.json 의 같은 항목과 맞춘다.
-KIWOOM_TR = {}
 
 
 # ───────────────────────── 조립 ─────────────────────────
 
 def main():
-    kiwoom_only = "--kiwoom-only" in sys.argv
-    if kiwoom_only:
-        res = kiwoom_collect()
+    money = load(MONEY)
+    dates = (money.get("dates") or [])[-DAYS:]
+    sec_of = {}
+    for sname, stocks in (money.get("sectorStocks") or {}).items():
+        for s in stocks:
+            sec_of.setdefault(s[0], sname)
+
+    if "--kiwoom-only" in sys.argv:   # PC 용: 키움만 받아 supply/kiwoom.json 으로 저장
+        res = kiwoom_collect(dates, load(KW_OUT).get("kwInvHist") or {}, sec_of)
         if res is None: raise SystemExit("KIWOOM_APPKEY / KIWOOM_SECRETKEY 환경변수가 없다")
         with open(KW_OUT, "w", encoding="utf-8") as f:
             json.dump(res, f, ensure_ascii=False, separators=(",", ":"))
         log(f"kiwoom.json 저장 (ok={res['ok']}, 오류 {len(res['errors'])})")
+        for e in res["errors"]: log("ERR " + str(e))
         return
 
     prev = load(OUT)
-    money = load(MONEY)
     out = {"updated": NOW.strftime("%Y-%m-%d %H:%M KST"), "version": 1, "errors": ERRORS, "src": {}}
-    dates = (money.get("dates") or [])[-DAYS:]
 
     # 1) 오늘 투자자·프로그램 + 장중 누적
     phist = prev.get("programHist") or {}
@@ -330,10 +479,6 @@ def main():
     log(f"선물 투자자 {len(fd)}/{len(dates)}일 (실패 {fail})")
 
     # 3) 종목 순위·연속매수·업종
-    sec_of = {}
-    for sname, stocks in (money.get("sectorStocks") or {}).items():
-        for s in stocks:
-            sec_of.setdefault(s[0], sname)
     try:
         rank, sector = public_rank(sec_of)
         if rank:
@@ -345,7 +490,7 @@ def main():
     # 4) 키움 — Actions 에서 직접 받거나, PC 가 올린 kiwoom.json 을 합친다
     kw = None
     try:
-        kw = kiwoom_collect()
+        kw = kiwoom_collect(dates, prev.get("kwInvHist") or {}, sec_of)
     except Exception as e:
         ERRORS.append(f"kiwoom: {e}")
     if not (kw and kw.get("ok")):
@@ -360,6 +505,17 @@ def main():
                 out[name] = kw[name]; out["src"][name] = "kiwoom"
         if kw.get("investor"):
             out["dates"] = kw.get("dates") or dates
+            # 합격 확인용: 키움 외국인·기관 순매수(오늘)와 네이버 값 대조
+            chk = {}
+            for key in ("kospi", "kosdaq"):
+                kv = kw["investor"].get(key) or {}
+                nv = (snap.get(key) or ({}, None))[0]
+                if kv.get("frg") and nv:
+                    chk[key] = {"date": dates[-1], "kiwoom": [kv["frg"][-1], kv["inst"][-1]],
+                                "naver": [nv.get("frg"), nv.get("inst")]}
+            out["kiwoom"]["check"] = chk
+            log(f"키움·네이버 대조 {chk}")
+    out["kwInvHist"] = (kw or {}).get("kwInvHist") or prev.get("kwInvHist") or {}
 
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
