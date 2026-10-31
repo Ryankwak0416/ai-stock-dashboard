@@ -1,0 +1,27 @@
+name: supply-probe
+
+# 수급 앱 원천 시험 — 결과는 로그로만 본다(커밋 없음).
+on:
+  workflow_dispatch:
+  push:
+    branches: [ 'claude/**' ]
+    paths: [ 'supply/probe_sources.py', '.github/workflows/supply-probe.yml' ]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Probe
+        env:
+          KIWOOM_APPKEY: ${{ secrets.KIWOOM_APPKEY }}
+          KIWOOM_SECRETKEY: ${{ secrets.KIWOOM_SECRETKEY }}
+        run: python supply/probe_sources.py
